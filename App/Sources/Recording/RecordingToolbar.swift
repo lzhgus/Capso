@@ -300,7 +300,7 @@ struct RecordingToolbarView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
-    private func toolbarToggle(icon: String, isOn: Binding<Bool>, tooltip: String) -> some View {
+    private func toolbarToggle(icon: String, isOn: Binding<Bool>, tooltip: LocalizedStringKey) -> some View {
         Button(action: { isOn.wrappedValue.toggle() }) {
             Image(systemName: icon)
                 .font(.system(size: 14))
@@ -341,7 +341,7 @@ struct RecordingToolbarView: View {
 }
 
 private extension CameraShape {
-    var displayName: String {
+    var displayName: LocalizedStringKey {
         switch self {
         case .circle: "Circle"
         case .square: "Square"
@@ -361,7 +361,7 @@ private extension CameraShape {
 }
 
 private extension SharedKit.CameraSize {
-    var displayName: String {
+    var displayName: LocalizedStringKey {
         switch self {
         case .small: "Small"
         case .medium: "Medium"

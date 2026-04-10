@@ -26,9 +26,9 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
         menu.delegate = self
 
         // CAMERA section
-        addSectionHeader(menu, title: "Camera")
+        addSectionHeader(menu, title: String(localized: "Camera"))
         let noneItem = makeItem(
-            title: "None",
+            title: String(localized: "None"),
             isSelected: selectedCameraID == nil,
             action: #selector(selectNone)
         )
@@ -47,7 +47,7 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         // SHAPE section
-        addSectionHeader(menu, title: "Shape")
+        addSectionHeader(menu, title: String(localized: "Shape"))
         for shape in CameraShape.allCases {
             let item = makeItem(
                 title: shape.displayName,
@@ -62,7 +62,7 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         // SIZE section
-        addSectionHeader(menu, title: "Size")
+        addSectionHeader(menu, title: String(localized: "Size"))
         for size in SharedKit.CameraSize.allCases {
             let isCustom = settings.cameraCustomSizePt > 0
             let item = makeItem(
@@ -78,7 +78,7 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
 
         // OPTIONS section
         let mirrorItem = makeItem(
-            title: "Mirror",
+            title: String(localized: "Mirror"),
             isSelected: settings.cameraMirror,
             action: #selector(toggleMirror)
         )
@@ -153,10 +153,10 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
 private extension CameraShape {
     var displayName: String {
         switch self {
-        case .circle: return "Circle"
-        case .square: return "Square"
-        case .landscape: return "Landscape (16:9)"
-        case .portrait: return "Portrait (9:16)"
+        case .circle: return String(localized: "Circle")
+        case .square: return String(localized: "Square")
+        case .landscape: return String(localized: "Landscape (16:9)")
+        case .portrait: return String(localized: "Portrait (9:16)")
         }
     }
 
@@ -173,9 +173,9 @@ private extension CameraShape {
 private extension SharedKit.CameraSize {
     var displayName: String {
         switch self {
-        case .small: return "Small"
-        case .medium: return "Medium"
-        case .large: return "Large"
+        case .small: return String(localized: "Small")
+        case .medium: return String(localized: "Medium")
+        case .large: return String(localized: "Large")
         }
     }
 }

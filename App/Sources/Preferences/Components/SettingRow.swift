@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct SettingRow<Control: View>: View {
-    let label: String
-    var sublabel: String? = nil
+    let label: LocalizedStringKey
+    var sublabel: LocalizedStringKey? = nil
     var showDivider: Bool = false
     @ViewBuilder let control: Control
 

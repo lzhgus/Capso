@@ -7,6 +7,7 @@ options:
   xcodeVersion: "26.0"
   generateEmptyDirectories: true
   groupSortPosition: top
+  defaultLocalization: en
 
 settings:
   base:
@@ -16,8 +17,8 @@ settings:
     CODE_SIGN_IDENTITY: "Developer ID Application"
     DEVELOPMENT_TEAM: "T247WTJV77"
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.1"
+    CURRENT_PROJECT_VERSION: "2"
 
 packages:
   SharedKit:

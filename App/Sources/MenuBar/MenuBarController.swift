@@ -36,27 +36,27 @@ final class MenuBarController: NSObject {
         let menu = NSMenu()
         menu.delegate = self
 
-        let captureArea = menuItem("Capture Area", action: #selector(captureArea))
+        let captureArea = menuItem(String(localized: "Capture Area"), action: #selector(captureArea))
         captureArea.setShortcut(for: .captureArea)
         menu.addItem(captureArea)
 
-        let captureFullscreen = menuItem("Capture Fullscreen", action: #selector(captureFullscreen))
+        let captureFullscreen = menuItem(String(localized: "Capture Fullscreen"), action: #selector(captureFullscreen))
         captureFullscreen.setShortcut(for: .captureFullscreen)
         menu.addItem(captureFullscreen)
 
-        let captureWindow = menuItem("Capture Window", action: #selector(captureWindow))
+        let captureWindow = menuItem(String(localized: "Capture Window"), action: #selector(captureWindow))
         captureWindow.setShortcut(for: .captureWindow)
         menu.addItem(captureWindow)
 
         menu.addItem(.separator())
 
-        let captureText = menuItem("Capture Text (OCR)", action: #selector(captureText))
+        let captureText = menuItem(String(localized: "Capture Text (OCR)"), action: #selector(captureText))
         captureText.setShortcut(for: .captureText)
         menu.addItem(captureText)
 
         menu.addItem(.separator())
 
-        let recordScreen = menuItem("Record Screen", action: #selector(recordScreen))
+        let recordScreen = menuItem(String(localized: "Record Screen"), action: #selector(recordScreen))
         recordScreen.setShortcut(for: .recordScreen)
         menu.addItem(recordScreen)
 
@@ -69,10 +69,10 @@ final class MenuBarController: NSObject {
         // menu.addItem(menuItem("Capture History...", action: #selector(openHistory)))
         // menu.addItem(.separator())
 
-        menu.addItem(menuItem("Preferences...", action: #selector(openPreferences), key: ",", modifiers: [.command]))
-        menu.addItem(menuItem("About Capso", action: #selector(openAbout)))
+        menu.addItem(menuItem(String(localized: "Preferences..."), action: #selector(openPreferences), key: ",", modifiers: [.command]))
+        menu.addItem(menuItem(String(localized: "About Capso"), action: #selector(openAbout)))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Quit Capso", action: #selector(quitApp), key: "q", modifiers: [.command]))
+        menu.addItem(menuItem(String(localized: "Quit Capso"), action: #selector(quitApp), key: "q", modifiers: [.command]))
 
         return menu
     }

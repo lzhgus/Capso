@@ -17,7 +17,7 @@ struct SettingCard<Content: View>: View {
 }
 
 struct SettingGroup<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder let content: Content
 
     var body: some View {

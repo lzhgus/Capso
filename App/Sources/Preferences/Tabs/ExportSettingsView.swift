@@ -55,7 +55,7 @@ struct ExportSettingsView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
-        panel.prompt = "Select"
+        panel.prompt = String(localized: "Select")
         if panel.runModal() == .OK, let url = panel.url {
             viewModel.setExportLocation(url)
         }

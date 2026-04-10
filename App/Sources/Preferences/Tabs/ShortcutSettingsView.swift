@@ -50,7 +50,7 @@ struct ShortcutSettingsView: View {
         }
     }
 
-    private func shortcutRow(_ label: String, name: KeyboardShortcuts.Name, showDivider: Bool = false) -> some View {
+    private func shortcutRow(_ label: LocalizedStringKey, name: KeyboardShortcuts.Name, showDivider: Bool = false) -> some View {
         SettingRow(label: label, showDivider: showDivider) {
             KeyboardShortcuts.Recorder(for: name)
                 .controlSize(.small)

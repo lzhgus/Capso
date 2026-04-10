@@ -10,7 +10,7 @@ enum PreferencesTab: String, CaseIterable {
     case ocr
     case shortcuts
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .general: "General"
         case .screenshots: "Screenshots"

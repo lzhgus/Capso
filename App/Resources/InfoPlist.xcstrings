@@ -1,0 +1,27 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "NSScreenCaptureUsageDescription": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Capso 需要屏幕录制权限来截取屏幕截图和录制屏幕。" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Capso はスクリーンショットの撮影と画面録画のために画面収録の許可が必要です。" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "Capso가 스크린샷을 캡처하고 화면을 녹화하려면 화면 녹화 권한이 필요합니다." } }
+      }
+    },
+    "NSCameraUsageDescription": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Capso 需要摄像头权限以在录屏时显示摄像头画面。" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Capso は画面録画中にウェブカメラを表示するためにカメラへのアクセスが必要です。" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "Capso가 화면 녹화 중 웹캠을 표시하려면 카메라 접근 권한이 필요합니다." } }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "localizations": {
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Capso 需要麦克风权限以在录屏时录制音频。" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Capso は画面録画中にオーディオを録音するためにマイクへのアクセスが必要です。" } },
+        "ko": { "stringUnit": { "state": "translated", "value": "Capso가 화면 녹화 중 오디오를 녹음하려면 마이크 접근 권한이 필요합니다." } }
+      }
+    }
+  }
+}

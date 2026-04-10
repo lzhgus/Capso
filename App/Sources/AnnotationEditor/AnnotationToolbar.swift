@@ -48,7 +48,7 @@ struct AnnotationToolbar: View {
         }
     }
 
-    private func toolButton(_ tool: AnnotationTool, icon: String, label: String) -> some View {
+    private func toolButton(_ tool: AnnotationTool, icon: String, label: LocalizedStringKey) -> some View {
         Button(action: { currentTool = tool }) {
             Image(systemName: icon)
                 .font(.system(size: 14))

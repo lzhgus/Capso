@@ -82,7 +82,7 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 - **Pin to Screen** — float screenshots as always-on-top windows with lock/click-through mode
 - **Global keyboard shortcuts** — fully configurable
 - **Preferences** — comprehensive settings with Apple Liquid Glass design
-- **Localization** — English + Simplified Chinese
+- **Localization** — English, Simplified Chinese, Japanese, Korean
 
 <p align="center">
   <img src=".github/assets/annotation.jpeg" alt="Annotation Editor" width="600"><br>
@@ -187,8 +187,11 @@ The package split means you can embed, for example, `CaptureKit` or `AnnotationK
 
 ## Roadmap
 
-### Shipped (v0.1.0)
+### Shipped (v0.1.1)
 Everything listed in Features above.
+
+### v0.1.0
+Initial release.
 
 ### Planned
 - Spotlight, magnifier, ruler, image overlay annotation tools

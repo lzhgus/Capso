@@ -43,7 +43,7 @@ struct QuickAccessView: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
     }
 
-    private func quickActionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func quickActionButton(_ title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 12))

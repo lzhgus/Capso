@@ -28,5 +28,7 @@
     <string>Capso needs camera access to show your webcam during screen recordings.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Capso needs microphone access to record audio during screen recordings.</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
 </dict>
 </plist>

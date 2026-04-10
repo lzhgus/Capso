@@ -68,8 +68,8 @@ private enum StepAnimation {
 
 private struct StepCard: View {
     let number: String
-    let title: String
-    let description: String
+    let title: LocalizedStringKey
+    let description: LocalizedStringKey
     let animation: StepAnimation
 
     var body: some View {

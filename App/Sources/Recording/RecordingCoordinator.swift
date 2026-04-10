@@ -414,10 +414,10 @@ final class RecordingCoordinator {
     private func confirmDeleteRecording() {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Delete this recording?"
-        alert.informativeText = "The current recording will be permanently discarded."
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = String(localized: "Delete this recording?")
+        alert.informativeText = String(localized: "The current recording will be permanently discarded.")
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
 
         let response = alert.runModal()
         guard response == .alertFirstButtonReturn else { return }
@@ -471,10 +471,10 @@ final class RecordingCoordinator {
     private func showRecordingSaveFailureAlert(format: RecordingKit.RecordingFormat) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Couldn't save recording"
-        let kind = format == .gif ? "GIF" : "video"
-        alert.informativeText = "Saving the \(kind) to \(settings.exportLocation.path) failed. The recording is still available in the preview — close this dialog and try Save again, or use Copy."
-        alert.addButton(withTitle: "OK")
+        alert.messageText = String(localized: "Couldn't save recording")
+        let kind = format == .gif ? String(localized: "GIF") : String(localized: "video")
+        alert.informativeText = String(localized: "Saving the \(kind) to \(settings.exportLocation.path) failed. The recording is still available in the preview — close this dialog and try Save again, or use Copy.")
+        alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()
     }
 

@@ -111,7 +111,7 @@ struct RecordingPreviewView: View {
         }
     }
 
-    private func quickActionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func quickActionButton(_ title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 12))
