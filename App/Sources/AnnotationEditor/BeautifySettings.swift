@@ -11,10 +11,10 @@ enum BeautifyBackgroundStyle: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var label: String {
+    var label: LocalizedStringKey {
         switch self {
-        case .solid: return "Solid"
-        case .liquidGlass: return "Liquid Glass"
+        case .solid: "Solid"
+        case .liquidGlass: "Liquid Glass"
         }
     }
 }

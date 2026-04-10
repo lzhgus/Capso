@@ -420,11 +420,11 @@ final class AnnotationCanvasNSView: NSView {
                 }
             case .text:
                 let alert = NSAlert()
-                alert.messageText = "Enter Text"
-                alert.addButton(withTitle: "OK")
-                alert.addButton(withTitle: "Cancel")
+                alert.messageText = String(localized: "Enter Text")
+                alert.addButton(withTitle: String(localized: "OK"))
+                alert.addButton(withTitle: String(localized: "Cancel"))
                 let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-                input.stringValue = "Text"
+                input.stringValue = String(localized: "Text")
                 alert.accessoryView = input
                 if alert.runModal() == .alertFirstButtonReturn {
                     doc.addObject(TextObject(text: input.stringValue, origin: end, style: currentStyle))
