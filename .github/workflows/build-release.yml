@@ -145,7 +145,16 @@ jobs:
         run: |
           set -euo pipefail
           APP="build/export/${APP_NAME}.app"
-          xcrun stapler staple "$APP"
+          # Apple's CDN may take a moment to distribute the ticket after
+          # notarization completes. Retry stapling up to 5 times with a
+          # 15-second delay between attempts.
+          for i in 1 2 3 4 5; do
+            if xcrun stapler staple "$APP"; then
+              break
+            fi
+            echo "Staple attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
           xcrun stapler validate "$APP"
           spctl -a -t exec -vv "$APP" || true
 
