@@ -121,9 +121,37 @@ jobs:
           fi
           cp -R "$APP_PATH" "build/export/${APP_NAME}.app"
 
+          # Re-sign Sparkle's embedded XPC Services and framework with our
+          # Developer ID + hardened runtime + secure timestamp. SPM-delivered
+          # Sparkle binaries are not signed with our identity, which causes
+          # notarization to reject them.
+          APP="build/export/${APP_NAME}.app"
+          SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+          if [ -d "$SPARKLE_FW" ]; then
+            echo "Re-signing Sparkle framework and XPC Services..."
+            find "$SPARKLE_FW" -name "*.xpc" -type d | while read xpc; do
+              codesign --force --deep --sign "Developer ID Application" \
+                --options runtime --timestamp "$xpc"
+            done
+            # Sign Autoupdate helper if present
+            find "$SPARKLE_FW" -name "Autoupdate" -type f | while read helper; do
+              codesign --force --sign "Developer ID Application" \
+                --options runtime --timestamp "$helper"
+            done
+            # Re-sign the framework itself
+            codesign --force --deep --sign "Developer ID Application" \
+              --options runtime --timestamp "$SPARKLE_FW"
+          fi
+
+          # Re-sign the app bundle to incorporate the newly signed components
+          codesign --force --deep --sign "Developer ID Application" \
+            --options runtime --timestamp \
+            --entitlements App/Entitlements/Capso.entitlements \
+            "$APP"
+
           # Verify the signature and hardened runtime
-          codesign --verify --deep --strict --verbose=2 "build/export/${APP_NAME}.app"
-          codesign -dvv "build/export/${APP_NAME}.app" 2>&1 | grep -E "flags|Authority" || true
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dvv "$APP" 2>&1 | grep -E "flags|Authority" || true
 
       - name: Notarize .app
         run: |
@@ -133,11 +161,24 @@ jobs:
 
           ditto -c -k --keepParent "$APP" "$NOTARIZE_ZIP"
 
-          xcrun notarytool submit "$NOTARIZE_ZIP" \
+          SUBMIT_OUT=$(xcrun notarytool submit "$NOTARIZE_ZIP" \
             --apple-id "$APPLE_ID" \
             --password "$NOTARIZE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1) || true
+          echo "$SUBMIT_OUT"
+
+          # Extract submission ID and fetch detailed log on failure
+          SUB_ID=$(echo "$SUBMIT_OUT" | grep "id:" | head -1 | awk '{print $2}')
+          STATUS=$(echo "$SUBMIT_OUT" | grep "status:" | tail -1 | awk '{print $2}')
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: $STATUS"
+            xcrun notarytool log "$SUB_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$NOTARIZE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" || true
+            exit 1
+          fi
 
           rm -f "$NOTARIZE_ZIP"
 
@@ -145,7 +186,13 @@ jobs:
         run: |
           set -euo pipefail
           APP="build/export/${APP_NAME}.app"
-          xcrun stapler staple "$APP"
+          for i in 1 2 3 4 5; do
+            if xcrun stapler staple "$APP"; then
+              break
+            fi
+            echo "Staple attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
           xcrun stapler validate "$APP"
           spctl -a -t exec -vv "$APP" || true
 
