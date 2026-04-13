@@ -116,14 +116,19 @@ final class CaptureOverlayView: NSView {
         if isDragging {
             let selectionRect = self.selectionRect
 
-            // Subtle white highlight inside the selection area
-            context.setFillColor(NSColor.white.withAlphaComponent(0.08).cgColor)
-            context.fill(selectionRect)
-
-            // Selection border
-            context.setStrokeColor(selectionBorderColor.cgColor)
-            context.setLineWidth(1.0)
+            // Selection border with shadow glow — visible on any background.
+            // Dark shadow makes it clear on light backgrounds,
+            // white border makes it clear on dark backgrounds.
+            context.saveGState()
+            context.setShadow(
+                offset: .zero,
+                blur: 10,
+                color: NSColor.black.withAlphaComponent(0.5).cgColor
+            )
+            context.setStrokeColor(NSColor.white.withAlphaComponent(0.9).cgColor)
+            context.setLineWidth(1.5)
             context.stroke(selectionRect)
+            context.restoreGState()
 
             drawDimensionLabel(for: selectionRect, in: context)
             drawReticle(at: currentMouseLocation, in: context)
