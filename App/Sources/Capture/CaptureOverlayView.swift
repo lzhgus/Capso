@@ -116,9 +116,19 @@ final class CaptureOverlayView: NSView {
         if isDragging {
             let selectionRect = self.selectionRect
 
-            // Subtle white highlight inside the selection area
-            context.setFillColor(NSColor.white.withAlphaComponent(0.08).cgColor)
-            context.fill(selectionRect)
+            // Very subtle darkening outside the selection (10% black).
+            // The selection area stays untouched — original brightness.
+            // This is visible on both light and dark backgrounds without
+            // causing the heavy visual disruption of a 30% overlay.
+            context.saveGState()
+            let outerPath = CGMutablePath()
+            outerPath.addRect(bounds)
+            outerPath.addRect(selectionRect)
+            context.addPath(outerPath)
+            context.clip(using: .evenOdd)
+            context.setFillColor(NSColor.black.withAlphaComponent(0.12).cgColor)
+            context.fill(bounds)
+            context.restoreGState()
 
             // Selection border
             context.setStrokeColor(selectionBorderColor.cgColor)
