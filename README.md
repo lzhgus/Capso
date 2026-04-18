@@ -60,7 +60,7 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 ## Features
 
 ### Screenshots
-- **Area capture** — drag to select with dimension display
+- **Area capture** — drag to select with dimension display; press **R** to cycle aspect ratio and fixed-size presets (1:1, 16:9, 1920×1080, custom)
 - **Fullscreen capture** — one-click full screen
 - **Window capture** — click any window to capture
 - **Scrolling capture** — capture long webpages, chat threads, and documents into one stitched image
