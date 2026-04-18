@@ -40,6 +40,8 @@ public enum RecordingError: Error, LocalizedError {
 @MainActor
 @Observable
 public final class ScreenRecorder {
+    private static let excludedWindowLookupDelay: Duration = .milliseconds(30)
+    private static let excludedWindowLookupAttempts = 8
 
     public private(set) var state: RecordingState = .idle
     public private(set) var elapsedTime: TimeInterval = 0
@@ -56,7 +58,10 @@ public final class ScreenRecorder {
 
     public init() {}
 
-    public func startRecording(config: RecordingConfig) async throws {
+    public func startRecording(
+        config: RecordingConfig,
+        excludeWindowIDs: [CGWindowID] = []
+    ) async throws {
         capsoLog("startRecording rect=\(config.captureRect) display=\(config.displayID)")
         guard state == .idle else { throw RecordingError.alreadyRecording }
 
@@ -74,7 +79,7 @@ public final class ScreenRecorder {
             let dims = videoDims(for: config.captureRect)
 
             // Set up SCStream first (creates the dispatch queue)
-            try await setupStream(config: config, dims: dims)
+            try await setupStream(config: config, dims: dims, excludeWindowIDs: excludeWindowIDs)
 
             // Create writer ON the recording dispatch queue (thread affinity —
             // AVAssetWriter's AAC encoder must be created and used on same thread)
@@ -152,13 +157,21 @@ public final class ScreenRecorder {
                   h: ensureEven(Int(ceil(rect.height)) * 2))
     }
 
-    private func setupStream(config: RecordingConfig, dims: VideoDims) async throws {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    private func setupStream(config: RecordingConfig, dims: VideoDims, excludeWindowIDs: [CGWindowID]) async throws {
+        let excludeSet = Set(excludeWindowIDs)
+        let content = try await shareableContent(excludingWindowIDs: excludeSet)
         guard let display = content.displays.first(where: { $0.displayID == config.displayID }) else {
             throw RecordingError.noMatchingDisplay
         }
 
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let excludedWindows = excludeSet.isEmpty
+            ? []
+            : content.windows.filter { excludeSet.contains($0.windowID) }
+        if !excludeSet.isEmpty, excludedWindows.count != excludeSet.count {
+            let missingIDs = excludeSet.subtracting(excludedWindows.map(\.windowID))
+            capsoLog("Proceeding without excluding windows: \(missingIDs)")
+        }
+        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
         let sc = SCStreamConfiguration()
 
         sc.width = dims.w
@@ -200,6 +213,32 @@ public final class ScreenRecorder {
         }
 
         self.stream = captureStream; self.streamOutput = output
+    }
+
+    private func shareableContent(excludingWindowIDs excludeSet: Set<CGWindowID>) async throws -> SCShareableContent {
+        var content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard !excludeSet.isEmpty else { return content }
+
+        for attempt in 1...Self.excludedWindowLookupAttempts {
+            let matchedIDs = Set(content.windows.map(\.windowID)).intersection(excludeSet)
+            if matchedIDs == excludeSet {
+                if attempt > 1 {
+                    capsoLog("Excluded windows became visible after \(attempt) attempts")
+                }
+                return content
+            }
+
+            if attempt == Self.excludedWindowLookupAttempts {
+                let missingIDs = excludeSet.subtracting(matchedIDs)
+                capsoLog("Timed out waiting for excluded windows: \(missingIDs)")
+                return content
+            }
+
+            try? await Task.sleep(for: Self.excludedWindowLookupDelay)
+            content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        }
+
+        return content
     }
 
     private func startElapsedTimer() {

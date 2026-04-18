@@ -336,12 +336,24 @@ final class RecordingCoordinator {
             guard let self else { return }
             Task { @MainActor in
                 do {
-                    try await self.recorder.startRecording(config: config)
+                    // Show the red border before starting the stream so its
+                    // window ID can be passed to SCContentFilter — otherwise
+                    // it gets composited into the first captured frames.
+                    self.showBorder()
+                    self.borderWindow?.displayIfNeeded()
+                    let excludeIDs: [CGWindowID]
+                    if let n = self.borderWindow?.windowNumber, n > 0 {
+                        excludeIDs = [CGWindowID(n)]
+                    } else {
+                        excludeIDs = []
+                    }
+                    try await self.recorder.startRecording(config: config, excludeWindowIDs: excludeIDs)
                     self.startClickHighlight()
                     self.showRecordingControls()
-                    self.showBorder()
                 } catch {
                     print("Recording failed to start: \(error)")
+                    self.borderWindow?.hide()
+                    self.borderWindow = nil
                     if cameraEnabled {
                         self.cameraPiPWindow?.close()
                         self.cameraPiPWindow = nil
