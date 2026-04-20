@@ -37,6 +37,7 @@ final class CountdownWindow: NSPanel {
         self.hasShadow = false
         self.ignoresMouseEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .transient]
+        self.sharingType = .none
 
         let view = CountdownContent(holder: value)
         self.contentView = NSHostingView(rootView: view)

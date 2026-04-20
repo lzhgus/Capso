@@ -41,6 +41,11 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(label: "Open Editor After Recording", sublabel: "Edit, trim, and add effects before exporting", showDivider: true) {
+                        Toggle("", isOn: $viewModel.openEditorAfterRecording)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                     // TODO: Re-enable the two rows below once their behaviors
                     // are implemented. They are stored in AppSettings but
                     // never consumed by RecordingCoordinator:

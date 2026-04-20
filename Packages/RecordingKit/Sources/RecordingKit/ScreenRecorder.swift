@@ -164,6 +164,17 @@ public final class ScreenRecorder {
             throw RecordingError.noMatchingDisplay
         }
 
+        // Two layers of window exclusion:
+        // 1. Per-window `sharingType = .none` on RecordingBorderWindow,
+        //    RecordingControlsWindow, CountdownWindow, ClickHighlightWindow
+        //    — macOS 14.2+ hides them from ScreenCaptureKit entirely (belt).
+        // 2. `SCContentFilter(excludingWindows:)` below — works on older
+        //    macOS and handles arbitrary window IDs the caller wants
+        //    excluded that aren't covered by (1) (suspenders).
+        // `sharingType = .none` windows won't appear in `content.windows`,
+        // so they'll be silently skipped by the filter build; the
+        // "Proceeding without excluding" log below is only meaningful for
+        // windows that don't use sharingType.
         let excludedWindows = excludeSet.isEmpty
             ? []
             : content.windows.filter { excludeSet.contains($0.windowID) }

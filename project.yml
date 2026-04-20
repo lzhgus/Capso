@@ -37,6 +37,8 @@ packages:
     path: Packages/ExportKit
   EffectsKit:
     path: Packages/EffectsKit
+  EditorKit:
+    path: Packages/EditorKit
   HistoryKit:
     path: Packages/HistoryKit
   KeyboardShortcuts:
@@ -78,6 +80,7 @@ targets:
       - package: OCRKit
       - package: ExportKit
       - package: EffectsKit
+      - package: EditorKit
       - package: HistoryKit
       - package: KeyboardShortcuts
       - package: Defaults

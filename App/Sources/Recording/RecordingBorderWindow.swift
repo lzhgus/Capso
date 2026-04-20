@@ -27,6 +27,8 @@ final class RecordingBorderWindow: NSPanel {
         self.hasShadow = false
         self.ignoresMouseEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // Prevent ScreenCaptureKit from capturing this window (macOS 14.2+).
+        self.sharingType = .none
         // Avoid the default panel fade-in so the first captured frame never
         // sees a half-rendered border.
         self.animationBehavior = .none

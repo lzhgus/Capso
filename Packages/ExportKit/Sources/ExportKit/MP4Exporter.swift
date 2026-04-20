@@ -8,10 +8,13 @@ enum MP4Exporter {
         source: URL,
         quality: ExportQuality,
         destination: URL,
-        progress: (@Sendable (Double) -> Void)?
+        timeRange: CMTimeRange? = nil,
+        progress: (@Sendable (Double) -> Void)?,
+        status: (@Sendable (ExportStatus) -> Void)?
     ) async throws -> URL {
         let asset = AVURLAsset(url: source)
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        status?(ExportStatus(stage: .preparing, fractionCompleted: 0))
 
         // Recordings that captured system audio + microphone end up with two
         // AAC tracks in the container. Passthrough export preserves both tracks,
@@ -19,11 +22,13 @@ enum MP4Exporter {
         // first one — so the shared file sounds silent even though both tracks
         // are present. Merge them into a single mixed track. (issue #55)
         if audioTracks.count > 1 {
+            status?(ExportStatus(stage: .encoding, fractionCompleted: 0.05))
             return try await exportWithMergedAudio(
                 asset: asset,
                 audioTracks: audioTracks,
                 destination: destination,
-                progress: progress
+                progress: progress,
+                status: status
             )
         }
 
@@ -58,6 +63,14 @@ enum MP4Exporter {
         }
 
         session.shouldOptimizeForNetworkUse = true
+        if let timeRange {
+            session.timeRange = timeRange
+            status?(ExportStatus(stage: .trimming, fractionCompleted: 0.1))
+        }
+        status?(ExportStatus(stage: .encoding, fractionCompleted: 0.12))
+
+        // AVAssetExportSession cannot overwrite existing files
+        try? FileManager.default.removeItem(at: destination)
 
         do {
             try await session.export(to: destination, as: .mp4)
@@ -67,6 +80,7 @@ enum MP4Exporter {
             throw ExportError.exportSessionFailed(error.localizedDescription)
         }
 
+        status?(ExportStatus(stage: .finalizing, fractionCompleted: 1.0))
         progress?(1.0)
         return destination
     }
@@ -79,7 +93,8 @@ enum MP4Exporter {
         asset: AVURLAsset,
         audioTracks: [AVAssetTrack],
         destination: URL,
-        progress: (@Sendable (Double) -> Void)?
+        progress: (@Sendable (Double) -> Void)?,
+        status: (@Sendable (ExportStatus) -> Void)?
     ) async throws -> URL {
         try? FileManager.default.removeItem(at: destination)
 
@@ -92,6 +107,7 @@ enum MP4Exporter {
             throw ExportError.exportSessionFailed(error.localizedDescription)
         }
         writer.shouldOptimizeForNetworkUse = true
+        status?(ExportStatus(stage: .encoding, fractionCompleted: 0.1))
 
         // Video track: read compressed samples, write them through unchanged.
         var videoPair: (output: AVAssetReaderOutput, input: AVAssetWriterInput)?
@@ -161,6 +177,8 @@ enum MP4Exporter {
         // Sendable, so wrap the work in a non-Sendable closure via a
         // continuation rather than a Swift Task.
         try await runDrain(videoPair: videoPair, audioOutput: audioOutput, audioInput: audioInput)
+        progress?(0.9)
+        status?(ExportStatus(stage: .finalizing, fractionCompleted: 0.9))
 
         if reader.status == .failed {
             throw ExportError.exportSessionFailed(reader.error?.localizedDescription ?? "Reader failed")
@@ -171,6 +189,7 @@ enum MP4Exporter {
             throw ExportError.exportSessionFailed(writer.error?.localizedDescription ?? "Writer did not complete")
         }
 
+        status?(ExportStatus(stage: .finalizing, fractionCompleted: 1.0))
         progress?(1.0)
         return destination
     }

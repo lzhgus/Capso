@@ -228,6 +228,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var openEditorAfterRecording: Bool {
+        get {
+            access(keyPath: \.openEditorAfterRecording)
+            return settings.openEditorAfterRecording
+        }
+        set {
+            withMutation(keyPath: \.openEditorAfterRecording) {
+                settings.openEditorAfterRecording = newValue
+            }
+        }
+    }
     var dimScreenWhileRecording: Bool {
         get {
             access(keyPath: \.dimScreenWhileRecording)

@@ -159,6 +159,14 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "rememberLastRecordingArea") }
     }
 
+    /// When `true`, the recording editor opens after every recording stops.
+    /// When `false` (default), the quick-preview flow is used instead.
+    /// Default is `false` to preserve existing behaviour for existing users.
+    public var openEditorAfterRecording: Bool {
+        get { defaults.object(forKey: "openEditorAfterRecording") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "openEditorAfterRecording") }
+    }
+
     // MARK: Camera
     public var cameraShape: CameraShape {
         get {

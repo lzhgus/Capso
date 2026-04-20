@@ -40,7 +40,7 @@ struct AnnotationToolbar: View {
             toolButton(.arrow, icon: "arrow.up.right", label: "Arrow")
             toolButton(.rectangle, icon: "rectangle", label: "Rectangle")
             toolButton(.ellipse, icon: "circle", label: "Ellipse")
-            toolButton(.text, icon: "textformat", label: "Text")
+            textToolButton
             toolButton(.freehand, icon: "pencil.tip", label: "Draw")
             toolButton(.pixelate, icon: "eye.slash.fill", label: "Pixelate / Blur")
             toolButton(.counter, icon: "number.circle.fill", label: "Counter")
@@ -58,6 +58,26 @@ struct AnnotationToolbar: View {
         }
         .buttonStyle(.plain)
         .help(label)
+    }
+
+    /// Text-tool button. Rendered as a literal "Aa" glyph rather than the
+    /// SF Symbol `textformat`, because Apple localizes that symbol's
+    /// appearance per language (en: "Aa", zh: "格式", ja: "書式", …) and
+    /// we want a consistent look across all locales — the iconic "Aa"
+    /// shorthand is the industry convention for a text tool.
+    ///
+    /// `Text(verbatim:)` prevents SwiftUI from treating "Aa" as a
+    /// LocalizedStringKey lookup.
+    private var textToolButton: some View {
+        Button(action: { currentTool = .text }) {
+            Text(verbatim: "Aa")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 26)
+                .background(currentTool == .text ? Color.accentColor.opacity(0.2) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .help("Text")
     }
 
     private var colorGroup: some View {

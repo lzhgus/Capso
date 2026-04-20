@@ -30,6 +30,7 @@ public final class ClickHighlightWindow: NSPanel {
         self.hasShadow = false
         self.ignoresMouseEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .transient]
+        self.sharingType = .none
 
         // Layer-backed content view for Core Animation
         let contentView = NSView(frame: NSRect(origin: .zero, size: frame.size))

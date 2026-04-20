@@ -1,5 +1,12 @@
 // App/Sources/Recording/RecordingCoordinator.swift
 import AppKit
+// AVFoundation's `AVAssetTrack` and related types aren't annotated as
+// `Sendable` in the SDK yet. Without @preconcurrency, Swift 6 strict-
+// concurrency builds (Xcode 17 CI) fail compiling `openEditor(…)` where
+// `asset.loadTracks(withMediaType:)` returns `[AVAssetTrack]` across an
+// async boundary. Local Debug builds may succeed due to DerivedData
+// caching old artefacts; CI's clean build is authoritative.
+@preconcurrency import AVFoundation
 import Observation
 import HistoryKit
 import RecordingKit
@@ -8,6 +15,7 @@ import CaptureKit
 import SharedKit
 import ExportKit
 import EffectsKit
+import EditorKit
 
 /// Orchestrates recording flow:
 /// 1. Show overlay for area selection (drag or Space for window)
@@ -30,7 +38,10 @@ final class RecordingCoordinator {
     private var borderWindow: RecordingBorderWindow?
     private var cameraPiPWindow: CameraPiPWindow?
     private var recordingPreviewWindow: RecordingPreviewWindow?
+    private var editorWindow: RecordingEditorWindow?
+    private var editorCoordinator: EditorCoordinator?
     private var clickMonitor: ClickMonitor?
+    private var cursorTelemetry: CursorTelemetry?
     private var clickHighlightWindow: ClickHighlightWindow?
     private var countdownWindow: CountdownWindow?
     private var escGlobalMonitor: Any?
@@ -314,6 +325,9 @@ final class RecordingCoordinator {
         currentMicEnabled = micEnabled
         currentSystemAudioEnabled = systemAudioEnabled
 
+        // Editor flow renders the cursor from telemetry, so avoid baking the
+        // hardware cursor into the source video in that path. The quick-preview
+        // flow still keeps the native hardware cursor in the captured file.
         let config = RecordingConfig(
             captureRect: selectedRect,
             displayID: selectedDisplayID,
@@ -321,7 +335,7 @@ final class RecordingCoordinator {
             fps: 30,
             captureSystemAudio: systemAudioEnabled,
             captureMicrophone: micEnabled,
-            showCursor: settings.showCursor
+            showCursor: settings.openEditorAfterRecording ? false : settings.showCursor
         )
 
         // Start camera if not already running from toolbar preview.
@@ -349,6 +363,7 @@ final class RecordingCoordinator {
                     }
                     try await self.recorder.startRecording(config: config, excludeWindowIDs: excludeIDs)
                     self.startClickHighlight()
+                    self.startCursorTelemetry()
                     self.showRecordingControls()
                 } catch {
                     print("Recording failed to start: \(error)")
@@ -382,6 +397,7 @@ final class RecordingCoordinator {
         Task {
             do {
                 let result = try await recorder.stopRecording()
+                let cursorTelemetryURL = stopCursorTelemetry()
                 hideRecordingUI()
 
                 let tempURL = result.fileURL
@@ -390,14 +406,22 @@ final class RecordingCoordinator {
                 let format = result.format as RecordingKit.RecordingFormat
                 saveRecordingToHistory(url: tempURL, format: format)
 
-                // Extract thumbnail and show preview
-                let thumbnail = await VideoThumbnail.extractThumbnail(from: tempURL)
-                let nsThumb = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
-                let size = VideoThumbnail.formattedFileSize(VideoThumbnail.fileSize(at: tempURL))
-                let duration = VideoThumbnail.formattedDuration(result.duration)
-
-                showRecordingPreview(thumbnail: nsThumb, duration: duration, fileSize: size,
-                                    tempURL: tempURL, format: result.format as RecordingKit.RecordingFormat)
+                if settings.openEditorAfterRecording {
+                    // Open the full recording editor (trim, zoom, export)
+                    openEditor(
+                        tempURL: tempURL,
+                        cursorTelemetryURL: cursorTelemetryURL,
+                        showsCursor: settings.showCursor
+                    )
+                } else {
+                    // Quick-preview flow: show thumbnail preview with Save/Copy/Discard
+                    let thumbnail = await VideoThumbnail.extractThumbnail(from: tempURL)
+                    let nsThumb = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
+                    let size = VideoThumbnail.formattedFileSize(VideoThumbnail.fileSize(at: tempURL))
+                    let duration = VideoThumbnail.formattedDuration(result.duration)
+                    showRecordingPreview(thumbnail: nsThumb, duration: duration, fileSize: size,
+                                        tempURL: tempURL, format: result.format as RecordingKit.RecordingFormat)
+                }
             } catch {
                 print("Failed to stop/save recording: \(error)")
                 hideRecordingUI()
@@ -512,6 +536,38 @@ final class RecordingCoordinator {
         alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. The recording is still available in the preview — close this dialog and try Copy again, or use Save.")
         alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()
+    }
+
+    func openEditor(tempURL: URL, cursorTelemetryURL: URL?, showsCursor: Bool) {
+        Task {
+            let asset = AVURLAsset(url: tempURL)
+            let duration = (try? await asset.load(.duration).seconds) ?? 0
+            let tracks = try? await asset.loadTracks(withMediaType: .video)
+            let naturalSize = (try? await tracks?.first?.load(.naturalSize)) ?? .zero
+
+            let project = RecordingProject(
+                sourceVideoURL: tempURL,
+                cursorTelemetryURL: cursorTelemetryURL,
+                showsCursor: showsCursor,
+                videoDuration: duration,
+                videoSize: naturalSize,
+                recordingAreaSize: CGSize(
+                    width: selectedRect.width,
+                    height: selectedRect.height
+                )
+            )
+
+            let coordinator = EditorCoordinator(project: project)
+            coordinator.onClose = { [weak self] in
+                self?.editorWindow?.close()
+                self?.editorWindow = nil
+                self?.editorCoordinator = nil
+            }
+            let window = RecordingEditorWindow(coordinator: coordinator)
+            self.editorCoordinator = coordinator
+            self.editorWindow = window
+            window.showCentered()
+        }
     }
 
     private func showRecordingPreview(thumbnail: NSImage?, duration: String, fileSize: String,
@@ -654,6 +710,47 @@ final class RecordingCoordinator {
         clickHighlightWindow = nil
     }
 
+    private func startCursorTelemetry() {
+        // CursorTelemetry normalizes CGEvent positions, which are in global
+        // TOP-LEFT origin. `selectedRect` is in display-local top-left origin
+        // (see handleAreaSelected), so the correct global-top-left origin of
+        // the recording rect is `CGDisplayBounds(displayID).origin + selectedRect.origin`.
+        //
+        // Do NOT use NSScreen.frame here — that is in AppKit BOTTOM-LEFT origin
+        // and would require flipping CGEvent positions to match, which is what
+        // downstream code does NOT do. Using the bottom-left rect against a
+        // top-left event position produces an overlay cursor drawn at the
+        // wrong on-screen location.
+        let displayBounds = CGDisplayBounds(selectedDisplayID)
+        let globalRect = CGRect(
+            x: displayBounds.origin.x + selectedRect.origin.x,
+            y: displayBounds.origin.y + selectedRect.origin.y,
+            width: selectedRect.width,
+            height: selectedRect.height
+        )
+        let telemetry = CursorTelemetry(recordingRect: globalRect)
+        telemetry.start()
+        cursorTelemetry = telemetry
+    }
+
+    private func stopCursorTelemetry() -> URL? {
+        guard let telemetry = cursorTelemetry else { return nil }
+        telemetry.stop()
+        cursorTelemetry = nil
+
+        let recordingsDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Capso/Recordings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: recordingsDir, withIntermediateDirectories: true)
+
+        let telemetryURL = recordingsDir.appendingPathComponent("\(UUID().uuidString).cursor.json")
+        do {
+            try telemetry.save(to: telemetryURL)
+            return telemetryURL
+        } catch {
+            return nil
+        }
+    }
+
     private func showRecordingControls() {
         guard let screen = selectedScreen else { return }
 
@@ -683,11 +780,15 @@ final class RecordingCoordinator {
         // coordinates for the border window's frame.
         let screenFrame = screen.frame
         let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
+        // Expand the border frame outward by the border width (3pt) so the
+        // border is drawn entirely OUTSIDE the capture area. This prevents
+        // ScreenCaptureKit from capturing the red border in the recording.
+        let borderInset: CGFloat = 3
         let borderFrame = CGRect(
-            x: selectedRect.origin.x + screenFrame.origin.x,
-            y: viewY + screenFrame.origin.y,
-            width: selectedRect.width,
-            height: selectedRect.height
+            x: selectedRect.origin.x + screenFrame.origin.x - borderInset,
+            y: viewY + screenFrame.origin.y - borderInset,
+            width: selectedRect.width + borderInset * 2,
+            height: selectedRect.height + borderInset * 2
         )
         borderWindow = RecordingBorderWindow(frame: borderFrame, screen: screen)
         borderWindow?.show()
@@ -716,6 +817,8 @@ final class RecordingCoordinator {
 
     private func hideRecordingUI() {
         stopClickHighlight()
+        cursorTelemetry?.stop()
+        cursorTelemetry = nil
         controlsWindow?.close()
         controlsWindow = nil
         borderWindow?.hide()

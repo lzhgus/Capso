@@ -58,10 +58,17 @@ struct CameraPiPView: View {
                     lineWidth: usePresentationChrome ? 1.0 : 2.5
                 )
             )
+            // Drop shadow adds welcome depth on rectangular shapes but
+            // looks muddy on a circle — the shape's own silhouette already
+            // provides visual separation, and a y-offset shadow around a
+            // perfect circle reads as a faint halo rather than elevation.
+            // Skip the shadow for `.circle` to keep it a clean, pure disc.
             .shadow(
-                color: .black.opacity(usePresentationChrome ? 0.18 : 0.5),
-                radius: usePresentationChrome ? 4 : 10,
-                y: usePresentationChrome ? 1 : 4
+                color: shape == .circle
+                    ? .clear
+                    : .black.opacity(usePresentationChrome ? 0.18 : 0.5),
+                radius: shape == .circle ? 0 : (usePresentationChrome ? 4 : 10),
+                y: shape == .circle ? 0 : (usePresentationChrome ? 1 : 4)
             )
 
         }

@@ -76,6 +76,8 @@ brew install --cask capso
 - **录制控制**：暂停、停止、重新开始、删除、计时器
 - **倒计时提示**：录制前 3-2-1 倒计时
 - **导出质量预设**：最高画质、社交媒体、网页三挡可选
+- **录屏编辑器**：在一个流程里完成裁剪、缩放建议、光标平滑、背景样式和 MP4/GIF 导出
+- **实时合成预览**：导出前即可预览缩放、光标和背景效果
 
 ### 标注编辑器
 - 箭头、矩形、椭圆、文字、自由绘制、马赛克/模糊、裁剪
@@ -170,6 +172,7 @@ Capso/
 │   ├── MenuBar/             # 菜单栏
 │   ├── Capture/             # 截图
 │   ├── Recording/           # 录屏
+│   ├── Editor/              # 录屏编辑器、时间线、预览、导出 UI
 │   ├── Camera/              # 摄像头画中画
 │   ├── AnnotationEditor/    # 标注编辑器 + 美化
 │   ├── OCR/                 # 文字识别
@@ -183,8 +186,9 @@ Capso/
 │   ├── CameraKit/           # AVFoundation 摄像头
 │   ├── AnnotationKit/       # 绘制/标注系统
 │   ├── OCRKit/              # Vision 框架 OCR
-│   ├── ExportKit/           # 视频/GIF/图片导出
-│   ├── EffectsKit/          # 光标特效
+│   ├── ExportKit/           # 视频/GIF 导出 + 录屏编辑器合成导出
+│   ├── EffectsKit/          # 光标遥测、点击高亮、特效
+│   ├── EditorKit/           # 录屏编辑器模型、合成器、缩放/光标逻辑
 │   └── HistoryKit/          # 持久化截图/录屏历史
 └── project.yml              # XcodeGen 项目定义
 ```
@@ -205,9 +209,6 @@ swift test --package-path Packages/AnnotationKit
 
 - 聚光灯、放大镜、标尺、图片叠加等标注工具
 - 文字标注支持 Emoji 和自定义字体
-- 视频剪辑编辑器
-- 光标平滑（弹簧物理）
-- 录制视频的缩放动画
 - URL Scheme API
 - Raycast / 快捷指令集成
 

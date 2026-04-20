@@ -7,10 +7,11 @@ public enum VideoExporter {
     public static func export(
         source: URL,
         options: ExportOptions,
-        progress: (@Sendable (Double) -> Void)? = nil
+        progress: (@Sendable (Double) -> Void)? = nil,
+        status: (@Sendable (ExportStatus) -> Void)? = nil
     ) async throws -> URL {
-        guard FileManager.default.fileExists(atPath: source.path) else {
-            throw ExportError.sourceFileNotFound
+        guard FileManager.default.fileExists(atPath: source.path(percentEncoded: false)) else {
+            throw ExportError.exportSessionFailed("Source file not found at: \(source.path(percentEncoded: false))")
         }
 
         switch options.format {
@@ -19,14 +20,17 @@ public enum VideoExporter {
                 source: source,
                 quality: options.quality,
                 destination: options.destination,
-                progress: progress
+                timeRange: options.timeRange,
+                progress: progress,
+                status: status
             )
         case .gif:
             return try await GIFExporter.export(
                 source: source,
                 quality: options.quality,
                 destination: options.destination,
-                progress: progress
+                progress: progress,
+                status: status
             )
         }
     }

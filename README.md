@@ -74,6 +74,8 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 - **Recording controls** — pause, stop, restart, delete, timer
 - **Countdown overlay** — 3-2-1 before recording starts
 - **Export quality presets** — Maximum, Social, Web
+- **Recording editor** — trim, zoom suggestions, cursor smoothing, background styling, and MP4/GIF export in one flow
+- **Live composited preview** — see zoom, cursor, and background changes before export
 
 ### Annotation Editor
 - Arrow, rectangle, ellipse, text, freehand drawing, pixelate/blur, crop
@@ -168,6 +170,7 @@ Capso/
 │   ├── MenuBar/             # Menu bar controller
 │   ├── Capture/             # Capture overlay, pinned screenshots
 │   ├── Recording/           # Recording coordinator, controls, toolbar
+│   ├── Editor/              # Recording editor, timeline, preview, export UI
 │   ├── Camera/              # Webcam PiP window
 │   ├── AnnotationEditor/    # Annotation editor + beautify
 │   ├── OCR/                 # OCR coordinator, overlay, toast
@@ -181,8 +184,9 @@ Capso/
 │   ├── CameraKit/           # AVFoundation webcam capture
 │   ├── AnnotationKit/       # Drawing/annotation system
 │   ├── OCRKit/              # Vision framework OCR
-│   ├── ExportKit/           # Video/GIF/image export
-│   ├── EffectsKit/          # Cursor effects, click highlights
+│   ├── ExportKit/           # Video/GIF export + composited editor export
+│   ├── EffectsKit/          # Cursor telemetry, click highlights, effects
+│   ├── EditorKit/           # Recording editor models, compositor, zoom/cursor logic
 │   └── HistoryKit/          # Persistent screenshot/recording history
 └── project.yml              # XcodeGen project definition
 ```
@@ -203,9 +207,6 @@ The package split means you can embed, for example, `CaptureKit` or `AnnotationK
 
 - Spotlight, magnifier, ruler, image overlay annotation tools
 - Emoji support and custom fonts in text annotations
-- Video trimmer/editor
-- Cursor smoothing (spring-physics during export)
-- Zoom animation on recorded video
 - URL scheme API for automation
 - Raycast / Shortcuts integration
 

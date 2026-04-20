@@ -35,6 +35,7 @@ final class RecordingControlsWindow: NSPanel {
         self.hasShadow = false
         self.collectionBehavior = [.canJoinAllSpaces, .transient]
         self.isMovableByWindowBackground = true
+        self.sharingType = .none
 
         let view = RecordingControlsView(recorder: recorder, onStop: onStop, onRestart: onRestart, onDelete: onDelete)
         self.contentView = NSHostingView(rootView: view)

@@ -30,9 +30,11 @@ enum GIFExporter {
         source: URL,
         quality: ExportQuality,
         destination: URL,
-        progress: (@Sendable (Double) -> Void)?
+        progress: (@Sendable (Double) -> Void)?,
+        status: (@Sendable (ExportStatus) -> Void)?
     ) async throws -> URL {
         let asset = AVURLAsset(url: source)
+        status?(ExportStatus(stage: .preparing, fractionCompleted: 0))
 
         let duration: CMTime
         do {
@@ -74,6 +76,7 @@ enum GIFExporter {
             targetFps = baseFps
         }
         let estimatedFrameCount = max(1, Int(ceil(totalSeconds * targetFps)))
+        status?(ExportStatus(stage: .encoding, fractionCompleted: 0.08))
 
         // Load the video track.
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
@@ -163,6 +166,7 @@ enum GIFExporter {
             nextSampleTime += targetInterval
 
             progress?(min(0.99, pts / totalSeconds))
+            status?(ExportStatus(stage: .encoding, fractionCompleted: min(0.99, pts / totalSeconds)))
         }
 
         if reader.status == .failed {
@@ -181,6 +185,7 @@ enum GIFExporter {
             throw ExportError.gifCreationFailed
         }
 
+        status?(ExportStatus(stage: .finalizing, fractionCompleted: 1.0))
         progress?(1.0)
         return destination
     }
