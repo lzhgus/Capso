@@ -20,6 +20,7 @@ struct AnnotationToolbar: View {
     let onSave: () -> Void
     let onCopy: () -> Void
     let onCancel: () -> Void
+    let onCrop: () -> Void
 
     /// The size slider serves multiple tools: in text / editing mode it means
     /// font size; for other tools it retains its existing role.
@@ -34,6 +35,8 @@ struct AnnotationToolbar: View {
             colorGroup
             Divider().frame(height: 24)
             strokeGroup
+            Divider().frame(height: 24)
+            cropGroup
             Divider().frame(height: 24)
             beautifyGroup
             Divider().frame(height: 24)
@@ -143,6 +146,19 @@ struct AnnotationToolbar: View {
                 .help("Fill Shape")
             }
         }
+    }
+
+    private var cropGroup: some View {
+        Button(action: onCrop) {
+            Image(systemName: "crop")
+                .font(.system(size: 14))
+                .frame(width: 30, height: 26)
+                .background(Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .help("Crop")
+        .disabled(isEditingText)
     }
 
     private var beautifyGroup: some View {

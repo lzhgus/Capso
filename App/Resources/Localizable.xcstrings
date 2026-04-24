@@ -4917,6 +4917,398 @@
           }
         }
       }
+    },
+    "Crop" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "切り抜き" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자르기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "裁剪" } }
+      }
+    },
+    "Image size:" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "画像サイズ:" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이미지 크기:" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图像尺寸：" } }
+      }
+    },
+    "Snap handles to image edges" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハンドルを画像の端にスナップ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "핸들을 이미지 가장자리에 맞추기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "吸附手柄至图像边缘" } }
+      }
+    },
+    "Hold ⌘ while dragging to disable temporarily." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ドラッグ中に ⌘ を押すと一時的に無効化。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "드래그 중 ⌘ 키를 누르면 일시적으로 비활성화됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拖动时按住 ⌘ 可临时禁用。" } }
+      }
+    },
+    "Revert to Original" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "オリジナルに戻す" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원본으로 되돌리기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "还原为原图" } }
+      }
+    },
+    "Freeform" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フリー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자유 형식" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自由" } }
+      }
+    },
+    "Original Ratio" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "元の比率" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원본 비율" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "原始比例" } }
+      }
+    },
+    "1 : 1 (Square)" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "1 : 1（正方形）" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "1 : 1 (정사각형)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "1 : 1（正方形）" } }
+      }
+    },
+    "4 : 3" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "4 : 3" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "4 : 3" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "4 : 3" } }
+      }
+    },
+    "3 : 2" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "3 : 2" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "3 : 2" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "3 : 2" } }
+      }
+    },
+    "16 : 9" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "16 : 9" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "16 : 9" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "16 : 9" } }
+      }
+    },
+    "When dragging a crop handle near the image boundary, snap it exactly to that edge. Hold ⌘ while dragging to temporarily disable." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ドラッグ中のハンドルが画像の端に近づくと、自動的にその端に吸着します。⌘ キーを押している間は一時的に無効になります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자르기 핸들을 이미지 가장자리 근처로 드래그하면 정확히 그 가장자리에 맞춰집니다. ⌘ 키를 누르고 있는 동안에는 일시적으로 비활성화됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拖动裁剪手柄接近图像边缘时，自动精确吸附到该边缘。按住 ⌘ 可临时禁用。" } }
+      }
+    },
+    "How to use Translate" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳の使い方" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역 사용 방법" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "如何使用翻译" } }
+      }
+    },
+    "Translate to" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳先" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역할 언어" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "翻译为" } }
+      }
+    },
+    "Apple Translation" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Apple 翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Apple 번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Apple 翻译" } }
+      }
+    },
+    "Translating…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在翻译…" } }
+      }
+    },
+    "Capture," : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャプチャ、" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캡처," } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "截图，" } }
+      }
+    },
+    "Translation" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "翻译" } }
+      }
+    },
+    "ORIGINAL" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "原文" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원문" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "原文" } }
+      }
+    },
+    "Click outside" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "外側をクリック" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "외부 클릭" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "点击外部" } }
+      }
+    },
+    "After delay" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "遅延後" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "지연 후" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "延迟后" } }
+      }
+    },
+    "Manual" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "手動" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "수동" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "手动" } }
+      }
+    },
+    "Capture & Translate" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャプチャして翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캡처 후 번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "截图并翻译" } }
+      }
+    },
+    "Text & Translation" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テキストと翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "텍스트 및 번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文字与翻译" } }
+      }
+    },
+    "Target Language" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳先言語" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역할 언어" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标语言" } }
+      }
+    },
+    "Language to translate text into" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テキストを翻訳する言語" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "텍스트를 번역할 언어" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "要将文字翻译成的语言" } }
+      }
+    },
+    "Auto-Copy Translation" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳を自動コピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역 자동 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动复制翻译" } }
+      }
+    },
+    "Copy result to clipboard automatically" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "結果を自動的にクリップボードにコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "결과를 자동으로 클립보드에 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动将结果复制到剪贴板" } }
+      }
+    },
+    "Show Original Text" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "原文を表示" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원문 표시" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示原文" } }
+      }
+    },
+    "Display source text alongside translation" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳と並べて原文を表示" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역과 함께 원문 표시" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在翻译旁显示原文" } }
+      }
+    },
+    "Auto-Dismiss" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "自動で閉じる" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자동 닫기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动关闭" } }
+      }
+    },
+    "When to close the translation panel" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳パネルを閉じるタイミング" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역 패널을 닫을 시점" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "何时关闭翻译面板" } }
+      }
+    },
+    "Capso Settings" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Capso 設定" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Capso 설정" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Capso 设置" } }
+      }
+    },
+    "Sound" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "サウンド" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사운드" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "声音" } }
+      }
+    },
+    "Unlimited" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "無制限" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "무제한" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无限制" } }
+      }
+    },
+    "You’re up to date!" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "最新の状態です！" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "최신 상태입니다!" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已是最新版本！" } }
+      }
+    },
+    "Copy translation" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳をコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制翻译" } }
+      }
+    },
+    "Change default in Preferences" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定でデフォルトを変更" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "환경설정에서 기본값 변경" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在偏好设置中更改默认值" } }
+      }
+    },
+    "Translate text from any screenshot without leaving Capso" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Capso から離れずに任意のスクリーンショットのテキストを翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Capso를 떠나지 않고 모든 스크린샷의 텍스트 번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无需离开 Capso 即可翻译任何截图中的文字" } }
+      }
+    },
+    "TRANSLATION" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "翻译" } }
+      }
+    },
+    "Quick Access actions" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クイックアクセスアクション" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "빠른 액세스 작업" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快速访问操作" } }
+      }
+    },
+    "The editor will close when the export is finished." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し完了後、エディタは閉じます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "내보내기가 완료되면 편집기가 닫힙니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出完成后编辑器将关闭。" } }
+      }
+    },
+    "Copying…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "コピー中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "복사 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在复制…" } }
+      }
+    },
+    "Saving…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "保存中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在保存…" } }
+      }
+    },
+    "Couldn't copy recording" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "録画をコピーできませんでした" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "녹화본을 복사할 수 없습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法复制录像" } }
+      }
+    },
+    "Add Custom Ratio" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カスタム比率を追加" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사용자 지정 비율 추가" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加自定义比例" } }
+      }
+    },
+    "Add Custom Ratio…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カスタム比率を追加…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사용자 지정 비율 추가…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加自定义比例…" } }
+      }
+    },
+    "Flip horizontally" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "左右反転" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "좌우 반전" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "水平翻转" } }
+      }
+    },
+    "Flip is disabled while annotations are present" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "注釈がある間は反転を使用できません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "주석이 있는 동안에는 뒤집기를 사용할 수 없습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存在标注时无法翻转" } }
+      }
+    },
+    "Height in pixels" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "高さ（ピクセル）" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "높이 (픽셀)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "高度（像素）" } }
+      }
+    },
+    "Height" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "高さ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "높이" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "高度" } }
+      }
+    },
+    "Rotate 90° counter-clockwise" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "反時計回りに 90° 回転" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "반시계 방향으로 90° 회전" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "逆时针旋转 90°" } }
+      }
+    },
+    "Rotate is disabled while annotations are present" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "注釈がある間は回転を使用できません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "주석이 있는 동안에는 회전을 사용할 수 없습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存在标注时无法旋转" } }
+      }
+    },
+    "Width in pixels" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "幅（ピクセル）" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "너비 (픽셀)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "宽度（像素）" } }
+      }
+    },
+    "Width" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "幅" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "너비" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "宽度" } }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カスタム" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사용자 지정" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自定义" } }
+      }
     }
   },
   "version" : "1.1"

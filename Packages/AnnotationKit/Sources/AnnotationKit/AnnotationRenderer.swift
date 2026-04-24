@@ -1,8 +1,13 @@
+// Packages/AnnotationKit/Sources/AnnotationKit/AnnotationRenderer.swift
 import Foundation
 import CoreGraphics
 import CoreImage
 
 public enum AnnotationRenderer {
+    /// Renders the source image with annotations drawn on top, optionally cropped.
+    /// `cropRect` is in image coordinates with top-left origin (y grows down),
+    /// matching AnnotationObject.bounds. The renderer flips to bottom-left
+    /// internally before calling `CGImage.cropping(to:)`.
     public static func render(
         sourceImage: CGImage,
         objects: [any AnnotationObject],
@@ -20,12 +25,8 @@ public enum AnnotationRenderer {
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
 
-        // Draw source image (no flip needed — CGContext.draw() in a standard
-        // bottom-left context already renders the image right-side-up)
         ctx.draw(sourceImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        // Draw annotations in flipped (top-left) coordinate space to match
-        // the canvas's isFlipped=true NSView where objects were created
         ctx.saveGState()
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)
@@ -42,7 +43,14 @@ public enum AnnotationRenderer {
         guard var outputImage = ctx.makeImage() else { return nil }
 
         if let crop = cropRect {
-            if let cropped = outputImage.cropping(to: crop) {
+            let flipped = CGRect(
+                x: crop.minX,
+                y: CGFloat(height) - crop.maxY,
+                width: crop.width,
+                height: crop.height
+            ).intersection(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+
+            if !flipped.isEmpty, let cropped = outputImage.cropping(to: flipped) {
                 outputImage = cropped
             }
         }

@@ -6,12 +6,19 @@ import Observation
 @MainActor
 @Observable
 public final class AnnotationDocument {
-    public let imageSize: CGSize
+    public private(set) var imageSize: CGSize
     public private(set) var objects: [any AnnotationObject] = []
     public private(set) var selectedObjectID: ObjectID?
+    public private(set) var cropRect: CGRect?
 
-    private var undoStack: [[(any AnnotationObject)]] = []
-    private var redoStack: [[(any AnnotationObject)]] = []
+    private var undoStack: [Snapshot] = []
+    private var redoStack: [Snapshot] = []
+
+    private struct Snapshot {
+        let objects: [any AnnotationObject]
+        let cropRect: CGRect?
+        let imageSize: CGSize
+    }
 
     public var canUndo: Bool { !undoStack.isEmpty }
     public var canRedo: Bool { !redoStack.isEmpty }
@@ -68,22 +75,47 @@ public final class AnnotationDocument {
         pushUndo()
     }
 
+    public func setCropRect(_ rect: CGRect?) {
+        pushUndo()
+        cropRect = rect
+    }
+
+    /// Called after the crop editor replaces the working image (e.g. after
+    /// rotate + commit). Updates `imageSize`, clears any stored crop rect
+    /// (coordinates are no longer meaningful), and pushes an undo snapshot.
+    /// Callers are expected to avoid calling this when `objects` is non-empty
+    /// — the annotations' coordinates would be invalidated.
+    public func replaceImage(size: CGSize) {
+        pushUndo()
+        imageSize = size
+        cropRect = nil
+    }
+
+    private func currentSnapshot() -> Snapshot {
+        Snapshot(objects: objects.map { $0.copy() }, cropRect: cropRect, imageSize: imageSize)
+    }
+
+    private func apply(_ snapshot: Snapshot) {
+        objects = snapshot.objects
+        cropRect = snapshot.cropRect
+        imageSize = snapshot.imageSize
+        selectedObjectID = nil
+    }
+
     private func pushUndo() {
-        undoStack.append(objects.map { $0.copy() })
+        undoStack.append(currentSnapshot())
         redoStack.removeAll()
     }
 
     public func undo() {
         guard let snapshot = undoStack.popLast() else { return }
-        redoStack.append(objects.map { $0.copy() })
-        objects = snapshot
-        selectedObjectID = nil
+        redoStack.append(currentSnapshot())
+        apply(snapshot)
     }
 
     public func redo() {
         guard let snapshot = redoStack.popLast() else { return }
-        undoStack.append(objects.map { $0.copy() })
-        objects = snapshot
-        selectedObjectID = nil
+        undoStack.append(currentSnapshot())
+        apply(snapshot)
     }
 }

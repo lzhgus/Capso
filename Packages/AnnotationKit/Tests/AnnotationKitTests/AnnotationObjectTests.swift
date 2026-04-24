@@ -8,8 +8,8 @@ import CoreGraphics
 struct AnnotationObjectTests {
     @Test("AnnotationTool has all cases")
     func tools() {
-        let tools: [AnnotationTool] = [.select, .arrow, .rectangle, .ellipse, .text, .freehand, .pixelate, .crop, .counter, .highlighter]
-        #expect(tools.count == 10)
+        let tools: [AnnotationTool] = [.select, .arrow, .rectangle, .ellipse, .text, .freehand, .pixelate, .counter, .highlighter]
+        #expect(tools.count == 9)
     }
 
     @Test("StrokeStyle has defaults")
