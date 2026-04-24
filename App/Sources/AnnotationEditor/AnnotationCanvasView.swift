@@ -23,6 +23,16 @@ struct AnnotationCanvasView: NSViewRepresentable {
     /// Called when the inline text editor commits / dismisses.
     var onTextEditingEnded: (() -> Void)?
 
+    /// Tools that stay active after each stroke so the user can keep drawing
+    /// without reaching back to the toolbar (issue #75). Shape tools (arrow,
+    /// rectangle, ellipse) and pixelate behave the same way — most users add
+    /// several in a row. Text and crop intentionally stay one-shot: text has
+    /// its own inline-edit flow and crop is naturally one-per-image.
+    private static let stickyTools: Set<AnnotationTool> = [
+        .arrow, .rectangle, .ellipse, .pixelate,
+        .counter, .freehand, .highlighter
+    ]
+
     func makeNSView(context: Context) -> AnnotationCanvasNSView {
         let view = AnnotationCanvasNSView()
         view.document = document
@@ -33,11 +43,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         view.zoomScale = zoomScale
         view.textRegions = textRegions
         view.onObjectCreated = {
-            // Continuous-drawing tools stay active after each stroke;
-            // one-shot tools (arrow, rect, ellipse, text, pixelate) switch
-            // back to select after creation.
-            let keepActive: Set<AnnotationTool> = [.counter, .freehand, .highlighter]
-            if !keepActive.contains(currentTool) {
+            if !Self.stickyTools.contains(currentTool) {
                 onSwitchToSelect?()
             }
         }
@@ -54,8 +60,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         nsView.zoomScale = zoomScale
         nsView.textRegions = textRegions
         nsView.onObjectCreated = {
-            let keepActive: Set<AnnotationTool> = [.counter, .freehand, .highlighter]
-            if !keepActive.contains(currentTool) {
+            if !Self.stickyTools.contains(currentTool) {
                 onSwitchToSelect?()
             }
         }

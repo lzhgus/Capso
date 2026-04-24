@@ -10,17 +10,23 @@ struct AnnotationEditorView: View {
     let onCopy: (CGImage) -> Void
     let onCancel: () -> Void
 
-    @State private var currentTool: AnnotationTool = .arrow
-    @State private var currentColor: AnnotationColor = .red
-    @State private var lineWidth: CGFloat = 3
-    @State private var filled: Bool = false
-    @State private var savedLineWidth: CGFloat = 3
-    @State private var savedBlockSize: CGFloat = 12
-    @State private var savedCounterSize: CGFloat = 20
-    @State private var savedHighlighterWidth: CGFloat = 20
+    // MARK: - Persisted tool preferences (issue #75)
+    // Tool / color / filled / per-tool sizes survive across editor sessions
+    // via UserDefaults. `lineWidth` itself is session-local because its
+    // meaning changes with the active tool; it is synced on every change into
+    // the correct per-tool store below.
+    @AppStorage("annotationLastTool") private var currentTool: AnnotationTool = .arrow
+    @AppStorage("annotationLastColor") private var currentColor: AnnotationColor = .red
+    @AppStorage("annotationFilled") private var filled: Bool = false
+    @AppStorage("annotationShapeWidth") private var savedLineWidth: Double = 3
+    @AppStorage("annotationBlockSize") private var savedBlockSize: Double = 12
+    @AppStorage("annotationCounterSize") private var savedCounterSize: Double = 20
+    @AppStorage("annotationHighlighterWidth") private var savedHighlighterWidth: Double = 20
     /// Preserved font size for the Text tool. Swapped in/out of `lineWidth`
     /// as the user toggles tools — same pattern as savedBlockSize etc.
-    @State private var savedTextFontSize: CGFloat = 48
+    @AppStorage("annotationTextFontSize") private var savedTextFontSize: Double = 48
+
+    @State private var lineWidth: CGFloat = 3
     /// True while an inline text editor is active. Lets the toolbar show
     /// the font-size slider even when the tool is `.select` (happens when
     /// re-editing via double-click).
@@ -69,7 +75,32 @@ struct AnnotationEditorView: View {
     /// wins so dragging it updates the editor in real time. Otherwise we
     /// fall back to the preserved value from the last text session.
     private var effectiveTextFontSize: CGFloat {
-        (currentTool == .text || isEditingText) ? lineWidth : savedTextFontSize
+        (currentTool == .text || isEditingText) ? lineWidth : CGFloat(savedTextFontSize)
+    }
+
+    /// Preserved width for the given tool. Bridges between the `Double`
+    /// UserDefaults stores and the canvas's `CGFloat` slider value.
+    private func savedWidth(for tool: AnnotationTool) -> CGFloat {
+        switch tool {
+        case .pixelate: return CGFloat(savedBlockSize)
+        case .counter: return CGFloat(savedCounterSize)
+        case .highlighter: return CGFloat(savedHighlighterWidth)
+        case .text: return CGFloat(savedTextFontSize)
+        default: return CGFloat(savedLineWidth)
+        }
+    }
+
+    /// Persist the current slider value into the store that owns the given
+    /// tool. Called on every slider change so a dragged-then-closed editor
+    /// still saves the user's choice.
+    private func persistWidth(_ width: CGFloat, for tool: AnnotationTool) {
+        switch tool {
+        case .pixelate: savedBlockSize = Double(width)
+        case .counter: savedCounterSize = Double(width)
+        case .highlighter: savedHighlighterWidth = Double(width)
+        case .text: savedTextFontSize = Double(width)
+        default: savedLineWidth = Double(width)
+        }
     }
 
     /// Live preview of the Beautify background. For solid, just a filled Rect.
@@ -155,7 +186,7 @@ struct AnnotationEditorView: View {
                                 isEditingText = false
                                 // Preserve the last-used font size for the
                                 // next text edit / tool switch.
-                                savedTextFontSize = lineWidth
+                                savedTextFontSize = Double(lineWidth)
                             }
                         )
                         .frame(
@@ -178,6 +209,9 @@ struct AnnotationEditorView: View {
                 .background(Color(white: 0.12))
                 .onAppear {
                     fitToWindow(availableSize: geo.size)
+                    // Sync the session-local slider to the persisted width
+                    // for whichever tool was last used (issue #75).
+                    lineWidth = savedWidth(for: currentTool)
                     // Pre-cache text regions for smart highlighter snapping
                     Task {
                         if let regions = try? await TextRecognizer.recognize(
@@ -192,25 +226,17 @@ struct AnnotationEditorView: View {
                     // overwrite the previously drawn object's style.
                     document.clearSelection()
 
-                    // Save outgoing tool's value
-                    switch oldTool {
-                    case .pixelate: savedBlockSize = lineWidth
-                    case .counter: savedCounterSize = lineWidth
-                    case .highlighter: savedHighlighterWidth = lineWidth
-                    case .text: savedTextFontSize = lineWidth
-                    default: savedLineWidth = lineWidth
-                    }
-                    // Restore incoming tool's value
-                    switch newTool {
-                    case .pixelate: lineWidth = savedBlockSize
-                    case .counter: lineWidth = savedCounterSize
-                    case .highlighter: lineWidth = savedHighlighterWidth
-                    case .text: lineWidth = savedTextFontSize
-                    default: lineWidth = savedLineWidth
-                    }
+                    // Save outgoing tool's value then restore incoming.
+                    persistWidth(lineWidth, for: oldTool)
+                    lineWidth = savedWidth(for: newTool)
                 }
                 .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
-                .onChange(of: lineWidth) { _, _ in updateSelectedStyle() }
+                .onChange(of: lineWidth) { _, newValue in
+                    updateSelectedStyle()
+                    // Persist slider drags live so closing the editor
+                    // without switching tools still saves the change.
+                    persistWidth(newValue, for: currentTool)
+                }
                 .onChange(of: filled) { _, _ in updateSelectedStyle() }
                 .onChange(of: geo.size) { _, newSize in
                     // Re-fit if window is resized and we're at fit scale
