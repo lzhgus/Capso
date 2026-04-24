@@ -4,11 +4,31 @@ import AnnotationKit
 import OCRKit
 
 struct AnnotationEditorView: View {
-    let sourceImage: CGImage
+    let initialSourceImage: CGImage
     let document: AnnotationDocument
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
     let onCancel: () -> Void
+
+    /// The working image shown in the canvas. Starts equal to
+    /// `initialSourceImage` and is swapped if a crop commit includes a
+    /// rotate or flip. Annotations live in this image's coordinate space.
+    @State private var sourceImage: CGImage
+
+    init(
+        sourceImage: CGImage,
+        document: AnnotationDocument,
+        onSave: @escaping (CGImage) -> Void,
+        onCopy: @escaping (CGImage) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.initialSourceImage = sourceImage
+        self.document = document
+        self.onSave = onSave
+        self.onCopy = onCopy
+        self.onCancel = onCancel
+        self._sourceImage = State(initialValue: sourceImage)
+    }
 
     // MARK: - Persisted tool preferences (issue #75)
     // Tool / color / filled / per-tool sizes survive across editor sessions
@@ -35,18 +55,39 @@ struct AnnotationEditorView: View {
     @State private var showBeautifyPanel = false
     @State private var refreshTrigger = 0
     @State private var zoomScale: CGFloat = 1.0
+    @State private var isCropMode = false
     /// Cached text line bounding boxes for smart highlighter snapping.
     @State private var textRegions: [CGRect] = []
 
     private var imageWidth: CGFloat { CGFloat(sourceImage.width) }
     private var imageHeight: CGFloat { CGFloat(sourceImage.height) }
 
+    /// Visible image width after applying any committed crop. The canvas view
+    /// is still rendered at full image size but clipped+offset to show only
+    /// this region, so annotations stay in full-image coordinates while layout
+    /// and Save output reflect the crop.
+    private var effectiveImageWidth: CGFloat {
+        document.cropRect?.width ?? imageWidth
+    }
+
+    private var effectiveImageHeight: CGFloat {
+        document.cropRect?.height ?? imageHeight
+    }
+
+    private var cropOffsetX: CGFloat {
+        -(document.cropRect?.minX ?? 0) * zoomScale
+    }
+
+    private var cropOffsetY: CGFloat {
+        -(document.cropRect?.minY ?? 0) * zoomScale
+    }
+
     private var previewContentWidth: CGFloat {
-        beautifySettings.isEnabled ? imageWidth + beautifySettings.outerInset * 2 : imageWidth
+        beautifySettings.isEnabled ? effectiveImageWidth + beautifySettings.outerInset * 2 : effectiveImageWidth
     }
 
     private var previewContentHeight: CGFloat {
-        beautifySettings.isEnabled ? imageHeight + beautifySettings.outerInset * 2 : imageHeight
+        beautifySettings.isEnabled ? effectiveImageHeight + beautifySettings.outerInset * 2 : effectiveImageHeight
     }
 
     private var previewOuterInset: CGFloat {
@@ -127,161 +168,192 @@ struct AnnotationEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Toolbar pinned at top
-            AnnotationToolbar(
-                currentTool: $currentTool,
-                currentColor: $currentColor,
-                lineWidth: $lineWidth,
-                filled: $filled,
-                showBeautifyPanel: $showBeautifyPanel,
-                isEditingText: isEditingText,
-                canUndo: document.canUndo,
-                canRedo: document.canRedo,
-                onUndo: { document.undo(); refreshTrigger += 1 },
-                onRedo: { document.redo(); refreshTrigger += 1 },
-                onSave: { save() },
-                onCopy: { copy() },
-                onCancel: onCancel
+        if isCropMode {
+            CropEditorView(
+                sourceImage: sourceImage,
+                initialCropRect: document.cropRect,
+                canTransformImage: document.objects.isEmpty,
+                onCancel: { isCropMode = false },
+                onCommit: { newImage, newRect in
+                    if let newImage {
+                        // Rotate/flip happened: swap the working image and
+                        // realign the document's imageSize so any future
+                        // annotations use the correct coordinate space.
+                        sourceImage = newImage
+                        document.replaceImage(size: CGSize(width: newImage.width, height: newImage.height))
+                        // cropRect lives in the new image's coords.
+                        document.setCropRect(newRect)
+                    } else {
+                        document.setCropRect(newRect)
+                    }
+                    isCropMode = false
+                }
             )
-            Divider()
-
-            if showBeautifyPanel {
-                BeautifyPanel(settings: $beautifySettings)
+        } else {
+            VStack(spacing: 0) {
+                // Toolbar pinned at top
+                AnnotationToolbar(
+                    currentTool: $currentTool,
+                    currentColor: $currentColor,
+                    lineWidth: $lineWidth,
+                    filled: $filled,
+                    showBeautifyPanel: $showBeautifyPanel,
+                    isEditingText: isEditingText,
+                    canUndo: document.canUndo,
+                    canRedo: document.canRedo,
+                    onUndo: { document.undo(); refreshTrigger += 1 },
+                    onRedo: { document.redo(); refreshTrigger += 1 },
+                    onSave: { save() },
+                    onCopy: { copy() },
+                    onCancel: onCancel,
+                    onCrop: { isCropMode = true }
+                )
                 Divider()
-            }
 
-            // Canvas area with fit-to-window zoom
-            GeometryReader { geo in
-                ScrollView([.horizontal, .vertical]) {
-                    ZStack {
-                        if beautifySettings.isEnabled {
-                            beautifyBackground
-                                .frame(width: previewWidth, height: previewHeight)
-                        }
+                if showBeautifyPanel {
+                    BeautifyPanel(settings: $beautifySettings)
+                    Divider()
+                }
 
-                        AnnotationCanvasView(
-                            document: document,
-                            sourceImage: sourceImage,
-                            currentTool: currentTool,
-                            currentStyle: currentStyle,
-                            textFontSize: effectiveTextFontSize,
-                            zoomScale: zoomScale,
-                            refreshTrigger: refreshTrigger,
-                            textRegions: textRegions,
-                            onSwitchToSelect: {
-                                document.clearSelection()
-                                currentTool = .select
-                            },
-                            onTextEditingStarted: { fontSize in
-                                isEditingText = true
-                                // Sync slider to the object's fontSize when
-                                // re-editing. Harmless for fresh edits: the
-                                // value matches what we just pushed in.
-                                if lineWidth != fontSize {
-                                    lineWidth = fontSize
-                                }
-                            },
-                            onTextEditingEnded: {
-                                isEditingText = false
-                                // Preserve the last-used font size for the
-                                // next text edit / tool switch.
-                                savedTextFontSize = Double(lineWidth)
+                // Canvas area with fit-to-window zoom
+                GeometryReader { geo in
+                    ScrollView([.horizontal, .vertical]) {
+                        ZStack {
+                            if beautifySettings.isEnabled {
+                                beautifyBackground
+                                    .frame(width: previewWidth, height: previewHeight)
                             }
-                        )
+
+                            AnnotationCanvasView(
+                                document: document,
+                                sourceImage: sourceImage,
+                                currentTool: currentTool,
+                                currentStyle: currentStyle,
+                                textFontSize: effectiveTextFontSize,
+                                zoomScale: zoomScale,
+                                refreshTrigger: refreshTrigger,
+                                textRegions: textRegions,
+                                onSwitchToSelect: {
+                                    document.clearSelection()
+                                    currentTool = .select
+                                },
+                                onTextEditingStarted: { fontSize in
+                                    isEditingText = true
+                                    // Sync slider to the object's fontSize when
+                                    // re-editing. Harmless for fresh edits: the
+                                    // value matches what we just pushed in.
+                                    if lineWidth != fontSize {
+                                        lineWidth = fontSize
+                                    }
+                                },
+                                onTextEditingEnded: {
+                                    isEditingText = false
+                                    // Preserve the last-used font size for the
+                                    // next text edit / tool switch.
+                                    savedTextFontSize = Double(lineWidth)
+                                }
+                            )
+                            .frame(
+                                width: imageWidth * zoomScale,
+                                height: imageHeight * zoomScale
+                            )
+                            .offset(x: cropOffsetX, y: cropOffsetY)
+                            .frame(
+                                width: effectiveImageWidth * zoomScale,
+                                height: effectiveImageHeight * zoomScale,
+                                alignment: .topLeading
+                            )
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: beautifySettings.isEnabled ? beautifySettings.clampedCornerRadius * zoomScale : 0))
+                            .shadow(
+                                color: .black.opacity(beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 0.25 : 0),
+                                radius: beautifySettings.clampedShadowRadius * zoomScale,
+                                y: beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 6 * zoomScale : 0
+                            )
+                            .padding(previewOuterInset)
+                        }
                         .frame(
-                            width: imageWidth * zoomScale,
-                            height: imageHeight * zoomScale
+                            width: beautifySettings.isEnabled ? previewWidth : effectiveImageWidth * zoomScale,
+                            height: beautifySettings.isEnabled ? previewHeight : effectiveImageHeight * zoomScale
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: beautifySettings.isEnabled ? beautifySettings.clampedCornerRadius * zoomScale : 0))
-                        .shadow(
-                            color: .black.opacity(beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 0.25 : 0),
-                            radius: beautifySettings.clampedShadowRadius * zoomScale,
-                            y: beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 6 * zoomScale : 0
-                        )
-                        .padding(previewOuterInset)
                     }
-                    .frame(
-                        width: beautifySettings.isEnabled ? previewWidth : imageWidth * zoomScale,
-                        height: beautifySettings.isEnabled ? previewHeight : imageHeight * zoomScale
-                    )
-                }
-                .background(Color(white: 0.12))
-                .onAppear {
-                    fitToWindow(availableSize: geo.size)
-                    // Sync the session-local slider to the persisted width
-                    // for whichever tool was last used (issue #75).
-                    lineWidth = savedWidth(for: currentTool)
-                    // Pre-cache text regions for smart highlighter snapping
-                    Task {
-                        if let regions = try? await TextRecognizer.recognize(
-                            image: sourceImage, level: .fast, detectURLs: false
-                        ) {
-                            textRegions = regions.map(\.boundingBox)
+                    .background(Color(white: 0.12))
+                    .onAppear {
+                        fitToWindow(availableSize: geo.size)
+                        // Sync the session-local slider to the persisted width
+                        // for whichever tool was last used (issue #75).
+                        lineWidth = savedWidth(for: currentTool)
+                        // Pre-cache text regions for smart highlighter snapping
+                        Task {
+                            if let regions = try? await TextRecognizer.recognize(
+                                image: sourceImage, level: .fast, detectURLs: false
+                            ) {
+                                textRegions = regions.map(\.boundingBox)
+                            }
                         }
                     }
-                }
-                .onChange(of: currentTool) { oldTool, newTool in
-                    // Clear selection so restoring lineWidth below doesn't
-                    // overwrite the previously drawn object's style.
-                    document.clearSelection()
+                    .onChange(of: currentTool) { oldTool, newTool in
+                        // Clear selection so restoring lineWidth below doesn't
+                        // overwrite the previously drawn object's style.
+                        document.clearSelection()
 
-                    // Save outgoing tool's value then restore incoming.
-                    persistWidth(lineWidth, for: oldTool)
-                    lineWidth = savedWidth(for: newTool)
-                }
-                .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
-                .onChange(of: lineWidth) { _, newValue in
-                    updateSelectedStyle()
-                    // Persist slider drags live so closing the editor
-                    // without switching tools still saves the change.
-                    persistWidth(newValue, for: currentTool)
-                }
-                .onChange(of: filled) { _, _ in updateSelectedStyle() }
-                .onChange(of: geo.size) { _, newSize in
-                    // Re-fit if window is resized and we're at fit scale
-                    if zoomScale == fitScale(for: newSize) { return }
-                }
-            }
-
-            // Bottom bar: zoom controls
-            HStack(spacing: 8) {
-                Button(action: zoomOut) {
-                    Image(systemName: "minus.magnifyingglass")
-                }
-                .buttonStyle(.borderless)
-                .keyboardShortcut("-", modifiers: .command)
-
-                Text("\(Int(zoomScale * 100))%")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44)
-
-                Button(action: zoomIn) {
-                    Image(systemName: "plus.magnifyingglass")
-                }
-                .buttonStyle(.borderless)
-                .keyboardShortcut("=", modifiers: .command)
-
-                Button("Fit") {
-                    // Re-calculate fit scale
-                    if let window = NSApp.keyWindow {
-                        let toolbarH: CGFloat = 90 // toolbar + zoom bar
-                        let available = CGSize(
-                            width: window.contentView?.bounds.width ?? 800,
-                            height: (window.contentView?.bounds.height ?? 600) - toolbarH
-                        )
-                        fitToWindow(availableSize: available)
+                        // Save outgoing tool's value then restore incoming.
+                        persistWidth(lineWidth, for: oldTool)
+                        lineWidth = savedWidth(for: newTool)
+                    }
+                    .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
+                    .onChange(of: lineWidth) { _, newValue in
+                        updateSelectedStyle()
+                        // Persist slider drags live so closing the editor
+                        // without switching tools still saves the change.
+                        persistWidth(newValue, for: currentTool)
+                    }
+                    .onChange(of: filled) { _, _ in updateSelectedStyle() }
+                    .onChange(of: geo.size) { _, newSize in
+                        // Re-fit if window is resized and we're at fit scale
+                        if zoomScale == fitScale(for: newSize) { return }
                     }
                 }
-                .buttonStyle(.borderless)
-                .keyboardShortcut("0", modifiers: .command)
 
-                Spacer()
+                // Bottom bar: zoom controls
+                HStack(spacing: 8) {
+                    Button(action: zoomOut) {
+                        Image(systemName: "minus.magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    .keyboardShortcut("-", modifiers: .command)
+
+                    Text("\(Int(zoomScale * 100))%")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44)
+
+                    Button(action: zoomIn) {
+                        Image(systemName: "plus.magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    .keyboardShortcut("=", modifiers: .command)
+
+                    Button("Fit") {
+                        // Re-calculate fit scale
+                        if let window = NSApp.keyWindow {
+                            let toolbarH: CGFloat = 90 // toolbar + zoom bar
+                            let available = CGSize(
+                                width: window.contentView?.bounds.width ?? 800,
+                                height: (window.contentView?.bounds.height ?? 600) - toolbarH
+                            )
+                            fitToWindow(availableSize: available)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .keyboardShortcut("0", modifiers: .command)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(.bar)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(.bar)
         }
     }
 
@@ -321,7 +393,11 @@ struct AnnotationEditorView: View {
     }
 
     private func renderedOutputImage() -> CGImage? {
-        guard let annotated = AnnotationRenderer.render(sourceImage: sourceImage, objects: document.objects) else {
+        guard let annotated = AnnotationRenderer.render(
+            sourceImage: sourceImage,
+            objects: document.objects,
+            cropRect: document.cropRect
+        ) else {
             return nil
         }
         return BeautifyRenderer.render(image: annotated, settings: beautifySettings)

@@ -4,7 +4,7 @@ import CoreGraphics
 import AppKit
 
 public enum AnnotationTool: String, CaseIterable, Sendable {
-    case select, arrow, rectangle, ellipse, text, freehand, pixelate, crop, counter, highlighter
+    case select, arrow, rectangle, ellipse, text, freehand, pixelate, counter, highlighter
 }
 
 public struct ObjectID: Hashable, Sendable {

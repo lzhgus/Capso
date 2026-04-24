@@ -261,9 +261,6 @@ final class AnnotationCanvasNSView: NSView {
         case .rectangle: ctx.stroke(rect)
         case .ellipse: ctx.strokeEllipse(in: rect)
         case .pixelate: ctx.setFillColor(CGColor(gray: 0.5, alpha: 0.3)); ctx.fill(rect)
-        case .crop:
-            ctx.setStrokeColor(CGColor(red: 0, green: 0.48, blue: 1, alpha: 1))
-            ctx.setLineDash(phase: 0, lengths: [6, 4]); ctx.stroke(rect)
         default: break
         }
         ctx.restoreGState()
@@ -536,7 +533,7 @@ final class AnnotationCanvasNSView: NSView {
                 let number = nextCounterNumber()
                 let counter = CounterObject(center: end, number: number, radius: currentStyle.lineWidth, style: currentStyle)
                 doc.addObject(counter)
-            case .crop, .select:
+            case .select:
                 break
             }
         }
