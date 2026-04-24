@@ -30,6 +30,7 @@ final class CaptureCoordinator {
 
     var lastCaptureResult: CaptureResult?
     var ocrCoordinator: OCRCoordinator?
+    var translationCoordinator: TranslationCoordinator?
     var historyCoordinator: HistoryCoordinator?
 
     /// Post-capture action override. When set, ignores Settings toggles.
@@ -535,7 +536,8 @@ final class CaptureCoordinator {
         case .clipboard:
             copyImageToClipboard(result.image)
         case .annotate:
-            openAnnotationEditor(result)
+            // Open the editor on the same screen the capture came from.
+            openAnnotationEditor(result, anchorScreen: screenFor(result: result))
         case .default:
             if settings.screenshotAutoCopy {
                 copyImageToClipboard(result.image)
@@ -590,14 +592,27 @@ final class CaptureCoordinator {
         }
         window.onAnnotate = { [weak self, weak window] in
             guard let self, let window else { return }
+            let anchor = window.targetScreen
             self.dismissQuickAccessWindow(window)
-            self.openAnnotationEditor(result)
+            self.openAnnotationEditor(result, anchorScreen: anchor)
         }
         window.onPin = { [weak self, weak window] in
             guard let self, let window else { return }
             let anchor = window.frame
             self.dismissQuickAccessWindow(window)
             self.pinToScreen(result, anchor: anchor)
+        }
+        window.onOCR = { [weak self, weak window] in
+            guard let self, let window else { return }
+            let anchor = window.targetScreen
+            self.dismissQuickAccessWindow(window)
+            self.ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: anchor)
+        }
+        window.onTranslate = { [weak self, weak window] in
+            guard let self, let window else { return }
+            let anchor = window.targetScreen
+            self.dismissQuickAccessWindow(window)
+            self.translationCoordinator?.translate(image: result.image, anchorScreen: anchor)
         }
         window.onClose = { [weak self, weak window] in
             guard let self, let window else { return }
@@ -643,9 +658,14 @@ final class CaptureCoordinator {
         }
     }
 
-    private func openAnnotationEditor(_ result: CaptureResult) {
+    private func openAnnotationEditor(_ result: CaptureResult, anchorScreen: NSScreen? = nil) {
+        // If the caller didn't pass a screen explicitly, derive one from the
+        // capture's displayID so `captureAreaAndAnnotate()` (direct ⌘⇧…
+        // shortcut path) also opens on the right display.
+        let screen = anchorScreen ?? screenFor(result: result)
         annotationWindow = AnnotationEditorWindow(
             image: result.image,
+            anchorScreen: screen,
             onSave: { [weak self] (rendered: CGImage) in
                 self?.saveRenderedImage(rendered)
                 self?.annotationWindow = nil
@@ -659,6 +679,34 @@ final class CaptureCoordinator {
             }
         )
         annotationWindow?.show()
+    }
+
+    /// Look up the NSScreen whose displayID matches the capture. Returns nil
+    /// if the originating display is no longer connected (rare — user
+    /// unplugged the monitor between capture and action).
+    private func screenFor(result: CaptureResult) -> NSScreen? {
+        NSScreen.screens.first { $0.displayID == result.displayID }
+    }
+
+    /// If the currently-focused Quick Access panel can handle the Translate
+    /// action, fire it and return true. Otherwise return false so the caller
+    /// (a global shortcut handler) can fall through to its default behavior.
+    ///
+    /// This exists because the `KeyboardShortcuts` package registers a
+    /// SYSTEM-wide hotkey for `⌘⇧T`, which always wins over a SwiftUI
+    /// `.keyboardShortcut` attached to the Translate button in the Quick
+    /// Access panel. Without this fall-through, pressing ⌘⇧T while hovering
+    /// a Quick Access preview would trigger a fresh capture-and-translate
+    /// flow instead of translating the capture the user was already looking at.
+    @discardableResult
+    func invokeQuickAccessTranslateIfKey() -> Bool {
+        guard let key = NSApp.keyWindow as? QuickAccessWindow,
+              quickAccessWindows.contains(where: { $0 === key }),
+              let handler = key.onTranslate else {
+            return false
+        }
+        handler()
+        return true
     }
 
     private func pinToScreen(_ result: CaptureResult, anchor: CGRect) {

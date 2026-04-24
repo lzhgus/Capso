@@ -1,14 +1,36 @@
 // App/Sources/Preferences/Tabs/OCRSettingsView.swift
 import SwiftUI
 import Vision
+import SharedKit
 
-struct OCRSettingsView: View {
+struct TextAndTranslationSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
     @State private var supportedLanguages: [(code: String, name: String)] = []
 
+    private let translationLanguages: [(code: String, name: String)] = [
+        ("en",      "English"),
+        ("zh-Hans", "简体中文"),
+        ("zh-Hant", "繁體中文"),
+        ("ja",      "日本語"),
+        ("ko",      "한국어"),
+        ("fr",      "Français"),
+        ("de",      "Deutsch"),
+        ("es",      "Español"),
+        ("it",      "Italiano"),
+        ("pt-BR",   "Português (Brasil)"),
+        ("ru",      "Русский"),
+        ("ar",      "العربية"),
+        ("hi",      "हिन्दी"),
+        ("nl",      "Nederlands"),
+        ("pl",      "Polski"),
+        ("tr",      "Türkçe"),
+        ("uk",      "Українська"),
+        ("id",      "Bahasa Indonesia"),
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("OCR")
+            Text("Text & Translation")
                 .font(.system(size: 20, weight: .bold))
 
             SettingGroup(title: "Text Recognition") {
@@ -22,6 +44,37 @@ struct OCRSettingsView: View {
                         Toggle("", isOn: $viewModel.ocrDetectLinks)
                             .toggleStyle(.switch)
                             .controlSize(.small)
+                    }
+                }
+            }
+
+            SettingGroup(title: "Translation") {
+                SettingCard {
+                    SettingRow(label: "Target Language", sublabel: "Language to translate text into") {
+                        Picker("", selection: $viewModel.translationTargetLanguage) {
+                            ForEach(translationLanguages, id: \.code) { lang in
+                                Text(lang.name).tag(lang.code)
+                            }
+                        }
+                        .frame(width: 180)
+                    }
+                    SettingRow(label: "Auto-Copy Translation", sublabel: "Copy result to clipboard automatically") {
+                        Toggle("", isOn: $viewModel.translationAutoCopy)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    SettingRow(label: "Show Original Text", sublabel: "Display source text alongside translation") {
+                        Toggle("", isOn: $viewModel.translationShowOriginal)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    SettingRow(label: "Auto-Dismiss", sublabel: "When to close the translation panel", showDivider: true) {
+                        Picker("", selection: $viewModel.translationAutoDismiss) {
+                            Text("Manual").tag(TranslationAutoDismiss.manual)
+                            Text("Click outside").tag(TranslationAutoDismiss.clickOutside)
+                            Text("After delay").tag(TranslationAutoDismiss.afterDelay)
+                        }
+                        .frame(width: 140)
                     }
                 }
             }

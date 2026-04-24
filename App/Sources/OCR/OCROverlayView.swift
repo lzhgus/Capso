@@ -104,17 +104,13 @@ struct OCROverlayView: View {
             Divider()
 
             HStack(spacing: 8) {
-                Button("Select All") {
-                    copyAll()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
+                Spacer()
                 Button("Copy All") {
                     copyAll()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
+                .keyboardShortcut("c", modifiers: .command)
             }
             .padding(12)
         }

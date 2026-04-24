@@ -13,11 +13,31 @@ final class AnnotationCanvasNSView: NSView {
     var document: AnnotationDocument?
     var sourceImage: CGImage?
     var currentTool: AnnotationTool = .select
-    var currentStyle: StrokeStyle = StrokeStyle()
+    var currentStyle: StrokeStyle = StrokeStyle() {
+        didSet { syncEditorStyle() }
+    }
+    /// Font size used for newly created TextObjects and propagated live to
+    /// the inline editor. Pushed from SwiftUI by AnnotationCanvasView.
+    var currentTextFontSize: CGFloat = 48 {
+        didSet { textEditor?.fontSize = currentTextFontSize }
+    }
     var onDocumentChanged: (() -> Void)?
     var onObjectCreated: (() -> Void)?
+    /// Fired when an inline text edit begins. Passes the effective fontSize
+    /// (matches the existing object when re-editing, or `currentTextFontSize`
+    /// for a fresh edit). SwiftUI uses it to flip `isEditingText` and — for
+    /// double-click re-edits — to sync the font-size slider to the object.
+    var onTextEditingStarted: ((CGFloat) -> Void)?
+    /// Fired on commit / cancel.
+    var onTextEditingEnded: (() -> Void)?
 
-    var zoomScale: CGFloat = 1.0
+    var zoomScale: CGFloat = 1.0 {
+        didSet {
+            guard zoomScale != oldValue, let editor = textEditor else { return }
+            editor.zoomScale = zoomScale
+            repositionEditor()
+        }
+    }
 
     private var dragStart: CGPoint?
     private var dragCurrent: CGPoint?
@@ -35,6 +55,14 @@ final class AnnotationCanvasNSView: NSView {
     /// When the highlighter starts on a text line, stores the line's
     /// bounding box so the stroke is constrained to a horizontal band.
     private var highlighterSnapRect: CGRect?
+
+    // MARK: - Inline text editing state
+
+    /// The currently-visible inline editor, if any.
+    private var textEditor: AnnotationTextEditor?
+    /// When re-editing an existing TextObject (double-click), holds it so we
+    /// can mutate it on commit rather than creating a new object.
+    private var editingOriginalObject: TextObject?
 
     private let handleRadius: CGFloat = 5  // in image coords (adjusted by zoom in drawing)
 
@@ -161,6 +189,12 @@ final class AnnotationCanvasNSView: NSView {
 
         if let doc = document {
             for object in doc.objects {
+                // While a TextObject is being re-edited inline, hide it from
+                // the canvas render so we don't double-draw the text under
+                // the live editor.
+                if let text = object as? TextObject, text === editingOriginalObject {
+                    continue
+                }
                 if let pixelate = object as? PixelateObject, let src = sourceImage {
                     pixelate.renderWithSource(in: ctx, sourceImage: src)
                 } else {
@@ -238,6 +272,21 @@ final class AnnotationCanvasNSView: NSView {
     // MARK: - Mouse Handling
 
     override func mouseDown(with event: NSEvent) {
+        // If we're currently editing a text object, any click *outside* the
+        // editor commits the edit; clicks inside are forwarded to the editor.
+        if let editor = textEditor {
+            let pointInSelf = convert(event.locationInWindow, from: nil)
+            if editor.containsCanvasPoint(pointInSelf) {
+                // Let the NSTextView handle the click (focus / caret placement).
+                super.mouseDown(with: event)
+                return
+            } else {
+                commitTextEditing()
+                // Fall through: the click should still be processed as a fresh
+                // canvas interaction (e.g. create another text box, select, etc.).
+            }
+        }
+
         // Make sure we own keyboard focus so subsequent keyDown events
         // (Delete, etc.) actually reach us. Safe to call even if we already are.
         window?.makeFirstResponder(self)
@@ -251,6 +300,14 @@ final class AnnotationCanvasNSView: NSView {
         resizeOriginalTextFontSize = nil
 
         if currentTool == .select {
+            // Double-click a TextObject → enter inline edit mode.
+            if event.clickCount == 2, let obj = doc.objectAt(point: point),
+               let text = obj as? TextObject {
+                isDragging = false
+                beginTextEditing(at: text.origin, existing: text)
+                return
+            }
+
             // Check resize handles on selected object FIRST
             if let selected = doc.selectedObject {
                 if let handle = handleHitTest(point: point, bounds: selected.bounds) {
@@ -452,16 +509,17 @@ final class AnnotationCanvasNSView: NSView {
                     doc.addObject(EllipseObject(rect: rect, style: currentStyle))
                 }
             case .text:
-                let alert = NSAlert()
-                alert.messageText = String(localized: "Enter Text")
-                alert.addButton(withTitle: String(localized: "OK"))
-                alert.addButton(withTitle: String(localized: "Cancel"))
-                let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-                input.stringValue = String(localized: "Text")
-                alert.accessoryView = input
-                if alert.runModal() == .alertFirstButtonReturn {
-                    doc.addObject(TextObject(text: input.stringValue, origin: end, style: currentStyle))
-                }
+                // Inline editor replaces the old NSAlert popup. Spawn at the
+                // click point; commit happens on Esc or outside-click.
+                beginTextEditing(at: end, existing: nil)
+                // Skip the normal post-create path — creation is deferred to
+                // commitTextEditing, and we do NOT want to switch back to
+                // select tool yet (user hasn't typed anything).
+                isDragging = false
+                dragStart = nil
+                dragCurrent = nil
+                needsDisplay = true
+                return
             case .freehand, .highlighter:
                 if let freehand = activeFreehand, freehand.points.count > 1 {
                     doc.addObject(freehand)
@@ -502,5 +560,123 @@ final class AnnotationCanvasNSView: NSView {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    // MARK: - Inline text editing
+
+    /// Begin an inline text edit at `imagePoint` (image coordinates).
+    /// Pass an `existing` TextObject for double-click re-edit; pass `nil` for
+    /// a fresh text creation.
+    private func beginTextEditing(at imagePoint: CGPoint, existing: TextObject?) {
+        // If one is already up, finish it before opening a new one.
+        if textEditor != nil { commitTextEditing() }
+
+        let editor = AnnotationTextEditor(frame: .zero)
+        editor.delegate = self
+        editor.zoomScale = zoomScale
+        editor.imageOrigin = imagePoint
+
+        if let existing {
+            editor.fontSize = existing.fontSize
+            editor.fontName = existing.fontName
+            editor.textColor = existing.style.color.nsColor
+                .withAlphaComponent(existing.style.opacity)
+            editor.beginEditing(initialText: existing.text)
+            editingOriginalObject = existing
+        } else {
+            editor.fontSize = currentTextFontSize
+            editor.textColor = currentStyle.color.nsColor
+                .withAlphaComponent(currentStyle.opacity)
+            editor.beginEditing(initialText: "")
+            editingOriginalObject = nil
+        }
+
+        addSubview(editor)
+        textEditor = editor
+        repositionEditor()
+        editor.focusTextView()
+        needsDisplay = true
+
+        // Notify SwiftUI so the toolbar can flip into font-size mode and
+        // — for re-edits — sync the slider to the object's fontSize.
+        onTextEditingStarted?(editor.fontSize)
+    }
+
+    /// Position the editor's frame based on its `imageOrigin` and the current
+    /// zoom. Called on create, on zoom change, and on content resize.
+    private func repositionEditor() {
+        guard let editor = textEditor else { return }
+        let viewOrigin = CGPoint(
+            x: editor.imageOrigin.x * zoomScale,
+            y: editor.imageOrigin.y * zoomScale
+        )
+        editor.setFrameOrigin(viewOrigin)
+    }
+
+    /// Finalize the edit: create / mutate / delete a TextObject depending on
+    /// the combination of (editingOriginalObject, text) and tear down the
+    /// inline editor.
+    private func commitTextEditing() {
+        guard let editor = textEditor, let doc = document else { return }
+
+        let finalText = editor.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let origin = editor.imageOrigin
+
+        if let existing = editingOriginalObject {
+            if finalText.isEmpty {
+                // Edited to empty → delete the original.
+                doc.removeObject(id: existing.id)
+            } else if finalText != existing.text || editor.fontSize != existing.fontSize {
+                // Mutated text or fontSize — push one undo step, then update.
+                doc.beginDrag()
+                existing.text = finalText
+                existing.fontSize = editor.fontSize
+            }
+        } else if !finalText.isEmpty {
+            // Fresh edit with content → create a new TextObject using the
+            // editor's current style (which reflects live toolbar changes).
+            let newObj = TextObject(
+                text: finalText,
+                origin: origin,
+                fontSize: editor.fontSize,
+                style: currentStyle
+            )
+            doc.addObject(newObj)
+        }
+        // else: fresh edit with empty text → just discard.
+
+        // Tear down the editor.
+        editor.removeFromSuperview()
+        textEditor = nil
+        editingOriginalObject = nil
+
+        needsDisplay = true
+        window?.makeFirstResponder(self)
+        onDocumentChanged?()
+        onTextEditingEnded?()
+
+        // Creation path: switch back to select, matching the other one-shot
+        // tools (arrow / rect / ellipse / pixelate).
+        if currentTool == .text {
+            onObjectCreated?()
+        }
+    }
+
+    /// When `currentStyle` changes (toolbar color / opacity) and we're mid-edit,
+    /// push the new color into the editor so the typed text re-renders live.
+    private func syncEditorStyle() {
+        guard let editor = textEditor else { return }
+        editor.textColor = currentStyle.color.nsColor
+            .withAlphaComponent(currentStyle.opacity)
+    }
+}
+
+// MARK: - AnnotationTextEditorDelegate
+
+extension AnnotationCanvasNSView: AnnotationTextEditorDelegate {
+    func textEditor(_ editor: AnnotationTextEditor, didCommitText text: String) {
+        // Editor is asking us to finalize (Esc pressed). Outside-click commits
+        // are handled directly in mouseDown.
+        commitTextEditing()
     }
 }

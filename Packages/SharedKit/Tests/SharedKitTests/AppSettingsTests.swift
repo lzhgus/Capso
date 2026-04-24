@@ -86,4 +86,64 @@ struct AppSettingsTests {
             FileNaming.generateFileName(for: .recording, format: .mov, date: date).hasSuffix(".mov")
         )
     }
+
+    @Test("Default translation target language is non-empty")
+    func defaultTranslationTargetLanguage() {
+        let settings = AppSettings()
+        #expect(!settings.translationTargetLanguage.isEmpty)
+    }
+
+    @Test("Default translationAutoCopy is true")
+    func defaultTranslationAutoCopy() {
+        let suite = "test.translationAutoCopy.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.translationAutoCopy == true)
+    }
+
+    @Test("Default translationShowOriginal is true")
+    func defaultTranslationShowOriginal() {
+        let suite = "test.translationShowOriginal.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.translationShowOriginal == true)
+    }
+
+    @Test("Default card position is .centerScreen")
+    func defaultCardPosition() {
+        let suite = "test.translationCardPosition.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.translationCardPosition == .centerScreen)
+    }
+
+    @Test("Default auto-dismiss is .manual")
+    func defaultAutoDismiss() {
+        let suite = "test.translationAutoDismiss.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.translationAutoDismiss == .manual)
+    }
+
+    @Test("Translation onboarding flag defaults false")
+    func defaultOnboardingShown() {
+        let suite = "test.translationOnboardingShown.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.translationOnboardingShown == false)
+    }
+
+    @Test("Default auto-dismiss delay is 10 seconds")
+    func defaultAutoDismissDelay() {
+        let suite = "test.translationAutoDismissDelay.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.translationAutoDismissDelay == 10)
+    }
 }

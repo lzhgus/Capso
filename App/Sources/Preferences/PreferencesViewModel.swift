@@ -401,6 +401,52 @@ final class PreferencesViewModel {
         }
     }
 
+    // MARK: Translation
+    var translationTargetLanguage: String {
+        get {
+            access(keyPath: \.translationTargetLanguage)
+            return settings.translationTargetLanguage
+        }
+        set {
+            withMutation(keyPath: \.translationTargetLanguage) {
+                settings.translationTargetLanguage = newValue
+            }
+        }
+    }
+    var translationAutoCopy: Bool {
+        get {
+            access(keyPath: \.translationAutoCopy)
+            return settings.translationAutoCopy
+        }
+        set {
+            withMutation(keyPath: \.translationAutoCopy) {
+                settings.translationAutoCopy = newValue
+            }
+        }
+    }
+    var translationShowOriginal: Bool {
+        get {
+            access(keyPath: \.translationShowOriginal)
+            return settings.translationShowOriginal
+        }
+        set {
+            withMutation(keyPath: \.translationShowOriginal) {
+                settings.translationShowOriginal = newValue
+            }
+        }
+    }
+    var translationAutoDismiss: TranslationAutoDismiss {
+        get {
+            access(keyPath: \.translationAutoDismiss)
+            return settings.translationAutoDismiss
+        }
+        set {
+            withMutation(keyPath: \.translationAutoDismiss) {
+                settings.translationAutoDismiss = newValue
+            }
+        }
+    }
+
     // MARK: Version
     // MARK: History
     var historyEnabled: Bool {

@@ -33,6 +33,8 @@ packages:
     path: Packages/AnnotationKit
   OCRKit:
     path: Packages/OCRKit
+  TranslationKit:
+    path: Packages/TranslationKit
   ExportKit:
     path: Packages/ExportKit
   EffectsKit:
@@ -78,6 +80,7 @@ targets:
       - package: CameraKit
       - package: AnnotationKit
       - package: OCRKit
+      - package: TranslationKit
       - package: ExportKit
       - package: EffectsKit
       - package: EditorKit

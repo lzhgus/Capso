@@ -7,9 +7,21 @@ import OCRKit
 final class OCROverlayWindow: NSPanel {
     var onClose: (() -> Void)?
 
-    init(image: CGImage, regions: [TextRegion]) {
+    init(image: CGImage, regions: [TextRegion], anchorScreen: NSScreen? = nil) {
+        // Pick the screen the capture came from, not the primary by default.
+        // `NSWindow.center()` centers within the window's *current* screen,
+        // which for a freshly-constructed window is the primary — so relying
+        // on it means secondary-display captures always open on main.
+        let screen = anchorScreen ?? NSScreen.main ?? NSScreen.screens.first!
+        let size = NSSize(width: 900, height: 550)
+        let visible = screen.visibleFrame
+        let origin = NSPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.midY - size.height / 2
+        )
+
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 550),
+            contentRect: NSRect(origin: origin, size: size),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -19,7 +31,6 @@ final class OCROverlayWindow: NSPanel {
         self.title = "OCR — Text Recognition"
         self.isMovableByWindowBackground = false
         self.minSize = NSSize(width: 600, height: 400)
-        self.center()
 
         let view = OCROverlayView(
             image: image,

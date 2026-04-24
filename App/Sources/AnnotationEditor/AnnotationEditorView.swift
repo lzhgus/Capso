@@ -18,6 +18,13 @@ struct AnnotationEditorView: View {
     @State private var savedBlockSize: CGFloat = 12
     @State private var savedCounterSize: CGFloat = 20
     @State private var savedHighlighterWidth: CGFloat = 20
+    /// Preserved font size for the Text tool. Swapped in/out of `lineWidth`
+    /// as the user toggles tools — same pattern as savedBlockSize etc.
+    @State private var savedTextFontSize: CGFloat = 48
+    /// True while an inline text editor is active. Lets the toolbar show
+    /// the font-size slider even when the tool is `.select` (happens when
+    /// re-editing via double-click).
+    @State private var isEditingText = false
     @State private var beautifySettings = BeautifySettings()
     @State private var showBeautifyPanel = false
     @State private var refreshTrigger = 0
@@ -57,6 +64,14 @@ struct AnnotationEditorView: View {
         )
     }
 
+    /// Font size currently pushed to the canvas. When the slider is in
+    /// font-size mode (text tool active OR mid-edit), the live slider value
+    /// wins so dragging it updates the editor in real time. Otherwise we
+    /// fall back to the preserved value from the last text session.
+    private var effectiveTextFontSize: CGFloat {
+        (currentTool == .text || isEditingText) ? lineWidth : savedTextFontSize
+    }
+
     /// Live preview of the Beautify background. For solid, just a filled Rect.
     /// For liquid glass, a blurred & saturation-boosted copy of the screenshot
     /// scaled to fill the background area — mirrors what `BeautifyRenderer`
@@ -89,6 +104,7 @@ struct AnnotationEditorView: View {
                 lineWidth: $lineWidth,
                 filled: $filled,
                 showBeautifyPanel: $showBeautifyPanel,
+                isEditingText: isEditingText,
                 canUndo: document.canUndo,
                 canRedo: document.canRedo,
                 onUndo: { document.undo(); refreshTrigger += 1 },
@@ -118,12 +134,28 @@ struct AnnotationEditorView: View {
                             sourceImage: sourceImage,
                             currentTool: currentTool,
                             currentStyle: currentStyle,
+                            textFontSize: effectiveTextFontSize,
                             zoomScale: zoomScale,
                             refreshTrigger: refreshTrigger,
                             textRegions: textRegions,
                             onSwitchToSelect: {
                                 document.clearSelection()
                                 currentTool = .select
+                            },
+                            onTextEditingStarted: { fontSize in
+                                isEditingText = true
+                                // Sync slider to the object's fontSize when
+                                // re-editing. Harmless for fresh edits: the
+                                // value matches what we just pushed in.
+                                if lineWidth != fontSize {
+                                    lineWidth = fontSize
+                                }
+                            },
+                            onTextEditingEnded: {
+                                isEditingText = false
+                                // Preserve the last-used font size for the
+                                // next text edit / tool switch.
+                                savedTextFontSize = lineWidth
                             }
                         )
                         .frame(
@@ -165,6 +197,7 @@ struct AnnotationEditorView: View {
                     case .pixelate: savedBlockSize = lineWidth
                     case .counter: savedCounterSize = lineWidth
                     case .highlighter: savedHighlighterWidth = lineWidth
+                    case .text: savedTextFontSize = lineWidth
                     default: savedLineWidth = lineWidth
                     }
                     // Restore incoming tool's value
@@ -172,6 +205,7 @@ struct AnnotationEditorView: View {
                     case .pixelate: lineWidth = savedBlockSize
                     case .counter: lineWidth = savedCounterSize
                     case .highlighter: lineWidth = savedHighlighterWidth
+                    case .text: lineWidth = savedTextFontSize
                     default: lineWidth = savedLineWidth
                     }
                 }

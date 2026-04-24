@@ -8,6 +8,11 @@ struct AnnotationToolbar: View {
     @Binding var lineWidth: CGFloat
     @Binding var filled: Bool
     @Binding var showBeautifyPanel: Bool
+    /// True when an inline text edit is active (either via the text tool or
+    /// by double-clicking an existing TextObject in select mode). When set,
+    /// the size slider behaves as a Font Size control regardless of the
+    /// currently selected tool — so users can keep tuning size while typing.
+    var isEditingText: Bool = false
     let canUndo: Bool
     let canRedo: Bool
     let onUndo: () -> Void
@@ -15,6 +20,12 @@ struct AnnotationToolbar: View {
     let onSave: () -> Void
     let onCopy: () -> Void
     let onCancel: () -> Void
+
+    /// The size slider serves multiple tools: in text / editing mode it means
+    /// font size; for other tools it retains its existing role.
+    private var isFontSizeMode: Bool {
+        currentTool == .text || isEditingText
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -98,7 +109,12 @@ struct AnnotationToolbar: View {
 
     private var strokeGroup: some View {
         HStack(spacing: 8) {
-            if currentTool == .pixelate {
+            if isFontSizeMode {
+                // Text tool or mid-edit: slider becomes a font-size control.
+                Slider(value: $lineWidth, in: 12...120, step: 1)
+                    .frame(width: 80)
+                    .help("Font Size: \(Int(lineWidth))")
+            } else if currentTool == .pixelate {
                 Slider(value: $lineWidth, in: 4...48, step: 2)
                     .frame(width: 80)
                     .help("Block Size: \(Int(lineWidth))")
@@ -115,7 +131,10 @@ struct AnnotationToolbar: View {
                     .frame(width: 80)
                     .help("Line Width: \(Int(lineWidth))")
             }
-            if currentTool != .counter && currentTool != .highlighter {
+            // Fill toggle is meaningless for counter / highlighter / text.
+            if currentTool != .counter
+                && currentTool != .highlighter
+                && !isFontSizeMode {
                 Toggle(isOn: $filled) {
                     Image(systemName: filled ? "square.fill" : "square")
                         .font(.system(size: 12))

@@ -98,17 +98,21 @@ final class OCRCoordinator {
 
     // MARK: - Visual OCR
 
-    func startVisualOCR(image: CGImage) {
+    /// - Parameter anchorScreen: The screen where the capture came from /
+    ///   where the user was focused. When nil, the overlay falls back to the
+    ///   primary display — use the nil form only when we genuinely don't know
+    ///   (e.g. menu-bar invocation with no prior anchor).
+    func startVisualOCR(image: CGImage, anchorScreen: NSScreen? = nil) {
         if !settings.ocrOnboardingShown {
             showOnboarding { [weak self] in
-                self?.beginVisualOCR(image: image)
+                self?.beginVisualOCR(image: image, anchorScreen: anchorScreen)
             }
         } else {
-            beginVisualOCR(image: image)
+            beginVisualOCR(image: image, anchorScreen: anchorScreen)
         }
     }
 
-    private func beginVisualOCR(image: CGImage) {
+    private func beginVisualOCR(image: CGImage, anchorScreen: NSScreen?) {
         Task {
             do {
                 let regions = try await TextRecognizer.recognize(
@@ -121,7 +125,7 @@ final class OCRCoordinator {
                     return
                 }
 
-                showOCROverlay(image: image, regions: regions)
+                showOCROverlay(image: image, regions: regions, anchorScreen: anchorScreen)
             } catch {
                 logger.error("Visual OCR failed: \(error.localizedDescription, privacy: .public)")
                 showToast("OCR: \(error.localizedDescription)", icon: "xmark.circle.fill", iconColor: .systemRed)
@@ -129,9 +133,9 @@ final class OCRCoordinator {
         }
     }
 
-    private func showOCROverlay(image: CGImage, regions: [TextRegion]) {
+    private func showOCROverlay(image: CGImage, regions: [TextRegion], anchorScreen: NSScreen?) {
         ocrOverlayWindow?.close()
-        ocrOverlayWindow = OCROverlayWindow(image: image, regions: regions)
+        ocrOverlayWindow = OCROverlayWindow(image: image, regions: regions, anchorScreen: anchorScreen)
         ocrOverlayWindow?.onClose = { [weak self] in
             self?.ocrOverlayWindow = nil
         }

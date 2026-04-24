@@ -18,6 +18,18 @@ public enum RecordingFormat: String, CaseIterable, Sendable {
     case gif
 }
 
+public enum TranslationCardPosition: String, CaseIterable, Sendable {
+    case belowSelection
+    case centerScreen
+    case rememberLast
+}
+
+public enum TranslationAutoDismiss: String, CaseIterable, Sendable {
+    case manual
+    case clickOutside
+    case afterDelay
+}
+
 public enum ExportQuality: String, CaseIterable, Sendable {
     case maximum
     case social
@@ -323,6 +335,73 @@ public final class AppSettings: @unchecked Sendable {
     public var ocrOnboardingShown: Bool {
         get { defaults.object(forKey: "ocrOnboardingShown") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "ocrOnboardingShown") }
+    }
+
+    // MARK: Translation
+    public var translationTargetLanguage: String {
+        get {
+            defaults.string(forKey: "translationTargetLanguage") ?? Self.systemDefaultLanguage()
+        }
+        set { defaults.set(newValue, forKey: "translationTargetLanguage") }
+    }
+
+    public var translationAutoCopy: Bool {
+        get { defaults.object(forKey: "translationAutoCopy") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "translationAutoCopy") }
+    }
+
+    public var translationShowOriginal: Bool {
+        get { defaults.object(forKey: "translationShowOriginal") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "translationShowOriginal") }
+    }
+
+    public var translationCardPosition: TranslationCardPosition {
+        get {
+            guard let raw = defaults.string(forKey: "translationCardPosition"),
+                  let value = TranslationCardPosition(rawValue: raw) else { return .centerScreen }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "translationCardPosition") }
+    }
+
+    public var translationAutoDismiss: TranslationAutoDismiss {
+        get {
+            guard let raw = defaults.string(forKey: "translationAutoDismiss"),
+                  let value = TranslationAutoDismiss(rawValue: raw) else { return .manual }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "translationAutoDismiss") }
+    }
+
+    public var translationAutoDismissDelay: TimeInterval {
+        get { defaults.object(forKey: "translationAutoDismissDelay") as? TimeInterval ?? 10 }
+        set { defaults.set(newValue, forKey: "translationAutoDismissDelay") }
+    }
+
+    public var translationOnboardingShown: Bool {
+        get { defaults.object(forKey: "translationOnboardingShown") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "translationOnboardingShown") }
+    }
+
+    /// Chosen at first launch; falls back to English for unsupported locales.
+    /// Kept here (rather than in TranslationKit) so SharedKit has no extra dependency.
+    private static func systemDefaultLanguage() -> String {
+        let locale = Locale.current
+        guard let code = locale.language.languageCode?.identifier else { return "en" }
+        if code == "zh" {
+            let script = locale.language.script?.identifier
+            let region = locale.region?.identifier
+            let traditionalRegions: Set<String> = ["TW", "HK", "MO"]
+            let isTraditional = script == "Hant"
+                || (script == nil && region.map(traditionalRegions.contains) == true)
+            return isTraditional ? "zh-Hant" : "zh-Hans"
+        }
+        if code == "pt" { return "pt-BR" }
+        let supported: Set<String> = [
+            "ar", "de", "en", "es", "fr", "hi", "id", "it", "ja", "ko",
+            "nl", "pl", "ru", "tr", "uk"
+        ]
+        return supported.contains(code) ? code : "en"
     }
 
     // MARK: Licensing

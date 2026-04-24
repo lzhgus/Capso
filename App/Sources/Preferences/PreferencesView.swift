@@ -18,7 +18,7 @@ enum PreferencesTab: String, CaseIterable {
         case .recording: "Recording"
         case .quickAccess: "Quick Access"
         case .export: "Export"
-        case .ocr: "OCR"
+        case .ocr: "Text & Translation"
         case .shortcuts: "Shortcuts"
         }
     }
@@ -95,7 +95,7 @@ struct PreferencesView: View {
                 case .export:
                     ExportSettingsView(viewModel: viewModel)
                 case .ocr:
-                    OCRSettingsView(viewModel: viewModel)
+                    TextAndTranslationSettingsView(viewModel: viewModel)
                 case .shortcuts:
                     ShortcutSettingsView()
                 }

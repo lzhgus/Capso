@@ -15,14 +15,16 @@ final class MenuBarController: NSObject {
     private let captureCoordinator: CaptureCoordinator
     private let recordingCoordinator: RecordingCoordinator
     private let ocrCoordinator: OCRCoordinator
+    private let translationCoordinator: TranslationCoordinator
     private let historyCoordinator: HistoryCoordinator
     private let onShowPreferences: () -> Void
 
-    init(settings: AppSettings, captureCoordinator: CaptureCoordinator, recordingCoordinator: RecordingCoordinator, ocrCoordinator: OCRCoordinator, historyCoordinator: HistoryCoordinator, onShowPreferences: @escaping () -> Void) {
+    init(settings: AppSettings, captureCoordinator: CaptureCoordinator, recordingCoordinator: RecordingCoordinator, ocrCoordinator: OCRCoordinator, translationCoordinator: TranslationCoordinator, historyCoordinator: HistoryCoordinator, onShowPreferences: @escaping () -> Void) {
         self.settings = settings
         self.captureCoordinator = captureCoordinator
         self.recordingCoordinator = recordingCoordinator
         self.ocrCoordinator = ocrCoordinator
+        self.translationCoordinator = translationCoordinator
         self.historyCoordinator = historyCoordinator
         self.onShowPreferences = onShowPreferences
         super.init()
@@ -87,6 +89,10 @@ final class MenuBarController: NSObject {
         captureText.setShortcut(for: .captureText)
         menu.addItem(captureText)
 
+        let captureAndTranslate = menuItem(String(localized: "Capture & Translate"), action: #selector(self.captureAndTranslate))
+        captureAndTranslate.setShortcut(for: .captureAndTranslate)
+        menu.addItem(captureAndTranslate)
+
         let captureScrolling = menuItem(String(localized: "Scrolling Capture"), action: #selector(captureScrolling))
         captureScrolling.setShortcut(for: .captureScrolling)
         menu.addItem(captureScrolling)
@@ -135,6 +141,10 @@ final class MenuBarController: NSObject {
         ocrCoordinator.startInstantOCR()
     }
 
+    @objc private func captureAndTranslate() {
+        translationCoordinator.startCaptureAndTranslate()
+    }
+
     @objc private func captureScrolling() {
         captureCoordinator.captureScrolling()
     }
@@ -172,6 +182,7 @@ extension MenuBarController: NSMenuDelegate {
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)
             case #selector(captureWindow): item.setShortcut(for: .captureWindow)
             case #selector(captureText): item.setShortcut(for: .captureText)
+            case #selector(captureAndTranslate): item.setShortcut(for: .captureAndTranslate)
             case #selector(recordScreen): item.setShortcut(for: .recordScreen)
             case #selector(captureScrolling): item.setShortcut(for: .captureScrolling)
             case #selector(openHistory): item.setShortcut(for: .screenshotHistory)

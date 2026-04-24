@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var captureCoordinator: CaptureCoordinator?
     private(set) var recordingCoordinator: RecordingCoordinator?
     private(set) var ocrCoordinator: OCRCoordinator?
+    private(set) var translationCoordinator: TranslationCoordinator?
     private(set) var historyCoordinator: HistoryCoordinator?
     private var preferencesWindow: PreferencesWindow?
     /// Sparkle update coordinator used by preferences and manual update checks.
@@ -26,8 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureCoordinator = CaptureCoordinator(settings: settings)
         recordingCoordinator = RecordingCoordinator(settings: settings)
         ocrCoordinator = OCRCoordinator(settings: settings)
+        translationCoordinator = TranslationCoordinator(settings: settings)
         historyCoordinator = HistoryCoordinator(settings: settings)
         captureCoordinator!.ocrCoordinator = ocrCoordinator
+        captureCoordinator!.translationCoordinator = translationCoordinator
         captureCoordinator!.historyCoordinator = historyCoordinator
         recordingCoordinator!.historyCoordinator = historyCoordinator
         preferencesWindow = PreferencesWindow(settings: settings, updateManager: updateManager)
@@ -36,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             captureCoordinator: captureCoordinator!,
             recordingCoordinator: recordingCoordinator!,
             ocrCoordinator: ocrCoordinator!,
+            translationCoordinator: translationCoordinator!,
             historyCoordinator: historyCoordinator!,
             onShowPreferences: { [weak self] in self?.showPreferences() }
         )
@@ -106,6 +110,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         KeyboardShortcuts.onKeyDown(for: .screenshotHistory) { [weak self] in
             self?.historyCoordinator?.showWindow()
+        }
+        KeyboardShortcuts.onKeyDown(for: .captureAndTranslate) { [weak self] in
+            guard let self else { return }
+            // If the user pressed ⌘⇧T while a Quick Access panel has focus
+            // (hovered / clicked), translate THAT capture rather than
+            // starting a brand-new capture flow. The global hotkey otherwise
+            // always wins over the panel's local `.keyboardShortcut`.
+            if self.captureCoordinator?.invokeQuickAccessTranslateIfKey() == true {
+                return
+            }
+            self.translationCoordinator?.startCaptureAndTranslate()
         }
     }
 
