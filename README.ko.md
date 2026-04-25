@@ -24,6 +24,7 @@ Swift 6.0과 SwiftUI로 만든 무료 네이티브 CleanShot X 대안입니다. 
 <p align="center">
   <a href="https://github.com/lzhgus/Capso/releases/latest"><strong>다운로드 &rarr;</strong></a> &nbsp;&bull;&nbsp;
   <a href="https://www.awesomemacapp.com/app/capso">웹사이트</a> &nbsp;&bull;&nbsp;
+  <a href="https://x.com/lzhgus">@lzhgus 팔로우</a> &nbsp;&bull;&nbsp;
   <a href="#기능">기능</a> &nbsp;&bull;&nbsp;
   <a href="#소스에서-빌드하기">소스에서 빌드하기</a>
 </p>
@@ -243,10 +244,15 @@ Capso는 [Business Source License 1.1](LICENSE) 로 배포됩니다.
 
 - [버그 신고](https://github.com/lzhgus/Capso/issues/new?template=bug_report.yml)
 - [기능 요청](https://github.com/lzhgus/Capso/issues/new?template=feature_request.yml)
+- [X에서 @lzhgus 팔로우](https://x.com/lzhgus)하고 릴리스 소식, 개발 비하인드, 다른 macOS 도구를 확인하세요
 
 Capso가 시간을 아껴줬다면, 작은 후원이 개발의 큰 힘이 됩니다 — 더 많은 다듬음, 더 많은 기능, 더 적은 버그로 이어집니다.
 
 <p align="center">
+  <a href="https://x.com/lzhgus">
+    <img src="https://img.shields.io/badge/Follow-@lzhgus-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @lzhgus on X" />
+  </a>
+  &nbsp;
   <a href="https://github.com/sponsors/lzhgus">
     <img src="https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub" />
   </a>

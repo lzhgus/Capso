@@ -24,6 +24,7 @@
 <p align="center">
   <a href="https://github.com/lzhgus/Capso/releases/latest"><strong>下载 &rarr;</strong></a> &nbsp;&bull;&nbsp;
   <a href="https://www.awesomemacapp.com/app/capso">官网</a> &nbsp;&bull;&nbsp;
+  <a href="https://x.com/lzhgus">关注 @lzhgus</a> &nbsp;&bull;&nbsp;
   <a href="#功能特性">功能</a> &nbsp;&bull;&nbsp;
   <a href="#从源码构建">源码构建</a>
 </p>
@@ -247,10 +248,15 @@ Capso 采用 [Business Source License 1.1](LICENSE) 许可。
 
 - [报告 Bug](https://github.com/lzhgus/Capso/issues/new?template=bug_report.yml)
 - [功能建议](https://github.com/lzhgus/Capso/issues/new?template=feature_request.yml)
+- [在 X 上关注 @lzhgus](https://x.com/lzhgus)，获取版本更新、开发幕后和更多 macOS 工具
 
 如果 Capso 为你节省了时间，一点小小的支持就能让它持续打磨 — 更多细节，更多功能，更少 Bug。
 
 <p align="center">
+  <a href="https://x.com/lzhgus">
+    <img src="https://img.shields.io/badge/Follow-@lzhgus-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @lzhgus on X" />
+  </a>
+  &nbsp;
   <a href="https://github.com/sponsors/lzhgus">
     <img src="https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub" />
   </a>

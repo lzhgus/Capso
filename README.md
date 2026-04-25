@@ -24,6 +24,7 @@ A native, feature-rich alternative to CleanShot X. Built with Swift 6.0 and Swif
 <p align="center">
   <a href="https://github.com/lzhgus/Capso/releases/latest"><strong>Download &rarr;</strong></a> &nbsp;&bull;&nbsp;
   <a href="https://www.awesomemacapp.com/app/capso">Website</a> &nbsp;&bull;&nbsp;
+  <a href="https://x.com/lzhgus">Follow @lzhgus</a> &nbsp;&bull;&nbsp;
   <a href="#features">Features</a> &nbsp;&bull;&nbsp;
   <a href="#build-from-source">Build from Source</a>
 </p>
@@ -243,10 +244,15 @@ The license auto-converts to Apache 2.0 three years after each release — so ev
 
 - [Report a bug](https://github.com/lzhgus/Capso/issues/new?template=bug_report.yml)
 - [Request a feature](https://github.com/lzhgus/Capso/issues/new?template=feature_request.yml)
+- [Follow @lzhgus on X](https://x.com/lzhgus) for release notes, behind-the-scenes updates, and other macOS tools
 
 If Capso saves you time, a small tip keeps it growing — every bit funds more polish, more features, fewer bugs.
 
 <p align="center">
+  <a href="https://x.com/lzhgus">
+    <img src="https://img.shields.io/badge/Follow-@lzhgus-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @lzhgus on X" />
+  </a>
+  &nbsp;
   <a href="https://github.com/sponsors/lzhgus">
     <img src="https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub" />
   </a>

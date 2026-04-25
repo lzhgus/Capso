@@ -112,6 +112,11 @@ struct GeneralSettingsView: View {
                             openURL("https://github.com/lzhgus/Capso")
                         }
                     }
+                    SettingRow(label: "Follow on X", sublabel: "Updates from @lzhgus", showDivider: true) {
+                        ExternalLinkButton(title: "Follow", icon: "at") {
+                            openURL("https://x.com/lzhgus")
+                        }
+                    }
                 }
             }
         }

@@ -4807,6 +4807,20 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 GitHub 上查看" } }
       }
     },
+    "Follow on X" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "X をフォロー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "X에서 팔로우" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 X 上关注" } }
+      }
+    },
+    "Updates from @lzhgus" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "@lzhgus の最新情報" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "@lzhgus의 업데이트" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "来自 @lzhgus 的更新" } }
+      }
+    },
     "Report" : {
       "comment" : "Button label in About → Report a Bug row. Opens the bug report issue template.",
       "localizations" : {
@@ -4829,6 +4843,14 @@
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "開く" } },
         "ko" : { "stringUnit" : { "state" : "translated", "value" : "열기" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开" } }
+      }
+    },
+    "Follow" : {
+      "comment" : "Button label in About → Follow on X row. Opens the creator's X profile.",
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フォロー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "팔로우" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关注" } }
       }
     },
     "Screenshot History..." : {
