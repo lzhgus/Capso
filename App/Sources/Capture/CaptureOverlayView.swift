@@ -31,11 +31,25 @@ final class CaptureOverlayView: NSView {
     /// Used by OCR and Recording overlays which always use freeform selection.
     private let presetsDisabled: Bool
 
+    /// CGDirectDisplayID of the screen this overlay covers. Used to scope the
+    /// "remember last selection" feature to the screen where it was captured.
+    private let screenID: UInt32?
+
     private var mode: CaptureOverlayMode = .area
     private var isDragging = false
     private var dragStart: NSPoint = .zero
     private var dragEnd: NSPoint = .zero
     private var currentMouseLocation: NSPoint?
+
+    /// Cached "last captured" rect for this screen, in view coordinates.
+    /// Populated in `prepareForPresentation` and drawn as a translucent
+    /// dashed ghost when the user is in freeform mode and hasn't started a
+    /// new selection yet. A click inside it re-captures the same area.
+    private var ghostRect: CGRect?
+    /// Set when mouseDown lands inside `ghostRect`. Cleared on drag-threshold
+    /// breach (turning the gesture into a real drag) or on mouseUp (firing the
+    /// ghost rect as the new selection).
+    private var pendingGhostClickStart: NSPoint?
 
     /// The currently active capture preset. Starts from settings and can be
     /// changed at runtime via R-key cycling or the right-click context menu.
@@ -74,12 +88,13 @@ final class CaptureOverlayView: NSView {
 
     nonisolated(unsafe) private var presetObserver: Any?
 
-    init(frame: NSRect, settings: AppSettings, presetsDisabled: Bool = false) {
+    init(frame: NSRect, settings: AppSettings, presetsDisabled: Bool = false, screenID: UInt32? = nil) {
         self.settings = settings
         // Presets are disabled when explicitly requested (OCR/Recording) or when
         // the user has turned off the feature in Settings.
         self.presetsDisabled = presetsDisabled || !settings.capturePresetsEnabled
         self.activePreset = self.presetsDisabled ? .freeform : settings.capturePreset
+        self.screenID = screenID
         super.init(frame: frame)
         addTrackingArea(NSTrackingArea(
             rect: bounds,
@@ -100,6 +115,7 @@ final class CaptureOverlayView: NSView {
                 let newPreset = self.settings.capturePreset
                 guard newPreset != self.activePreset else { return }
                 self.activePreset = newPreset
+                self.refreshGhostRect()
 
                 if self.activePreset.isFixedSize {
                     self.restoreCursorIfNeeded()
@@ -129,7 +145,46 @@ final class CaptureOverlayView: NSView {
         dragEnd = .zero
         hoveredWindowID = nil
         currentMouseLocation = nil
+        pendingGhostClickStart = nil
         needsDisplay = true
+    }
+
+    /// True when the active preset is freeform (no aspect-ratio or fixed-size
+    /// constraint). The "remember last spot" feature only applies here per
+    /// product spec — fixed sizes already replay by definition, and aspect
+    /// ratios re-impose the same shape on every drag.
+    private var freeformActive: Bool {
+        if case .freeform = activePreset { return true }
+        return false
+    }
+
+    /// Combined gating for the "remember last spot" feature: only in real
+    /// area-capture overlays (not OCR/recording), only in freeform, only when
+    /// the user enabled the toggle.
+    private var rememberLastSpotEnabled: Bool {
+        !presetsDisabled && freeformActive && settings.rememberLastCaptureArea
+    }
+
+    /// Read the persisted last selection and pin it to this overlay's screen.
+    /// Skips when disabled, when the saved selection is from another display,
+    /// or when the saved rect would fall entirely outside the current bounds
+    /// (e.g. resolution changed). Called once when the overlay is presented
+    /// — UserDefaults reads inside `draw(_:)` would be wasteful per frame.
+    private func refreshGhostRect() {
+        guard rememberLastSpotEnabled,
+              let selection = settings.lastCaptureSelection,
+              let screenID,
+              selection.screenID == screenID else {
+            ghostRect = nil
+            return
+        }
+        let rect = selection.rect
+        guard rect.width > 5, rect.height > 5,
+              bounds.intersects(rect) else {
+            ghostRect = nil
+            return
+        }
+        ghostRect = rect
     }
 
     /// Prepare the overlay after the window is on-screen and key so the
@@ -137,6 +192,7 @@ final class CaptureOverlayView: NSView {
     /// of waiting for the first mouse-moved event.
     func prepareForPresentation() {
         syncCurrentMouseLocation()
+        refreshGhostRect()
 
         // Only hide cursor in area mode — we draw our own crosshair reticle.
         // In window selection mode, keep the normal cursor visible so
@@ -216,6 +272,7 @@ final class CaptureOverlayView: NSView {
 
         activePreset = presets[newIndex]
         settings.capturePreset = activePreset
+        refreshGhostRect()
 
         // Update cursor visibility: fixed-size shows system cursor, others hide it
         if activePreset.isFixedSize {
@@ -252,6 +309,12 @@ final class CaptureOverlayView: NSView {
         // changes — no dark tint, no visual disruption. While dragging, the
         // selection area gets a subtle frosted fill so the chosen region reads
         // more like an active target instead of just a border.
+
+        // Ghost of the last captured area: shown only when the user is idle
+        // (not dragging) so it never competes with an active selection.
+        if !isDragging, let ghostRect {
+            drawGhostRect(ghostRect, in: context)
+        }
 
         if isDragging {
             let selectionRect = self.selectionRect
@@ -337,6 +400,27 @@ final class CaptureOverlayView: NSView {
                 drawPresetBadge(in: context)
             }
         }
+    }
+
+    // MARK: - Last Spot Ghost
+
+    /// Draw a translucent dashed rectangle representing the last captured
+    /// area on this screen. Hover (cursor inside) bumps opacity slightly so
+    /// the user gets feedback that a click here will recapture the same spot.
+    private func drawGhostRect(_ rect: CGRect, in context: CGContext) {
+        let isHover = currentMouseLocation.map { rect.contains($0) } ?? false
+
+        context.saveGState()
+        context.setFillColor(NSColor.white.withAlphaComponent(isHover ? 0.16 : 0.08).cgColor)
+        context.fill(rect.insetBy(dx: 1, dy: 1))
+        context.restoreGState()
+
+        context.saveGState()
+        context.setStrokeColor(NSColor.white.withAlphaComponent(isHover ? 0.85 : 0.55).cgColor)
+        context.setLineWidth(1.0)
+        context.setLineDash(phase: 0, lengths: [4, 3])
+        context.stroke(rect)
+        context.restoreGState()
     }
 
     // MARK: - Preset Badge
@@ -641,8 +725,20 @@ final class CaptureOverlayView: NSView {
                 return
             }
 
+            let loc = convert(event.locationInWindow, from: nil)
+
+            // If the click lands inside the "last captured" ghost, defer the
+            // gesture: a release without movement recaptures the saved rect,
+            // a drag past the threshold turns into a regular new selection.
+            if let ghostRect, ghostRect.contains(loc) {
+                pendingGhostClickStart = loc
+                dragStart = loc
+                dragEnd = loc
+                return
+            }
+
             isDragging = true
-            dragStart = convert(event.locationInWindow, from: nil)
+            dragStart = loc
             dragEnd = dragStart
             needsDisplay = true
 
@@ -653,6 +749,11 @@ final class CaptureOverlayView: NSView {
             }
         }
     }
+
+    /// Distance (in points) past which a deferred ghost click promotes to a
+    /// real drag. Small enough to feel responsive, large enough to absorb
+    /// micro-tremors from a regular click.
+    private static let ghostDragThreshold: CGFloat = 4
 
     /// Apply aspect-ratio constraint to a raw drag endpoint, clamped to view bounds.
     private func constrainedDragEnd(rawEnd: NSPoint) -> NSPoint {
@@ -714,6 +815,20 @@ final class CaptureOverlayView: NSView {
     override func mouseDragged(with event: NSEvent) {
         guard case .area = mode else { return }
         let rawEnd = convert(event.locationInWindow, from: nil)
+
+        // Promote a deferred ghost click to a real drag once the user
+        // moves past the threshold — anything before that is still a click.
+        if let start = pendingGhostClickStart {
+            let dx = rawEnd.x - start.x
+            let dy = rawEnd.y - start.y
+            if dx * dx + dy * dy < Self.ghostDragThreshold * Self.ghostDragThreshold {
+                return
+            }
+            pendingGhostClickStart = nil
+            isDragging = true
+            dragStart = start
+        }
+
         dragEnd = constrainedDragEnd(rawEnd: rawEnd)
         // Reticle tracks the constrained corner so it stays on the selection edge
         currentMouseLocation = dragEnd
@@ -731,16 +846,41 @@ final class CaptureOverlayView: NSView {
         guard case .area = mode else { return }
         // Fixed-size mode already captured in mouseDown — skip mouseUp
         guard !activePreset.isFixedSize else { return }
+
+        // Click without drag inside the ghost rect: recapture the saved spot.
+        // Always clear the pending flag — a cycle/clear that happened between
+        // mouseDown and mouseUp may have nilled the ghost; in that case fall
+        // through and just no-op (the synthetic drag has zero size anyway).
+        if pendingGhostClickStart != nil {
+            pendingGhostClickStart = nil
+            if let ghostRect {
+                restoreCursorIfNeeded()
+                onSelectionComplete?(ghostRect)
+                return
+            }
+            needsDisplay = true
+            return
+        }
+
         let rawEnd = convert(event.locationInWindow, from: nil)
         dragEnd = constrainedDragEnd(rawEnd: rawEnd)
         isDragging = false
 
         let rect = selectionRect
         if rect.width > 5 && rect.height > 5 {
+            persistLastSelectionIfNeeded(rect)
             restoreCursorIfNeeded()
             onSelectionComplete?(rect)
         }
         needsDisplay = true
+    }
+
+    /// Save the just-completed selection as the ghost rect for next time,
+    /// gated by the same conditions that draw it (freeform, real area
+    /// overlay, toggle on, screen identifiable).
+    private func persistLastSelectionIfNeeded(_ rect: CGRect) {
+        guard rememberLastSpotEnabled, let screenID else { return }
+        settings.lastCaptureSelection = StoredCaptureSelection(rect: rect, screenID: screenID)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -806,6 +946,7 @@ final class CaptureOverlayView: NSView {
 
     private func cancelCurrentSelection() {
         isDragging = false
+        pendingGhostClickStart = nil
         let currentLocation = currentMouseLocation ?? .zero
         dragStart = currentLocation
         dragEnd = currentLocation
@@ -881,6 +1022,20 @@ final class CaptureOverlayView: NSView {
             }
         }
 
+        // "Clear Last Captured Area" — only when the toggle is on and there
+        // is something to clear. Available regardless of the current preset
+        // so the user can reset even from inside an aspect-ratio session.
+        if settings.rememberLastCaptureArea, settings.lastCaptureSelection != nil {
+            menu.addItem(.separator())
+            let clearItem = NSMenuItem(
+                title: String(localized: "Clear Last Captured Area"),
+                action: #selector(clearLastCapturedArea),
+                keyEquivalent: ""
+            )
+            clearItem.target = self
+            menu.addItem(clearItem)
+        }
+
         menu.addItem(.separator())
         let manageItem = NSMenuItem(
             title: String(localized: "Manage Presets\u{2026}"),
@@ -891,6 +1046,13 @@ final class CaptureOverlayView: NSView {
         menu.addItem(manageItem)
 
         menu.popUp(positioning: nil, at: location, in: self)
+    }
+
+    @objc private func clearLastCapturedArea() {
+        settings.lastCaptureSelection = nil
+        refreshGhostRect()
+        setNeedsDisplay(bounds)
+        display()
     }
 
     /// Create a non-interactive section header menu item.
@@ -911,6 +1073,7 @@ final class CaptureOverlayView: NSView {
         guard let preset = presetMenuMap[sender.tag] else { return }
         activePreset = preset
         settings.capturePreset = preset
+        refreshGhostRect()
 
         // Update cursor visibility after preset change
         if activePreset.isFixedSize {

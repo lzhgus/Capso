@@ -43,9 +43,17 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(
+                        label: "Remember Last Spot Captured",
+                        sublabel: "Show the last freeform selection as a ghost; click it to recapture",
+                        showDivider: true
+                    ) {
+                        Toggle("", isOn: $viewModel.rememberLastCaptureArea)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                     // TODO: Re-enable the rows below once underlying
-                    // behaviors are implemented (freezeScreen, showMagnifier,
-                    // rememberLastCaptureArea).
+                    // behaviors are implemented (freezeScreen, showMagnifier).
                 }
             }
 
