@@ -18,9 +18,11 @@ final class PreferencesWindow {
         if let window {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
-            // Navigate to requested tab if window already exists
+            // Navigate to requested tab if window already exists.
+            // Use a dedicated notification name (NOT .openScreenshotSettings)
+            // to avoid recursing back through AppDelegate's observer.
             if let tab {
-                NotificationCenter.default.post(name: .openScreenshotSettings, object: tab)
+                NotificationCenter.default.post(name: .preferencesSwitchTab, object: tab)
             }
             return
         }

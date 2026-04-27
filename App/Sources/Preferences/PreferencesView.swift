@@ -7,6 +7,7 @@ enum PreferencesTab: String, CaseIterable {
     case screenshots
     case recording
     case quickAccess
+    case cloudShare
     case export
     case ocr
     case shortcuts
@@ -17,6 +18,7 @@ enum PreferencesTab: String, CaseIterable {
         case .screenshots: "Screenshots"
         case .recording: "Recording"
         case .quickAccess: "Quick Access"
+        case .cloudShare: "Cloud Share"
         case .export: "Export"
         case .ocr: "Text & Translation"
         case .shortcuts: "Shortcuts"
@@ -29,6 +31,7 @@ enum PreferencesTab: String, CaseIterable {
         case .screenshots: "camera"
         case .recording: "record.circle"
         case .quickAccess: "bolt"
+        case .cloudShare: "icloud"
         case .export: "folder"
         case .ocr: "text.viewfinder"
         case .shortcuts: "keyboard"
@@ -62,6 +65,11 @@ struct PreferencesView: View {
                 selectedTab = .screenshots
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .preferencesSwitchTab)) { notification in
+            if let tab = notification.object as? PreferencesTab {
+                selectedTab = tab
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -92,6 +100,8 @@ struct PreferencesView: View {
                     RecordingSettingsView(viewModel: viewModel)
                 case .quickAccess:
                     QuickAccessSettingsView(viewModel: viewModel)
+                case .cloudShare:
+                    CloudShareSettingsView(viewModel: viewModel)
                 case .export:
                     ExportSettingsView(viewModel: viewModel)
                 case .ocr:

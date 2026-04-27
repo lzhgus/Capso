@@ -428,6 +428,35 @@ public final class AppSettings: @unchecked Sendable {
         defaults.set(url, forKey: "exportLocation")
     }
 
+    // MARK: Cloud Share
+
+    public var cloudShareProvider: String? {
+        get { defaults.string(forKey: "cloudShareProvider") }
+        set { defaults.set(newValue, forKey: "cloudShareProvider") }
+    }
+
+    public var cloudShareURLPrefix: String? {
+        get { defaults.string(forKey: "cloudShareURLPrefix") }
+        set { defaults.set(newValue, forKey: "cloudShareURLPrefix") }
+    }
+
+    public var cloudShareAccountID: String? {
+        get { defaults.string(forKey: "cloudShareAccountID") }
+        set { defaults.set(newValue, forKey: "cloudShareAccountID") }
+    }
+
+    public var cloudShareBucket: String? {
+        get { defaults.string(forKey: "cloudShareBucket") }
+        set { defaults.set(newValue, forKey: "cloudShareBucket") }
+    }
+
+    public var isCloudShareConfigured: Bool {
+        cloudShareProvider != nil
+            && cloudShareURLPrefix != nil
+            && cloudShareAccountID != nil
+            && cloudShareBucket != nil
+    }
+
     // MARK: Computed
 
     public var isTrialActive: Bool {

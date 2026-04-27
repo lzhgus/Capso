@@ -62,6 +62,11 @@ public final class HistoryStore: Sendable {
                 t.column("fileSize", .integer).notNull()
             }
         }
+        migrator.registerMigration("v2_add_cloud_url") { db in
+            try db.alter(table: HistoryEntry.databaseTableName) { t in
+                t.add(column: "cloudURL", .text)
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 
@@ -99,6 +104,18 @@ public final class HistoryStore: Sendable {
     public func delete(id: UUID) throws {
         try dbQueue.write { db in
             _ = try HistoryEntry.deleteOne(db, id: id)
+        }
+    }
+
+    /// Set or clear the cloud share URL for a capture.
+    /// Silently no-ops if no row matches `id` — by design: if the user deletes a
+    /// capture while an upload is in flight, the URL has nowhere to land but the
+    /// upload itself already succeeded; this is not an error condition.
+    public func setCloudURL(id: UUID, url: String?) throws {
+        try dbQueue.write { db in
+            _ = try HistoryEntry
+                .filter(id: id)
+                .updateAll(db, Column("cloudURL").set(to: url))
         }
     }
 

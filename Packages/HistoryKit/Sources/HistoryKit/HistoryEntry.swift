@@ -27,6 +27,7 @@ public struct HistoryEntry: Identifiable, Codable, Sendable, FetchableRecord, Pe
     public let fullImageFileName: String
     public var annotationFileName: String?
     public let fileSize: Int64
+    public var cloudURL: String?
 
     public init(
         id: UUID = UUID(),
@@ -40,7 +41,8 @@ public struct HistoryEntry: Identifiable, Codable, Sendable, FetchableRecord, Pe
         thumbnailFileName: String,
         fullImageFileName: String,
         annotationFileName: String? = nil,
-        fileSize: Int64
+        fileSize: Int64,
+        cloudURL: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -54,5 +56,6 @@ public struct HistoryEntry: Identifiable, Codable, Sendable, FetchableRecord, Pe
         self.fullImageFileName = fullImageFileName
         self.annotationFileName = annotationFileName
         self.fileSize = fileSize
+        self.cloudURL = cloudURL
     }
 }

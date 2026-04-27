@@ -99,6 +99,14 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 - **Preferences** — comprehensive settings with Apple Liquid Glass design
 - **Localization** — English, Simplified Chinese, Japanese, Korean
 
+### Cloud Sharing (Optional)
+- **Bring-your-own storage** — point Capso at your own Cloudflare R2 bucket; we never run a hosted service
+- **One-click upload** — click the cloud icon in Quick Access, or use the **⌥⇧0** shortcut to capture-and-share in one step
+- **History integration** — upload past captures from the History window, or copy any previously-shared link with one click
+- **Setup wizard** in Preferences → Cloud Share — 5-minute guided R2 configuration, with Test Connection and Reset
+- **Zero project cost** — your captures, your storage, your bill (R2 has 10 GB free + zero egress fees)
+- Future provider support: Backblaze B2, AWS S3, generic S3-compatible — coming in a future release
+
 <p align="center">
   <img src=".github/assets/annotation.jpeg" alt="Annotation Editor" width="600"><br>
   <em>Annotation editor with drawing tools, counters, and markers</em>

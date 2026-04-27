@@ -43,6 +43,8 @@ packages:
     path: Packages/EditorKit
   HistoryKit:
     path: Packages/HistoryKit
+  ShareKit:
+    path: Packages/ShareKit
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     exactVersion: "2.2.1"
@@ -85,6 +87,7 @@ targets:
       - package: EffectsKit
       - package: EditorKit
       - package: HistoryKit
+      - package: ShareKit
       - package: KeyboardShortcuts
       - package: Defaults
       - package: LaunchAtLogin
@@ -94,3 +97,4 @@ targets:
       properties:
         com.apple.security.device.camera: true
         com.apple.security.device.audio-input: true
+        com.apple.security.network.client: true

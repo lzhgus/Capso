@@ -8,6 +8,11 @@ import SharedKit
 extension Notification.Name {
     static let openScreenshotSettings = Notification.Name("openScreenshotSettings")
     static let capturePresetChanged = Notification.Name("capturePresetChanged")
+    /// Posted by PreferencesWindow when the window is already open and the
+    /// caller wants the visible Preferences UI to switch to a specific tab.
+    /// Only PreferencesView observes this — NOT AppDelegate (which would cause
+    /// infinite recursion through show(tab:) → post → observer → show(tab:)).
+    static let preferencesSwitchTab = Notification.Name("preferencesSwitchTab")
 }
 
 enum CaptureOverlayMode {

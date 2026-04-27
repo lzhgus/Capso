@@ -5,6 +5,7 @@ import Observation
 import CaptureKit
 import ExportKit
 import HistoryKit
+import ShareKit
 import SharedKit
 
 @MainActor
@@ -15,6 +16,9 @@ final class HistoryCoordinator {
     private(set) var entries: [HistoryEntry] = []
     private(set) var totalSize: Int64 = 0
     var currentFilter: HistoryFilter = .all
+    /// Cloud sharing coordinator — set by AppDelegate after creation.
+    /// Non-nil only when cloud sharing is configured.
+    var shareCoordinator: ShareCoordinator?
 
     private var historyWindow: HistoryWindow?
 
@@ -52,12 +56,113 @@ final class HistoryCoordinator {
         loadEntries()
     }
 
+    // MARK: - Cloud URL
+
+    /// Persist the cloud-share URL for a history entry after a successful upload.
+    /// Can be called from any context (e.g. QuickAccess upload callback).
+    func setCloudURL(id: UUID, url: String) {
+        guard let store else { return }
+        do {
+            try store.setCloudURL(id: id, url: url)
+            // Refresh in-memory list so the History UI reflects the change.
+            loadEntries()
+        } catch {
+            print("Failed to persist cloud URL: \(error)")
+        }
+    }
+
+    /// Upload a history entry to the cloud and persist the resulting URL.
+    /// Returns the cloud URL on success. Throws on failure.
+    ///
+    /// For recordings and GIFs, transcodes the on-disk .mov to a web-friendly
+    /// format (H.264 .mp4 or actual .gif) BEFORE upload. Without this, Chrome
+    /// and Firefox often fail to play .mov inline even when the codec is H.264 —
+    /// the user gets a blank page when opening the share link. Screenshots
+    /// (.png) upload as-is.
+    func uploadEntry(_ entry: HistoryEntry) async throws -> URL {
+        guard let coord = shareCoordinator else {
+            throw ShareError.notConfigured
+        }
+        guard let sourceURL = fullImageURL(for: entry) else {
+            throw ShareError.unknown("Source file not found")
+        }
+
+        let uploadURL: URL
+        let contentType: String
+        var tempFileToDelete: URL?
+        defer {
+            if let url = tempFileToDelete {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+
+        switch entry.captureMode {
+        case .recording:
+            let quality = settings.exportQuality
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("mp4")
+            try await Task.detached(priority: .userInitiated) {
+                try await Self.exportVideo(
+                    from: sourceURL,
+                    to: tmp,
+                    format: .mp4,
+                    exportQuality: quality
+                )
+            }.value
+            uploadURL = tmp
+            contentType = "video/mp4"
+            tempFileToDelete = tmp
+        case .gif:
+            let quality = settings.exportQuality
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("gif")
+            try await Task.detached(priority: .userInitiated) {
+                try await Self.exportVideo(
+                    from: sourceURL,
+                    to: tmp,
+                    format: .gif,
+                    exportQuality: quality
+                )
+            }.value
+            uploadURL = tmp
+            contentType = "image/gif"
+            tempFileToDelete = tmp
+        default:
+            uploadURL = sourceURL
+            contentType = "image/png"
+        }
+
+        let cloudURL = try await coord.upload(file: uploadURL, contentType: contentType)
+        setCloudURL(id: entry.id, url: cloudURL.absoluteString)
+        return cloudURL
+    }
+
+    /// Delete the cloud copy for an entry using the last path component of its cloudURL as the key.
+    /// Failure is silently swallowed — the local delete proceeds regardless.
+    func deleteCloudCopy(for entry: HistoryEntry) async {
+        guard let coord = shareCoordinator,
+              let cloudURLString = entry.cloudURL,
+              let key = URL(string: cloudURLString)?.lastPathComponent,
+              !key.isEmpty else { return }
+        do {
+            try await coord.destination.delete(key: key)
+        } catch {
+            print("Cloud delete failed (proceeding with local delete): \(error)")
+        }
+    }
+
     // MARK: - Save Capture to History
 
-    func saveCapture(result: CaptureResult) {
-        guard settings.historyEnabled, let store else { return }
+    /// Save a capture result to history.
+    /// - Parameter entryID: A pre-generated UUID so the caller can reference
+    ///   this entry before the async save completes (e.g. to wire the cloud URL).
+    /// - Returns: The UUID used for the new entry.
+    @discardableResult
+    func saveCapture(result: CaptureResult, entryID: UUID = UUID()) -> UUID {
+        guard settings.historyEnabled, let store else { return entryID }
 
-        let entryID = UUID()
         let entryDir = store.entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
         let fm = FileManager.default
 
@@ -112,6 +217,7 @@ final class HistoryCoordinator {
                 print("Failed to save capture to history: \(error)")
             }
         }
+        return entryID
     }
 
     // MARK: - Save Recording to History

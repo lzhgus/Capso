@@ -1549,6 +1549,28 @@
         }
       }
     },
+    "Capture and Share to Cloud" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撮影してクラウドに共有"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캡처 후 클라우드에 공유"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图并上传到云端"
+          }
+        }
+      }
+    },
     "Capture Area" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5330,6 +5352,906 @@
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "カスタム" } },
         "ko" : { "stringUnit" : { "state" : "translated", "value" : "사용자 지정" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自定义" } }
+      }
+    },
+
+    "Upload to Cloud" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドにアップロード" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드에 업로드" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传到云端" } }
+      }
+    },
+    "Link Copied!" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リンクをコピーしました！" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "링크가 복사되었습니다!" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "链接已复制！" } }
+      }
+    },
+    "Upload screenshot to cloud and copy link" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "スクリーンショットをクラウドにアップロードしてリンクをコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "스크린샷을 클라우드에 업로드하고 링크 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传截图到云端并复制链接" } }
+      }
+    },
+    "Link has been copied to clipboard" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リンクがクリップボードにコピーされました" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "링크가 클립보드에 복사되었습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "链接已复制到剪贴板" } }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再試行" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다시 시도" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } }
+      }
+    },
+    "Cloud credentials are invalid. Open Settings to fix." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドの認証情報が無効です。設定を開いて修正してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 자격 증명이 유효하지 않습니다. 설정을 열어 수정하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端凭证无效，请打开设置修复。" } }
+      }
+    },
+    "Upload failed — network error: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロード失敗 — ネットワークエラー: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업로드 실패 — 네트워크 오류: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传失败 — 网络错误：%@" } }
+      }
+    },
+    "Cloud quota exceeded." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドのストレージ容量を超えました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 저장 공간이 초과되었습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端存储配额已满。" } }
+      }
+    },
+    "Upload OK but public URL unreachable. Check bucket settings." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロードは成功しましたが、公開 URL にアクセスできません。バケットの設定を確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업로드는 성공했지만 공개 URL에 접근할 수 없습니다. 버킷 설정을 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传成功，但公开 URL 无法访问，请检查存储桶设置。" } }
+      }
+    },
+    "Cloud URL prefix is invalid: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド URL プレフィックスが無効です: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 URL 접두사가 유효하지 않습니다: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端 URL 前缀无效：%@" } }
+      }
+    },
+    "Cloud sharing is not configured." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有が設定されていません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유가 설정되지 않았습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享尚未配置。" } }
+      }
+    },
+    "Upload failed: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロード失敗: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업로드 실패: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传失败：%@" } }
+      }
+    },
+
+    "Cloud Share is not set up yet" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有はまだ設定されていません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유가 아직 설정되지 않았습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享尚未设置" } }
+      }
+    },
+    "Configure a Cloudflare R2 bucket to share captures with one click." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 バケットを設定して、ワンクリックでキャプチャを共有できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 버킷을 설정하면 한 번의 클릭으로 캡처를 공유할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置 Cloudflare R2 存储桶，一键分享截图。" } }
+      }
+    },
+    "Set up Cloud Share" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有を設定" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 설정" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设置云端分享" } }
+      }
+    },
+    "Testing…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テスト中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "테스트 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "测试中…" } }
+      }
+    },
+    "Test" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テスト" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "테스트" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "测试" } }
+      }
+    },
+    "Reset" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リセット" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "재설정" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置" } }
+      }
+    },
+    "Not configured" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "未設定" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설정되지 않음" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未配置" } }
+      }
+    },
+    "Cloud Share isn't fully set up yet — re-run the wizard." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有の設定が完了していません — ウィザードを再実行してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 설정이 완료되지 않았습니다 — 마법사를 다시 실행하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享尚未完全配置，请重新运行设置向导。" } }
+      }
+    },
+    "Credentials missing" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "認証情報がありません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자격 증명 없음" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "凭证缺失" } }
+      }
+    },
+    "Couldn't read the Access Key or Secret Access Key from Keychain. Re-run the wizard to re-enter them." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キーチェーンから Access Key または Secret Access Key を読み取れませんでした。ウィザードを再実行して再入力してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "키체인에서 Access Key 또는 Secret Access Key를 읽을 수 없습니다. 마법사를 다시 실행하여 다시 입력하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法从钥匙串中读取 Access Key 或 Secret Access Key，请重新运行设置向导以重新输入。" } }
+      }
+    },
+    "Connection works" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "接続成功" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "연결 성공" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接正常" } }
+      }
+    },
+    "Round-trip in %.1fs · Test file uploaded and removed cleanly." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "往復 %.1f 秒 · テストファイルを正常にアップロードして削除しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "왕복 %.1f초 · 테스트 파일을 정상적으로 업로드하고 삭제했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "往返 %.1f 秒 · 测试文件已成功上传并清理。" } }
+      }
+    },
+    "Test failed" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テスト失敗" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "테스트 실패" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "测试失败" } }
+      }
+    },
+    "Configuration is incomplete. Re-run the wizard." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定が未完了です。ウィザードを再実行してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설정이 완료되지 않았습니다. 마법사를 다시 실행하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置不完整，请重新运行设置向导。" } }
+      }
+    },
+    "Cloudflare rejected the credentials. Verify the Access Key and Secret have Object Read & Write on this bucket." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare が認証情報を拒否しました。Access Key と Secret がこのバケットに Object Read & Write 権限を持つか確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare가 자격 증명을 거부했습니다. Access Key와 Secret이 이 버킷에 대해 Object Read & Write 권한을 가지고 있는지 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare 拒绝了该凭证，请确认 Access Key 和 Secret 对此存储桶具有 Object Read & Write 权限。" } }
+      }
+    },
+    "Invalid public URL prefix: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "無効な公開 URL プレフィックス: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "유효하지 않은 공개 URL 접두사: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "公开 URL 前缀无效：%@" } }
+      }
+    },
+    "Network error: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ネットワークエラー: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "네트워크 오류: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网络错误：%@" } }
+      }
+    },
+    "Storage quota exceeded — free up space in the Cloudflare dashboard." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ストレージ容量を超えました — Cloudflare ダッシュボードでスペースを解放してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장 공간이 초과되었습니다 — Cloudflare 대시보드에서 공간을 확보하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储配额已满，请在 Cloudflare 控制台释放空间。" } }
+      }
+    },
+    "Upload worked, but the file isn't publicly reachable. Enable Public access on the bucket in Cloudflare." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロードは成功しましたが、ファイルに公開アクセスできません。Cloudflare でバケットの Public access を有効にしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업로드는 성공했지만 파일에 공개적으로 접근할 수 없습니다. Cloudflare에서 버킷의 Public access를 활성화하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传成功，但文件无法公开访问，请在 Cloudflare 中启用存储桶的 Public access。" } }
+      }
+    },
+
+    "Cloud Share Setup" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有の設定" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 설정" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享设置" } }
+      }
+    },
+    "Back" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "戻る" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "뒤로" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "返回" } }
+      }
+    },
+    "Next" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "次へ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다음" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一步" } }
+      }
+    },
+    "Could not save credentials to Keychain: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キーチェーンへの認証情報の保存に失敗しました: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "키체인에 자격 증명을 저장할 수 없습니다: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法将凭证保存到钥匙串：%@" } }
+      }
+    },
+    "Looks short — Cloudflare Account IDs are 32 hex characters" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "短すぎます — Cloudflare の Account ID は 32 桁の 16 進数です" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "너무 짧습니다 — Cloudflare Account ID는 32자리 16진수입니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "看起来太短了 — Cloudflare Account ID 是 32 位十六进制字符" } }
+      }
+    },
+    "Bucket names must be lowercase, no spaces" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "バケット名は小文字のみ、スペース不可" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "버킷 이름은 소문자만 가능하며 공백은 허용되지 않습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储桶名称必须小写，不含空格" } }
+      }
+    },
+    "Cloudflare R2 Access Key IDs are typically 32+ chars. This looks like an API token instead — verify you created an R2 token, not a regular API token." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 の Access Key ID は通常 32 文字以上です。これは API トークンのように見えます — R2 トークンを作成したか確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 Access Key ID는 보통 32자 이상입니다. 이것은 API 토큰처럼 보입니다 — R2 토큰을 생성했는지 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 的 Access Key ID 通常超过 32 个字符，这看起来像是 API 令牌 — 请确认创建的是 R2 令牌而非普通 API 令牌。" } }
+      }
+    },
+    "Uploading test file…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テストファイルをアップロード中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "테스트 파일 업로드 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在上传测试文件…" } }
+      }
+    },
+    "Fetching public URL…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "公開 URL を取得中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공개 URL 가져오는 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在获取公开 URL…" } }
+      }
+    },
+    "Cleaning up…" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クリーンアップ中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "정리 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在清理…" } }
+      }
+    },
+    "Step 1 — Introduction" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ステップ 1 — はじめに" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "1단계 — 소개" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "第 1 步 — 简介" } }
+      }
+    },
+    "Capso uploads to **your own cloud storage** — never our servers. You bring the bucket, you own the files, you keep the bill. We just hand you the share link." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Capso はファイルを**あなた自身のクラウドストレージ**にアップロードします — 当社のサーバーには送りません。バケットはあなたのもの、ファイルもあなたのもの、料金もあなた負担。私たちは共有リンクをお渡しするだけです。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Capso는 파일을 **내 클라우드 스토리지**에 업로드합니다 — 저희 서버에는 절대 저장되지 않습니다. 버킷은 내 것, 파일도 내 것, 비용도 내가 냅니다. 저희는 공유 링크만 전달합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Capso 将文件上传到**您自己的云存储** — 从不经过我们的服务器。存储桶是您的，文件是您的，费用也由您支付。我们只是把分享链接交到您手中。" } }
+      }
+    },
+    "Yours forever." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "永遠にあなたのもの。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "영원히 내 것." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "永久属于您。" } }
+      }
+    },
+    "Files live in your account. Cancel Capso, keep your screenshots." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ファイルはあなたのアカウントに保存されます。Capso を解約しても、スクリーンショットはそのまま残ります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "파일은 내 계정에 저장됩니다. Capso를 취소해도 스크린샷은 그대로 유지됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件保存在您的账户中。取消 Capso 订阅，截图依然保留。" } }
+      }
+    },
+    "Free tier friendly." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "無料プランで十分。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "무료 플랜으로 충분." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "免费套餐即可使用。" } }
+      }
+    },
+    "Cloudflare R2 includes 10 GB and zero egress fees." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 は 10 GB の無料ストレージと 0 円の下り転送費を提供します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2는 10GB 무료 저장 공간과 제로 이그레스 요금을 제공합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2 提供 10 GB 免费存储，且无出流量费用。" } }
+      }
+    },
+    "Five minutes to set up." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定は 5 分で完了。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "5분이면 설정 완료." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "五分钟完成设置。" } }
+      }
+    },
+    "Paste four keys, test, done." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "4 つのキーを貼り付けて、テストして、完了。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "네 가지 키를 붙여 넣고, 테스트하면 끝." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "粘贴四个密钥，测试，完成。" } }
+      }
+    },
+    "Already have credentials? You'll be done in under a minute." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "認証情報をお持ちの方は 1 分以内に設定できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이미 자격 증명이 있으신가요? 1분 이내로 완료할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已有凭证？不到一分钟即可完成设置。" } }
+      }
+    },
+    "Step 2 — Provider" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ステップ 2 — プロバイダー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "2단계 — 제공업체" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "第 2 步 — 服务商" } }
+      }
+    },
+    "Choose a storage provider" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ストレージプロバイダーを選択" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "스토리지 제공업체 선택" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择存储服务商" } }
+      }
+    },
+    "Capso speaks the S3 protocol, so any S3-compatible bucket works. We recommend Cloudflare R2 — generous free tier and no egress fees." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Capso は S3 プロトコルに対応しているため、S3 互換のバケットであれば利用できます。Cloudflare R2 を推奨します — 無料枠が充実しており、下り転送費もかかりません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Capso는 S3 프로토콜을 지원하므로 S3 호환 버킷이라면 모두 사용할 수 있습니다. Cloudflare R2를 권장합니다 — 무료 용량이 넉넉하고 이그레스 요금이 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Capso 支持 S3 协议，任何 S3 兼容的存储桶均可使用。推荐 Cloudflare R2 — 免费额度充足，且无出流量费用。" } }
+      }
+    },
+    "Cloudflare R2" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare R2" } }
+      }
+    },
+    "10 GB free · $0 egress · S3-compatible" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "10 GB 無料 · $0 下り転送 · S3 互換" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "10 GB 무료 · $0 이그레스 · S3 호환" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "10 GB 免费 · $0 出流量 · S3 兼容" } }
+      }
+    },
+    "RECOMMENDED" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "推奨" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "추천" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "推荐" } }
+      }
+    },
+    "Backblaze B2" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Backblaze B2" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Backblaze B2" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Backblaze B2" } }
+      }
+    },
+    "10 GB free · pay-as-you-go after" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "10 GB 無料 · 超過分は従量課金" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "10 GB 무료 · 초과 시 종량제" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "10 GB 免费 · 超出后按量计费" } }
+      }
+    },
+    "COMING SOON" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "近日公開" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "출시 예정" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "即将推出" } }
+      }
+    },
+    "Amazon S3" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Amazon S3" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Amazon S3" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Amazon S3" } }
+      }
+    },
+    "The original. AWS account required." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "元祖 S3。AWS アカウントが必要です。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원조 S3. AWS 계정이 필요합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "元老级 S3，需要 AWS 账户。" } }
+      }
+    },
+    "Want a provider added? Open an issue on GitHub" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "他のプロバイダーを追加してほしい場合は GitHub でリクエストしてください" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다른 제공업체를 추가하고 싶으신가요? GitHub에서 이슈를 열어주세요" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "想添加其他服务商？请在 GitHub 提交 Issue" } }
+      }
+    },
+    "Create a bucket" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "バケットを作成" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "버킷 생성" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建存储桶" } }
+      }
+    },
+    "Enable public access" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "パブリックアクセスを有効化" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공개 액세스 활성화" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用公开访问" } }
+      }
+    },
+    "Create an API token" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "API トークンを作成" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "API 토큰 생성" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建 API 令牌" } }
+      }
+    },
+    "Copy the four values" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "4 つの値をコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "네 가지 값 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制这四个值" } }
+      }
+    },
+    "Step 3 — Cloudflare" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ステップ 3 — Cloudflare" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "3단계 — Cloudflare" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "第 3 步 — Cloudflare" } }
+      }
+    },
+    "Get your R2 credentials" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "R2 の認証情報を取得" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "R2 자격 증명 가져오기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "获取 R2 凭证" } }
+      }
+    },
+    "Open the Cloudflare dashboard in your browser and follow these four steps. Keep this window open — you'll paste the keys on the next screen." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ブラウザで Cloudflare ダッシュボードを開き、以下の 4 つの手順を実行してください。このウィンドウは開いたままにしておいてください — 次の画面でキーを貼り付けます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "브라우저에서 Cloudflare 대시보드를 열고 아래 네 단계를 따르세요. 이 창을 열어 두세요 — 다음 화면에서 키를 붙여 넣을 것입니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在浏览器中打开 Cloudflare 控制台，按照以下四个步骤操作。请保持此窗口打开 — 您将在下一个界面粘贴密钥。" } }
+      }
+    },
+    "Open R2 Dashboard" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "R2 ダッシュボードを開く" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "R2 대시보드 열기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 R2 控制台" } }
+      }
+    },
+    "Step 4 — Credentials" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ステップ 4 — 認証情報" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "4단계 — 자격 증명" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "第 4 步 — 凭证" } }
+      }
+    },
+    "Paste your credentials" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "認証情報を貼り付け" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자격 증명 붙여넣기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "粘贴您的凭证" } }
+      }
+    },
+    "These are stored in macOS Keychain on this Mac and never sent anywhere except your bucket." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "これらの情報はこの Mac の macOS キーチェーンに保存され、あなたのバケット以外には送信されません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 정보는 이 Mac의 macOS 키체인에 저장되며, 내 버킷 이외에는 어디에도 전송되지 않습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这些信息存储在此 Mac 的 macOS 钥匙串中，除您的存储桶外不会发送到任何地方。" } }
+      }
+    },
+    "Account ID" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Account ID" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Account ID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Account ID" } }
+      }
+    },
+    "32-character hex" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "32 桁の 16 進数" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "32자리 16진수" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "32 位十六进制" } }
+      }
+    },
+    "Bucket name" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "バケット名" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "버킷 이름" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储桶名称" } }
+      }
+    },
+    "lowercase, hyphens OK" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "小文字、ハイフン可" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "소문자, 하이픈 허용" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "小写字母，允许连字符" } }
+      }
+    },
+    "Access Key ID" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Access Key ID" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Access Key ID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Access Key ID" } }
+      }
+    },
+    "32+ characters" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "32 文字以上" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "32자 이상" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "32+ 个字符" } }
+      }
+    },
+    "Secret Access Key" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Secret Access Key" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Secret Access Key" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Secret Access Key" } }
+      }
+    },
+    "Won't be shown again" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再表示はされません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다시 표시되지 않습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不会再次显示" } }
+      }
+    },
+    "Stored in Keychain · Encrypted at rest · Never leaves this device" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キーチェーンに保存 · 保管時は暗号化 · デバイス外に出ることはありません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "키체인에 저장 · 저장 시 암호화 · 이 기기를 벗어나지 않음" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储在钥匙串中 · 静态加密 · 永不离开此设备" } }
+      }
+    },
+    "Step 5 — Public URL" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ステップ 5 — 公開 URL" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "5단계 — 공개 URL" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "第 5 步 — 公开 URL" } }
+      }
+    },
+    "Public URL & test" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "公開 URL とテスト" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공개 URL 및 테스트" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "公开 URL 与测试" } }
+      }
+    },
+    "Capso prepends this to every uploaded filename to build the share link. If you set up a custom domain in R2, paste that here — otherwise use the pub-…r2.dev URL from your bucket's Public access section." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Capso はこれをアップロードされたファイル名の先頭に付加して共有リンクを生成します。R2 でカスタムドメインを設定した場合はそれを貼り付けてください — そうでない場合はバケットの Public access セクションにある pub-…r2.dev の URL を使用してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Capso는 업로드된 파일명 앞에 이것을 붙여 공유 링크를 만듭니다. R2에서 커스텀 도메인을 설정했다면 여기에 붙여 넣으세요 — 그렇지 않은 경우 버킷의 Public access 섹션에 있는 pub-…r2.dev URL을 사용하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Capso 会将此前缀拼接到每个上传文件名前，生成分享链接。如果您在 R2 中配置了自定义域名，请粘贴于此 — 否则请使用存储桶 Public access 部分中的 pub-…r2.dev URL。" } }
+      }
+    },
+    "Capso prepends this to every uploaded filename to build the share link. Use your custom domain if you connected one, otherwise use the pub-…r2.dev URL from the Public Development URL section." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Capso はアップロードされたファイル名の前にこれを付加して共有リンクを生成します。カスタムドメインを接続した場合はそれを、そうでなければ Public Development URL セクションの pub-…r2.dev URL を使用してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Capso는 업로드된 모든 파일 이름 앞에 이것을 붙여 공유 링크를 만듭니다. 사용자 지정 도메인을 연결한 경우 해당 도메인을, 그렇지 않으면 Public Development URL 섹션의 pub-…r2.dev URL을 사용하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Capso 会把这段前缀加在每个上传文件名前面来生成分享链接。如果你连接了自定义域名就用那个，否则用 Public Development URL 章节里的 pub-…r2.dev URL。" } }
+      }
+    },
+    "Public URL prefix" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "公開 URL プレフィックス" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공개 URL 접두사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "公开 URL 前缀" } }
+      }
+    },
+    "Final share link will look like" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "最終的な共有リンクの形式" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "최종 공유 링크 형식" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最终分享链接示例" } }
+      }
+    },
+    "Test Connection" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "接続をテスト" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "연결 테스트" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "测试连接" } }
+      }
+    },
+    "Connection works." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "接続成功。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "연결 성공." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接正常。" } }
+      }
+    },
+    "Round-trip in %.1fs · Test file written and removed cleanly." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "往復 %.1f 秒 · テストファイルを正常に書き込み・削除しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "왕복 %.1f초 · 테스트 파일을 정상적으로 작성하고 삭제했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "往返 %.1f 秒 · 测试文件已成功写入并清理。" } }
+      }
+    },
+    "Re-test" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再テスト" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "재테스트" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新测试" } }
+      }
+    },
+    "Configuration is incomplete." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定が未完了です。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설정이 완료되지 않았습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置不完整。" } }
+      }
+    },
+    "One or more required values are missing. Go back and double-check the previous step." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "1 つ以上の必須項目が入力されていません。前の手順に戻って確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "하나 이상의 필수 값이 누락되었습니다. 이전 단계로 돌아가 다시 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一个或多个必填项缺失，请返回上一步仔细检查。" } }
+      }
+    },
+    "Those credentials were rejected." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "認証情報が拒否されました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자격 증명이 거부되었습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "该凭证被拒绝。" } }
+      }
+    },
+    "Cloudflare returned an authentication error. Verify the Access Key ID and Secret Access Key, and that the token has Object Read & Write permission on this bucket." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare が認証エラーを返しました。Access Key ID と Secret Access Key を確認し、このバケットに対して Object Read & Write 権限があるか確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare에서 인증 오류가 반환되었습니다. Access Key ID와 Secret Access Key를 확인하고, 해당 토큰이 이 버킷에 대해 Object Read & Write 권한을 갖고 있는지 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare 返回了身份验证错误，请验证 Access Key ID 和 Secret Access Key，并确认该令牌对此存储桶具有 Object Read & Write 权限。" } }
+      }
+    },
+    "That URL prefix doesn't look right." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この URL プレフィックスは正しくないようです。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "URL 접두사가 올바르지 않은 것 같습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "该 URL 前缀看起来不正确。" } }
+      }
+    },
+    "Network error reaching Cloudflare." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare への接続でネットワークエラーが発生しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Cloudflare에 연결하는 중 네트워크 오류가 발생했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接 Cloudflare 时发生网络错误。" } }
+      }
+    },
+    "Storage quota exceeded." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ストレージ容量の上限に達しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장 공간 할당량을 초과했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储配额已满。" } }
+      }
+    },
+    "Your R2 account is at its storage limit. Free up space in the Cloudflare dashboard or upgrade your plan." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "R2 アカウントがストレージの上限に達しました。Cloudflare ダッシュボードでスペースを解放するか、プランをアップグレードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "R2 계정의 저장 공간이 가득 찼습니다. Cloudflare 대시보드에서 공간을 확보하거나 플랜을 업그레이드하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "您的 R2 账户已达存储上限，请在 Cloudflare 控制台释放空间或升级套餐。" } }
+      }
+    },
+    "The upload worked, but the file isn't publicly reachable." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロードは成功しましたが、ファイルに公開アクセスできません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업로드는 성공했지만 파일에 공개적으로 접근할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传成功，但文件无法公开访问。" } }
+      }
+    },
+    "The bucket needs Public access enabled. Open the Cloudflare dashboard → your bucket → Settings → Public access, then re-test." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "バケットの Public access を有効にする必要があります。Cloudflare ダッシュボード → バケット → Settings → Public access を開いて、再テストしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "버킷에 Public access를 활성화해야 합니다. Cloudflare 대시보드 → 버킷 → Settings → Public access를 열고 다시 테스트하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要为存储桶启用 Public access。请打开 Cloudflare 控制台 → 存储桶 → Settings → Public access，然后重新测试。" } }
+      }
+    },
+    "The bucket isn't publicly readable. Open the Cloudflare dashboard → your bucket → Settings, then enable Public Development URL or add a Custom Domain. Then re-test." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "バケットが公開読み取り可能になっていません。Cloudflare ダッシュボード → バケット → Settings を開き、Public Development URL を有効にするか Custom Domain を追加してください。その後、再テストしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "버킷이 공개적으로 읽을 수 없습니다. Cloudflare 대시보드 → 버킷 → Settings를 열고 Public Development URL을 활성화하거나 Custom Domain을 추가하세요. 그런 다음 다시 테스트하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "bucket 当前不可公开读取。打开 Cloudflare 控制台 → 你的 bucket → Settings，然后启用 Public Development URL 或添加 Custom Domain。然后重新测试。" } }
+      }
+    },
+    "Something went wrong." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "エラーが発生しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "오류가 발생했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "出现了错误。" } }
+      }
+    },
+    "Cloud Share is ready" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有の準備ができました" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 준비 완료" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享已就绪" } }
+      }
+    },
+    "Next time you capture a screenshot, click the cloud icon in Quick Access — your share link will be on your clipboard, ready to paste in Slack or Discord." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "次回スクリーンショットを撮ったら、Quick Access のクラウドアイコンをクリックするだけで、Slack や Discord にすぐ貼り付けられる共有リンクがクリップボードにコピーされます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다음에 스크린샷을 캡처하면 Quick Access의 클라우드 아이콘을 클릭하세요 — Slack이나 Discord에 바로 붙여 넣을 수 있는 공유 링크가 클립보드에 복사됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下次截图后，点击快速访问中的云端图标 — 分享链接将复制到剪贴板，可直接粘贴到 Slack 或 Discord。" } }
+      }
+    },
+    "Take a test capture" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テストキャプチャを撮る" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "테스트 캡처 촬영" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拍一张测试截图" } }
+      }
+    },
+    "Hide secret" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "シークレットを隠す" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "시크릿 숨기기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "隐藏密钥" } }
+      }
+    },
+    "Reveal secret" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "シークレットを表示" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "시크릿 표시" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示密钥" } }
+      }
+    },
+
+    "Uploaded to cloud" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドにアップロード済み" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드에 업로드됨" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已上传至云端" } }
+      }
+    },
+    "Copy cloud link" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドリンクをコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 링크 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制云端链接" } }
+      }
+    },
+    "Upload to cloud" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドにアップロード" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드에 업로드" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传到云端" } }
+      }
+    },
+    "Cloud credentials are invalid." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドの認証情報が無効です。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 자격 증명이 유효하지 않습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端凭证无效。" } }
+      }
+    },
+    "Upload OK but public URL unreachable." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロード成功、ただし公開 URL にアクセスできません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업로드 성공, 하지만 공개 URL에 접근할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传成功，但公开 URL 无法访问。" } }
+      }
+    },
+    "Invalid URL prefix: %@" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "無効な URL プレフィックス: %@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "유효하지 않은 URL 접두사: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "URL 前缀无效：%@" } }
+      }
+    },
+    "Copy Cloud Link" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドリンクをコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 링크 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制云端链接" } }
+      }
+    },
+    "Delete capture?" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャプチャを削除しますか？" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캡처를 삭제할까요?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除截图？" } }
+      }
+    },
+    "This will remove the capture from this Mac. You can also remove the cloud copy." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このキャプチャを Mac から削除します。クラウドのコピーも削除できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 캡처가 이 Mac에서 삭제됩니다. 클라우드 복사본도 삭제할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这将从此 Mac 中删除该截图。您也可以同时删除云端副本。" } }
+      }
+    },
+    "This will remove the capture from this Mac." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このキャプチャを Mac から削除します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 캡처가 이 Mac에서 삭제됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这将从此 Mac 中删除该截图。" } }
+      }
+    },
+    "Also delete from cloud" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウドからも削除" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드에서도 삭제" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "同时从云端删除" } }
+      }
+    },
+    "Cloud Share busy" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有がビジー中" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 사용 중" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享忙碌中" } }
+      }
+    },
+    "Previous upload still in progress — try again in a moment." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "前回のアップロードがまだ進行中です — もう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이전 업로드가 아직 진행 중입니다 — 잠시 후 다시 시도하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一次上传仍在进行中——稍后再试。" } }
+      }
+    },
+    "Cloud share ready" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有の準備完了" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 준비 완료" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享已就绪" } }
+      }
+    },
+    "Link copied to clipboard." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "リンクをクリップボードにコピーしました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "링크가 클립보드에 복사되었습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "链接已复制到剪贴板。" } }
+      }
+    },
+    "Cloud share failed" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド共有に失敗しました" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 공유 실패" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端分享失败" } }
+      }
+    },
+    "Couldn't encode capture for upload." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "撮影のエンコードに失敗しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캡처를 인코딩할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法编码截图以上传。" } }
+      }
+    },
+    "Couldn't fully clear Keychain" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Keychain を完全に削除できませんでした" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Keychain을 완전히 지울 수 없습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未能完全清除 Keychain" } }
+      }
+    },
+    "Some credentials may still be in Keychain: %@.\n\nOpen 'Keychain Access.app' and search for 'com.awesomemacapps.capso.share' to remove them manually." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の資格情報が Keychain に残っている可能性があります：%@。\n\n「キーチェーンアクセス.app」を開き、'com.awesomemacapps.capso.share' で検索して手動で削除してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 자격 증명이 Keychain에 남아 있을 수 있습니다: %@.\n\n'키체인 접근.app'을 열고 'com.awesomemacapps.capso.share'를 검색하여 수동으로 삭제하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分凭据可能仍保留在 Keychain 中：%@。\n\n请打开“钥匙串访问.app”，搜索 'com.awesomemacapps.capso.share' 手动删除。" } }
       }
     }
   },

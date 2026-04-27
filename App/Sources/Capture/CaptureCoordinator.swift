@@ -2,10 +2,12 @@
 import AppKit
 import CoreImage
 import Observation
+import UserNotifications
 import AnnotationKit
 import CaptureKit
 import OCRKit
 import SharedKit
+import ShareKit
 
 @MainActor
 @Observable
@@ -32,6 +34,7 @@ final class CaptureCoordinator {
     var ocrCoordinator: OCRCoordinator?
     var translationCoordinator: TranslationCoordinator?
     var historyCoordinator: HistoryCoordinator?
+    var shareCoordinator: ShareCoordinator?
 
     /// Post-capture action override. When set, ignores Settings toggles.
     private var pendingAction: PostCaptureAction = .default
@@ -40,6 +43,7 @@ final class CaptureCoordinator {
         case `default`    // Use Settings (Show Preview / Copy / Auto Save)
         case clipboard    // Copy to clipboard only, no preview
         case annotate     // Open annotation editor directly
+        case share        // Upload to cloud, skip Quick Access, save to history
     }
 
     init(settings: AppSettings) {
@@ -58,6 +62,32 @@ final class CaptureCoordinator {
 
     func captureAreaAndAnnotate() {
         pendingAction = .annotate
+        startAreaCapture()
+    }
+
+    func captureAreaAndShare() {
+        // Gate: Cloud Share not configured → ask AppDelegate (via notification) to
+        // open Preferences → Cloud Share tab. We avoid `NSApp.delegate as? AppDelegate`
+        // because the cast fails under SwiftUI's @NSApplicationDelegateAdaptor proxying.
+        guard let coord = shareCoordinator else {
+            NotificationCenter.default.post(
+                name: .openScreenshotSettings,
+                object: PreferencesTab.cloudShare
+            )
+            return
+        }
+
+        // Gate: upload already in flight → notify and bail
+        if case .uploading = coord.state {
+            Self.postNotification(
+                title: String(localized: "Cloud Share busy"),
+                body: String(localized: "Previous upload still in progress — try again in a moment.")
+            )
+            return
+        }
+
+        // All clear: run area selection, upload on success
+        pendingAction = .share
         startAreaCapture()
     }
 
@@ -532,12 +562,28 @@ final class CaptureCoordinator {
         let action = pendingAction
         pendingAction = .default
 
+        // Pre-generate the history entry ID so we can wire the cloud URL callback
+        // before the async save completes.
+        let entryID = UUID()
+
         switch action {
         case .clipboard:
             copyImageToClipboard(result.image)
         case .annotate:
             // Open the editor on the same screen the capture came from.
             openAnnotationEditor(result, anchorScreen: screenFor(result: result))
+        case .share:
+            // Skip Quick Access, save to history, then upload in background.
+            historyCoordinator?.saveCapture(result: result, entryID: entryID)
+            if let coord = shareCoordinator {
+                Task { await self.performShareAfterCapture(result: result, entryID: entryID, coord: coord) }
+            } else {
+                Self.postNotification(
+                    title: String(localized: "Cloud share failed"),
+                    body: String(localized: "Cloud Share is not configured.")
+                )
+            }
+            return  // history already saved above; skip the call below
         case .default:
             if settings.screenshotAutoCopy {
                 copyImageToClipboard(result.image)
@@ -546,10 +592,10 @@ final class CaptureCoordinator {
                 saveImageToFile(result.image)
             }
             if settings.screenshotShowPreview {
-                showQuickAccess(for: result)
+                showQuickAccess(for: result, entryID: entryID)
             }
         }
-        historyCoordinator?.saveCapture(result: result)
+        historyCoordinator?.saveCapture(result: result, entryID: entryID)
     }
 
     /// The real camera-shutter sound macOS itself plays for Cmd+Shift+3/4.
@@ -566,7 +612,7 @@ final class CaptureCoordinator {
         return NSSound(named: "Pop")
     }()
 
-    private func showQuickAccess(for result: CaptureResult) {
+    private func showQuickAccess(for result: CaptureResult, entryID: UUID) {
         // If the stack is full, evict the oldest (the one anchored at the
         // bottom slot) with a slide-off-left animation. The remaining
         // previews will slide down one slot as part of the restack below.
@@ -576,7 +622,12 @@ final class CaptureCoordinator {
         }
 
         let captureScreen = NSScreen.screens.first { $0.displayID == result.displayID }
-        let window = QuickAccessWindow(result: result, settings: settings, screen: captureScreen)
+        let window = QuickAccessWindow(result: result, settings: settings, screen: captureScreen, shareCoordinator: shareCoordinator)
+
+        // Persist the cloud URL to history when an upload succeeds from Quick Access.
+        window.onUploadSucceeded = { [weak self] urlString in
+            self?.historyCoordinator?.setCloudURL(id: entryID, url: urlString)
+        }
 
         // All callbacks capture the specific `window` weakly so the right
         // stack slot gets dismissed — not whichever one happens to be newest.
@@ -755,6 +806,95 @@ final class CaptureCoordinator {
 
     private func copyRenderedImage(_ image: CGImage) {
         copyImageToClipboard(image)
+    }
+
+    // MARK: - Cloud Share Upload
+
+    private func performShareAfterCapture(
+        result: CaptureResult,
+        entryID: UUID,
+        coord: ShareCoordinator
+    ) async {
+        let image = result.image
+
+        // Encode + write off the main actor so large PNGs don't block the UI.
+        let tempURL: URL? = await Task.detached(priority: .userInitiated) { () -> URL? in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("png")
+            guard let data = ImageUtilities.pngData(from: image) else { return nil }
+            do {
+                try data.write(to: url)
+                return url
+            } catch {
+                return nil
+            }
+        }.value
+
+        guard let tempURL else {
+            Self.postNotification(
+                title: String(localized: "Cloud share failed"),
+                body: String(localized: "Couldn't encode capture for upload.")
+            )
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        do {
+            let url = try await coord.upload(file: tempURL, contentType: "image/png")
+            // ShareCoordinator already copied the URL to clipboard on success.
+            historyCoordinator?.setCloudURL(id: entryID, url: url.absoluteString)
+            Self.postNotification(
+                title: String(localized: "Cloud share ready"),
+                body: String(localized: "Link copied to clipboard.")
+            )
+        } catch let err as ShareError {
+            Self.postNotification(
+                title: String(localized: "Cloud share failed"),
+                body: Self.humanizeShareError(err)
+            )
+        } catch {
+            Self.postNotification(
+                title: String(localized: "Cloud share failed"),
+                body: error.localizedDescription
+            )
+        }
+    }
+
+    private static func humanizeShareError(_ err: ShareError) -> String {
+        switch err {
+        case .invalidCredentials:
+            return String(localized: "Cloud credentials are invalid.")
+        case .network(let underlying):
+            return String(localized: "Network error: \(underlying)")
+        case .quotaExceeded:
+            return String(localized: "Cloud quota exceeded.")
+        case .publicAccessUnreachable:
+            return String(localized: "Upload OK but public URL unreachable.")
+        case .invalidURLPrefix(let reason):
+            return String(localized: "Invalid URL prefix: \(reason)")
+        case .notConfigured:
+            return String(localized: "Cloud Share is not configured.")
+        case .unknown(let detail):
+            return detail
+        }
+    }
+
+    /// Post a macOS user notification. Requests authorization on the first call.
+    private static func postNotification(title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            center.add(request, withCompletionHandler: nil)
+        }
     }
 
     // MARK: - Synchronous Display Capture

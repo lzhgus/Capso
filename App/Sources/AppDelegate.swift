@@ -1,11 +1,17 @@
 // App/Sources/AppDelegate.swift
 import AppKit
 import SharedKit
+import ShareKit
 import KeyboardShortcuts
 import Sparkle
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Static reference to the live AppDelegate. Use this instead of
+    /// `NSApp.delegate as? AppDelegate`, which fails under SwiftUI's
+    /// `@NSApplicationDelegateAdaptor` proxy wrapping.
+    static private(set) var shared: AppDelegate?
+
     private var menuBarController: MenuBarController?
     let settings = AppSettings()
     let permissionManager = PermissionManager()
@@ -14,11 +20,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var ocrCoordinator: OCRCoordinator?
     private(set) var translationCoordinator: TranslationCoordinator?
     private(set) var historyCoordinator: HistoryCoordinator?
+    private(set) var shareCoordinator: ShareCoordinator?
     private var preferencesWindow: PreferencesWindow?
     /// Sparkle update coordinator used by preferences and manual update checks.
     let updateManager = UpdateManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.shared = self
+
         // Show tooltips faster (default is ~2s, reduce to 0.3s)
         UserDefaults.standard.set(300, forKey: "NSInitialToolTipDelay")
 
@@ -29,9 +38,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ocrCoordinator = OCRCoordinator(settings: settings)
         translationCoordinator = TranslationCoordinator(settings: settings)
         historyCoordinator = HistoryCoordinator(settings: settings)
+        shareCoordinator = makeShareCoordinator(settings: settings)
         captureCoordinator!.ocrCoordinator = ocrCoordinator
         captureCoordinator!.translationCoordinator = translationCoordinator
         captureCoordinator!.historyCoordinator = historyCoordinator
+        captureCoordinator!.shareCoordinator = shareCoordinator
+        historyCoordinator!.shareCoordinator = shareCoordinator
         recordingCoordinator!.historyCoordinator = historyCoordinator
         preferencesWindow = PreferencesWindow(settings: settings, updateManager: updateManager)
         menuBarController = MenuBarController(
@@ -105,6 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .captureAreaToClipboard) { [weak self] in
             self?.captureCoordinator?.captureAreaToClipboard()
         }
+        KeyboardShortcuts.onKeyDown(for: .captureAreaAndShare) { [weak self] in
+            self?.captureCoordinator?.captureAreaAndShare()
+        }
         KeyboardShortcuts.onKeyDown(for: .captureAreaAndAnnotate) { [weak self] in
             self?.captureCoordinator?.captureAreaAndAnnotate()
         }
@@ -140,5 +155,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showPreferences() {
         preferencesWindow?.show()
+    }
+
+    /// Rebuild the live `ShareCoordinator` from current `AppSettings` + Keychain.
+    /// Called after the Cloud Share wizard saves new credentials, and after the
+    /// user resets the configuration — so the next capture's share button
+    /// reflects the current state without requiring a relaunch.
+    func refreshShareCoordinator() {
+        shareCoordinator = makeShareCoordinator(settings: settings)
+        captureCoordinator?.shareCoordinator = shareCoordinator
+        historyCoordinator?.shareCoordinator = shareCoordinator
+    }
+
+    private func makeShareCoordinator(settings: AppSettings) -> ShareCoordinator? {
+        guard
+            settings.isCloudShareConfigured,
+            let providerRaw = settings.cloudShareProvider,
+            let provider = ShareProvider(rawValue: providerRaw),
+            let urlPrefix = settings.cloudShareURLPrefix,
+            let accountID = settings.cloudShareAccountID,
+            let bucket = settings.cloudShareBucket
+        else {
+            return nil
+        }
+
+        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.\(provider.rawValue)")
+        guard
+            let access = AppDelegate.keychainString(keychain, account: "accessKey"),
+            let secret = AppDelegate.keychainString(keychain, account: "secretKey")
+        else {
+            return nil
+        }
+
+        let config = ShareConfig(provider: provider, urlPrefix: urlPrefix, accountID: accountID, bucket: bucket)
+        let destination = R2Destination(config: config, accessKey: access, secretKey: secret)
+        return ShareCoordinator(destination: destination)
+    }
+
+    /// Read a string from Keychain. Returns nil on missing entry or known recoverable errors.
+    /// Any unexpected error triggers an assertion failure in debug builds.
+    private static func keychainString(_ keychain: KeychainHelper, account: String) -> String? {
+        do {
+            return try keychain.get(account: account)
+        } catch KeychainError.interactionNotAllowed {
+            // Keychain locked (e.g., app launched at login before user logs in).
+            // Returning nil leaves the coordinator nil; the user can re-enter
+            // Settings → Cloud Share to trigger refreshShareCoordinator().
+            return nil
+        } catch {
+            assertionFailure("Unexpected Keychain error reading '\(account)': \(error)")
+            return nil
+        }
     }
 }

@@ -3,6 +3,7 @@ import AppKit
 import SwiftUI
 import CaptureKit
 import SharedKit
+import ShareKit
 
 @MainActor
 final class QuickAccessWindow: NSPanel {
@@ -15,13 +16,15 @@ final class QuickAccessWindow: NSPanel {
     var onTranslate: (() -> Void)?
     var onPin: (() -> Void)?
     var onClose: (() -> Void)?
+    /// Called with the public URL string when a cloud upload succeeds.
+    var onUploadSucceeded: ((String) -> Void)?
 
     private var autoDismissTimer: Timer?
     private let settings: AppSettings
     /// The screen this preview is anchored to (where the capture originated).
     let targetScreen: NSScreen
 
-    init(result: CaptureResult, settings: AppSettings, screen: NSScreen?) {
+    init(result: CaptureResult, settings: AppSettings, screen: NSScreen?, shareCoordinator: ShareCoordinator?) {
         self.settings = settings
         self.targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
 
@@ -62,9 +65,12 @@ final class QuickAccessWindow: NSPanel {
 
         let view = QuickAccessView(
             thumbnail: nsImage,
+            captureImage: result.image,
             dimensions: dimensions,
             capturedAt: Date(),
             targetLanguageDisplay: targetDisplay,
+            shareCoordinator: shareCoordinator,
+            onUploadSucceeded: { [weak self] url in self?.onUploadSucceeded?(url) },
             onCopy:      { [weak self] in self?.onCopy?() },
             onSave:      { [weak self] in self?.onSave?() },
             onAnnotate:  { [weak self] in self?.onAnnotate?() },

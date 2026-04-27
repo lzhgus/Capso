@@ -447,6 +447,64 @@ final class PreferencesViewModel {
         }
     }
 
+    // MARK: Cloud Share
+    var isCloudShareConfigured: Bool {
+        access(keyPath: \.isCloudShareConfigured)
+        return settings.isCloudShareConfigured
+    }
+    var cloudShareProvider: String? {
+        get {
+            access(keyPath: \.cloudShareProvider)
+            return settings.cloudShareProvider
+        }
+        set {
+            withMutation(keyPath: \.cloudShareProvider) {
+                withMutation(keyPath: \.isCloudShareConfigured) {
+                    settings.cloudShareProvider = newValue
+                }
+            }
+        }
+    }
+    var cloudShareURLPrefix: String? {
+        get {
+            access(keyPath: \.cloudShareURLPrefix)
+            return settings.cloudShareURLPrefix
+        }
+        set {
+            withMutation(keyPath: \.cloudShareURLPrefix) {
+                withMutation(keyPath: \.isCloudShareConfigured) {
+                    settings.cloudShareURLPrefix = newValue
+                }
+            }
+        }
+    }
+    var cloudShareAccountID: String? {
+        get {
+            access(keyPath: \.cloudShareAccountID)
+            return settings.cloudShareAccountID
+        }
+        set {
+            withMutation(keyPath: \.cloudShareAccountID) {
+                withMutation(keyPath: \.isCloudShareConfigured) {
+                    settings.cloudShareAccountID = newValue
+                }
+            }
+        }
+    }
+    var cloudShareBucket: String? {
+        get {
+            access(keyPath: \.cloudShareBucket)
+            return settings.cloudShareBucket
+        }
+        set {
+            withMutation(keyPath: \.cloudShareBucket) {
+                withMutation(keyPath: \.isCloudShareConfigured) {
+                    settings.cloudShareBucket = newValue
+                }
+            }
+        }
+    }
+
     // MARK: Version
     // MARK: History
     var historyEnabled: Bool {
