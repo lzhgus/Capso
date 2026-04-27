@@ -52,6 +52,29 @@ public enum CameraShape: String, CaseIterable, Sendable {
     }
 }
 
+/// A persisted area selection (in overlay-view coordinates) along with the
+/// `CGDirectDisplayID` of the screen it was captured on. Restored on the next
+/// area capture when `rememberLastCaptureArea` is on.
+public struct StoredCaptureSelection: Codable, Sendable {
+    public let x: Double
+    public let y: Double
+    public let width: Double
+    public let height: Double
+    public let screenID: UInt32
+
+    public var rect: CGRect {
+        CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    public init(rect: CGRect, screenID: UInt32) {
+        self.x = Double(rect.origin.x)
+        self.y = Double(rect.origin.y)
+        self.width = Double(rect.size.width)
+        self.height = Double(rect.size.height)
+        self.screenID = screenID
+    }
+}
+
 public enum CameraSize: String, CaseIterable, Sendable {
     case small   // 100pt shorter dimension
     case medium  // 150pt
@@ -244,6 +267,23 @@ public final class AppSettings: @unchecked Sendable {
     public var rememberLastCaptureArea: Bool {
         get { defaults.object(forKey: "rememberLastCaptureArea") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "rememberLastCaptureArea") }
+    }
+
+    public var lastCaptureSelection: StoredCaptureSelection? {
+        get {
+            guard let data = defaults.data(forKey: "lastCaptureSelection"),
+                  let value = try? JSONDecoder().decode(StoredCaptureSelection.self, from: data) else {
+                return nil
+            }
+            return value
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: "lastCaptureSelection")
+            } else {
+                defaults.removeObject(forKey: "lastCaptureSelection")
+            }
+        }
     }
 
     // MARK: Capture Presets

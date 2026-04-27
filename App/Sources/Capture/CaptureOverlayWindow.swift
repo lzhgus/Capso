@@ -39,7 +39,13 @@ final class CaptureOverlayWindow: NSPanel {
             perform(preventsActivationSel, with: NSNumber(value: true))
         }
 
-        overlayView = CaptureOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size), settings: settings, presetsDisabled: presetsDisabled)
+        let screenID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        overlayView = CaptureOverlayView(
+            frame: NSRect(origin: .zero, size: screen.frame.size),
+            settings: settings,
+            presetsDisabled: presetsDisabled,
+            screenID: screenID
+        )
         overlayView.onSelectionComplete = { [weak self] rect in
             guard let self, let screen = self.screen else { return }
             self.onAreaSelected?(rect, screen)
