@@ -52,6 +52,33 @@ public enum CameraShape: String, CaseIterable, Sendable {
     }
 }
 
+/// The most recent capture, persisted so the user can replay it via the
+/// "Capture Previous Area" global shortcut. Each case carries the
+/// `CGDirectDisplayID` of the display the capture targeted.
+///
+/// Window mode is intentionally excluded. A saved `CGWindowID` is fragile:
+/// the underlying window can move (Stage Manager, full-screen toggle,
+/// virtual desktop), be reassigned to a different window after close, or
+/// have its rendered size changed by the system out from under us. Replay
+/// would silently produce a result that doesn't match the original capture.
+/// Replay is limited to area and fullscreen, which are anchored to display
+/// geometry rather than to a particular live window instance.
+public enum StoredCaptureSelection: Codable, Sendable, Equatable {
+    case area(x: Double, y: Double, width: Double, height: Double, screenID: UInt32)
+    case fullscreen(screenID: UInt32)
+
+    /// Convenience constructor flattening a `CGRect` into the case's fields.
+    public static func area(rect: CGRect, screenID: UInt32) -> StoredCaptureSelection {
+        .area(
+            x: Double(rect.origin.x),
+            y: Double(rect.origin.y),
+            width: Double(rect.size.width),
+            height: Double(rect.size.height),
+            screenID: screenID
+        )
+    }
+}
+
 public enum CameraSize: String, CaseIterable, Sendable {
     case small   // 100pt shorter dimension
     case medium  // 150pt
@@ -241,9 +268,21 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "showMagnifier") }
     }
 
-    public var rememberLastCaptureArea: Bool {
-        get { defaults.object(forKey: "rememberLastCaptureArea") as? Bool ?? false }
-        set { defaults.set(newValue, forKey: "rememberLastCaptureArea") }
+    public var lastCaptureSelection: StoredCaptureSelection? {
+        get {
+            guard let data = defaults.data(forKey: "lastCaptureSelection"),
+                  let value = try? JSONDecoder().decode(StoredCaptureSelection.self, from: data) else {
+                return nil
+            }
+            return value
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: "lastCaptureSelection")
+            } else {
+                defaults.removeObject(forKey: "lastCaptureSelection")
+            }
+        }
     }
 
     // MARK: Self-Timer

@@ -113,6 +113,7 @@ final class CaptureCoordinator {
         let targetScreen = NSScreen.screens.first { $0.frame.contains(mouseLocation) }
             ?? NSScreen.main
         let displayID = targetScreen?.displayID ?? CGMainDisplayID()
+        settings.lastCaptureSelection = .fullscreen(screenID: displayID)
         Task {
             do {
                 let result = try await ScreenCaptureManager.captureFullscreen(displayID: displayID)
@@ -162,6 +163,37 @@ final class CaptureCoordinator {
         }
     }
 
+    /// Replay the last area or fullscreen capture without showing the
+    /// selection overlay. Bound to the user-assignable "Capture Previous
+    /// Area" global shortcut. Silent no-op when nothing has been captured
+    /// yet, or when the saved display is no longer connected.
+    ///
+    /// `pendingAction` is reset to `.default` on every branch so a previous
+    /// `Capture Area & Annotate` (or any other mode-specific entry point)
+    /// that left `pendingAction` non-default can't leak into the replay.
+    func replayLastCapture() {
+        guard let selection = settings.lastCaptureSelection else { return }
+        switch selection {
+        case let .area(x, y, width, height, screenID):
+            guard let screen = NSScreen.screens.first(where: { $0.displayID == screenID }) else {
+                return
+            }
+            let rect = CGRect(x: x, y: y, width: width, height: height)
+            pendingAction = .default
+            performAreaCapture(rect: rect, screen: screen)
+        case let .fullscreen(screenID):
+            pendingAction = .default
+            Task {
+                do {
+                    let result = try await ScreenCaptureManager.captureFullscreen(displayID: screenID)
+                    handleCaptureResult(result)
+                } catch {
+                    print("Fullscreen replay failed: \(error)")
+                }
+            }
+        }
+    }
+
     private func showOverlay(
         mode: CaptureOverlayMode = .area,
         isScrollingCapture: Bool = false,
@@ -177,11 +209,14 @@ final class CaptureCoordinator {
                 } else if let seconds = selfTimerSeconds {
                     self?.runSelfTimerThenCapture(rect: rect, screen: screen, seconds: seconds)
                 } else {
+                    self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
                     self?.performAreaCapture(rect: rect, screen: screen)
                 }
             }
             overlay.onWindowSelected = { [weak self] windowID in
                 self?.dismissOverlay()
+                // Window captures are intentionally not persisted for replay;
+                // see `StoredCaptureSelection` docs for the rationale.
                 self?.performWindowCapture(windowID: windowID)
             }
             overlay.onCancelled = { [weak self] in
@@ -274,6 +309,7 @@ final class CaptureCoordinator {
             let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
+                self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
                 let screenFrame = screen.frame
                 let scaleX = CGFloat(frozenImage.width) / screenFrame.width
                 let scaleY = CGFloat(frozenImage.height) / screenFrame.height

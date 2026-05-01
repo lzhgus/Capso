@@ -115,18 +115,6 @@ final class PreferencesViewModel {
             }
         }
     }
-    var rememberLastCaptureArea: Bool {
-        get {
-            access(keyPath: \.rememberLastCaptureArea)
-            return settings.rememberLastCaptureArea
-        }
-        set {
-            withMutation(keyPath: \.rememberLastCaptureArea) {
-                settings.rememberLastCaptureArea = newValue
-            }
-        }
-    }
-
     // MARK: Self-Timer
     var selfTimerDurationSeconds: Int {
         get {

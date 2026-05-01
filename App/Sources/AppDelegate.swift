@@ -126,6 +126,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .captureAreaAndAnnotate) { [weak self] in
             self?.captureCoordinator?.captureAreaAndAnnotate()
         }
+        KeyboardShortcuts.onKeyDown(for: .captureLastArea) { [weak self] in
+            self?.captureCoordinator?.replayLastCapture()
+        }
         KeyboardShortcuts.onKeyDown(for: .screenshotHistory) { [weak self] in
             self?.historyCoordinator?.showWindow()
         }

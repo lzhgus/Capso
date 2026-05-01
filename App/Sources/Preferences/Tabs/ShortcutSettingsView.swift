@@ -18,6 +18,9 @@ extension KeyboardShortcuts.Name {
     /// menu bar; shipping a default risks colliding with whatever the user
     /// has already bound in macOS or third-party apps.
     static let selfTimerCapture = Self("selfTimerCapture")
+    /// Replays the last capture (area / window / fullscreen) without showing
+    /// the selection overlay. Unbound by default — user must assign a key.
+    static let captureLastArea = Self("captureLastArea")
 }
 
 struct ShortcutSettingsView: View {
@@ -55,6 +58,7 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Capture and Share to Cloud", name: .captureAreaAndShare, showDivider: true)
                     shortcutRow("Capture Area & Annotate", name: .captureAreaAndAnnotate, showDivider: true)
                     shortcutRow("Capture & Translate", name: .captureAndTranslate, showDivider: true)
+                    shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
                 }
             }
 
