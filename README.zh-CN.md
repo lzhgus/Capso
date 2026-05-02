@@ -62,6 +62,12 @@ brew install --cask capso
 
 ## 功能特性
 
+### All-in-One 全能截图
+- **CleanShot 风格截图 HUD**：在同一个浮动工具栏中选择区域、全屏、窗口、滚动、计时器、OCR 或录屏
+- **可调整选区**：截图前可以拖拽移动、放大或缩小选区，周围变暗、选中区域保持明亮
+- **比例与固定尺寸预设**：快速切换自由比例、1:1、4:3、16:9 以及自定义固定像素尺寸
+- **原位标注**：直接在截取区域上添加箭头、形状、文字、荧光笔和马赛克，最后再保存或复制
+
 ### 截图
 - **区域截图**：拖拽选择，实时显示尺寸；按 **R** 键切换宽高比与固定尺寸预设（1:1、16:9、1920×1080、自定义）
 - **全屏截图**：一键捕获整个屏幕
@@ -84,6 +90,7 @@ brew install --cask capso
 - 箭头、矩形、椭圆、文字、自由绘制、马赛克/模糊、裁剪
 - 荧光笔和计数器（编号标记）工具
 - 颜色选择器、描边控制、撤销/重做
+- **原位编辑模式**：区域截图后可以直接在原位置标注，不需要先保存原始截图
 - **截图美化**：背景色、内边距、圆角、阴影，一键出图
 
 ### OCR 文字识别
@@ -133,6 +140,7 @@ brew install --cask capso
 | | CleanShot X | Shottr | Cap | **Capso** |
 |---|---|---|---|---|
 | 截图 | 完整 | 完整 | 基础 | **完整** |
+| All-in-One HUD | 有 | 无 | 无 | **有** |
 | 录屏 | 视频 + GIF | 无 | 视频 + GIF | **视频 + GIF** |
 | 摄像头画中画 | 有 | 无 | 有 | **有（4 种形状）** |
 | OCR | 有 | 有 | 无 | **有** |
@@ -172,18 +180,18 @@ xcodebuild -project Capso.xcodeproj -scheme Capso -configuration Release build
 
 ## 架构
 
-Capso 采用模块化的 SPM 架构。App 本身是一个很薄的 SwiftUI + AppKit 壳层，核心能力分布在 9 个独立的包中。
+Capso 采用模块化的 SPM 架构。App 本身是一个很薄的 SwiftUI + AppKit 壳层，核心能力分布在 10 个独立的包中。
 
 ```
 Capso/
 ├── App/                     # 主 App（薄壳层）
 │   ├── CapsoApp.swift       # @main 入口
 │   ├── MenuBar/             # 菜单栏
-│   ├── Capture/             # 截图
+│   ├── Capture/             # 截图、All-in-One HUD、钉到屏幕
 │   ├── Recording/           # 录屏
 │   ├── Editor/              # 录屏编辑器、时间线、预览、导出 UI
 │   ├── Camera/              # 摄像头画中画
-│   ├── AnnotationEditor/    # 标注编辑器 + 美化
+│   ├── AnnotationEditor/    # 标注编辑器、原位标注 + 美化
 │   ├── OCR/                 # 文字识别
 │   ├── History/             # 截图历史窗口
 │   ├── QuickAccess/         # 快速操作浮窗

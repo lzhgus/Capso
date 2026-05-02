@@ -31,6 +31,10 @@ final class AnnotationCanvasNSView: NSView {
     /// Fired on commit / cancel.
     var onTextEditingEnded: (() -> Void)?
 
+    func commitTextEditingIfNeeded() {
+        commitTextEditing()
+    }
+
     var zoomScale: CGFloat = 1.0 {
         didSet {
             guard zoomScale != oldValue, let editor = textEditor else { return }

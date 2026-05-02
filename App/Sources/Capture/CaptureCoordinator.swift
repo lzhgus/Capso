@@ -24,6 +24,8 @@ final class CaptureCoordinator {
     /// Maximum previews kept on-screen. Oldest is evicted when exceeded.
     private let maxQuickAccessStackSize = 5
     private var annotationWindow: AnnotationEditorWindow?
+    private var inlineAnnotationWindow: InlineAnnotationEditorWindow?
+    private var allInOneToolbarWindow: CaptureAllInOneToolbarWindow?
     private var pinnedControllers: [PinnedScreenshotController] = []
     /// Opaque freeze-screen windows (one per display) that replace the live desktop
     private var freezeWindows: [NSWindow] = []
@@ -34,6 +36,7 @@ final class CaptureCoordinator {
     var lastCaptureResult: CaptureResult?
     var ocrCoordinator: OCRCoordinator?
     var translationCoordinator: TranslationCoordinator?
+    var recordingCoordinator: RecordingCoordinator?
     var historyCoordinator: HistoryCoordinator?
     var shareCoordinator: ShareCoordinator?
 
@@ -44,7 +47,26 @@ final class CaptureCoordinator {
         case `default`    // Use Settings (Show Preview / Copy / Auto Save)
         case clipboard    // Copy to clipboard only, no preview
         case annotate     // Open annotation editor directly
+        case ocr          // Open visual OCR directly
         case share        // Upload to cloud, skip Quick Access, save to history
+
+        var playsShutterSound: Bool {
+            switch self {
+            case .annotate:
+                false
+            case .default, .clipboard, .ocr, .share:
+                true
+            }
+        }
+
+        var savesOriginalCaptureToHistory: Bool {
+            switch self {
+            case .annotate:
+                false
+            case .default, .clipboard, .ocr, .share:
+                true
+            }
+        }
     }
 
     init(settings: AppSettings) {
@@ -90,6 +112,13 @@ final class CaptureCoordinator {
         // All clear: run area selection, upload on success
         pendingAction = .share
         startAreaCapture()
+    }
+
+    func captureAllInOne() {
+        pendingAction = .default
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.showOverlay(mode: .area, isAllInOne: true)
+        }
     }
 
     private func startAreaCapture() {
@@ -197,14 +226,19 @@ final class CaptureCoordinator {
     private func showOverlay(
         mode: CaptureOverlayMode = .area,
         isScrollingCapture: Bool = false,
-        selfTimerSeconds: Int? = nil
+        selfTimerSeconds: Int? = nil,
+        isAllInOne: Bool = false
     ) {
         dismissOverlay()
+        dismissAllInOneToolbar()
         for screen in NSScreen.screens {
             let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
-                if isScrollingCapture {
+                if isAllInOne {
+                    self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+                    self?.showAllInOneToolbar(selectionRect: rect, screen: screen)
+                } else if isScrollingCapture {
                     self?.startScrollingCapture(rect: rect, screen: screen)
                 } else if let seconds = selfTimerSeconds {
                     self?.runSelfTimerThenCapture(rect: rect, screen: screen, seconds: seconds)
@@ -225,6 +259,87 @@ final class CaptureCoordinator {
             overlay.activate(mode: mode)
             overlayWindows.append(overlay)
         }
+    }
+
+    private func showAllInOneToolbar(selectionRect: CGRect, screen: NSScreen) {
+        dismissAllInOneToolbar()
+
+        let visiblePresets = settings.capturePresetsEnabled ? settings.visiblePresets : [.freeform]
+        let activePreset = settings.capturePresetsEnabled ? settings.capturePreset : .freeform
+        let toolbar = CaptureAllInOneToolbarWindow(
+            selectionRect: selectionRect,
+            screen: screen,
+            presets: visiblePresets,
+            activePreset: activePreset
+        )
+        toolbar.onPresetChanged = { [weak self] preset in
+            guard let self, self.settings.capturePresetsEnabled else { return }
+            self.settings.capturePreset = preset
+        }
+        toolbar.onArea = { [weak self] _ in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.showOverlay(mode: .area, isAllInOne: true)
+        }
+        toolbar.onFullscreen = { [weak self] in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.captureFullscreen()
+        }
+        toolbar.onWindow = { [weak self] in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.captureWindow()
+        }
+        toolbar.onScrolling = { [weak self] rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.startScrollingCapture(rect: rect, screen: screen)
+        }
+        toolbar.onTimer = { [weak self] rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.runSelfTimerThenCapture(
+                rect: rect,
+                screen: screen,
+                seconds: self.settings.selfTimerDurationSeconds
+            )
+        }
+        toolbar.onOCR = { [weak self] rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.pendingAction = .ocr
+            self.performAreaCapture(rect: rect, screen: screen)
+        }
+        toolbar.onRecording = { [weak self] rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.recordingCoordinator?.startRecordingFlow(withSelectedArea: rect, screen: screen)
+        }
+        toolbar.onAnnotate = { [weak self] rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.pendingAction = .annotate
+            self.performAreaCapture(rect: rect, screen: screen)
+        }
+        toolbar.onCopy = { [weak self] rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.pendingAction = .clipboard
+            self.performAreaCapture(rect: rect, screen: screen)
+        }
+        toolbar.onCancel = { [weak self] in
+            self?.dismissAllInOneToolbar()
+        }
+
+        allInOneToolbarWindow = toolbar
+        toolbar.show()
     }
 
     /// Show the Self-Timer HUD on the screen the user just selected an area
@@ -320,10 +435,16 @@ final class CaptureCoordinator {
                     height: rect.height * scaleY
                 )
                 if let cropped = frozenImage.cropping(to: cropRect) {
+                    let captureRect = CGRect(
+                        x: rect.origin.x,
+                        y: screenFrame.height - rect.origin.y - rect.height,
+                        width: rect.width,
+                        height: rect.height
+                    )
                     let result = CaptureResult(
                         image: cropped,
                         mode: .area,
-                        captureRect: rect,
+                        captureRect: captureRect,
                         displayID: screen.displayID
                     )
                     self?.handleCaptureResult(result)
@@ -517,6 +638,11 @@ final class CaptureCoordinator {
         }
     }
 
+    private func dismissAllInOneToolbar() {
+        allInOneToolbarWindow?.close()
+        allInOneToolbarWindow = nil
+    }
+
     // MARK: - Scrolling Capture
 
     /// Saved capture rect (ScreenCaptureKit coordinates) for deferred start.
@@ -637,13 +763,14 @@ final class CaptureCoordinator {
 
     private func handleCaptureResult(_ result: CaptureResult) {
         lastCaptureResult = result
-        if settings.playShutterSound {
-            Self.shutterSound?.stop()
-            Self.shutterSound?.play()
-        }
 
         let action = pendingAction
         pendingAction = .default
+
+        if settings.playShutterSound, action.playsShutterSound {
+            Self.shutterSound?.stop()
+            Self.shutterSound?.play()
+        }
 
         // Pre-generate the history entry ID so we can wire the cloud URL callback
         // before the async save completes.
@@ -655,6 +782,8 @@ final class CaptureCoordinator {
         case .annotate:
             // Open the editor on the same screen the capture came from.
             openAnnotationEditor(result, anchorScreen: screenFor(result: result))
+        case .ocr:
+            ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: screenFor(result: result))
         case .share:
             // Skip Quick Access, save to history, then upload in background.
             historyCoordinator?.saveCapture(result: result, entryID: entryID)
@@ -678,7 +807,10 @@ final class CaptureCoordinator {
                 showQuickAccess(for: result, entryID: entryID)
             }
         }
-        historyCoordinator?.saveCapture(result: result, entryID: entryID)
+
+        if action.savesOriginalCaptureToHistory {
+            historyCoordinator?.saveCapture(result: result, entryID: entryID)
+        }
     }
 
     /// The real camera-shutter sound macOS itself plays for Cmd+Shift+3/4.
@@ -797,6 +929,14 @@ final class CaptureCoordinator {
         // capture's displayID so `captureAreaAndAnnotate()` (direct ⌘⇧…
         // shortcut path) also opens on the right display.
         let screen = anchorScreen ?? screenFor(result: result)
+        if result.mode == .area,
+           let screen,
+           openInlineAnnotationEditor(result, screen: screen) {
+            return
+        }
+
+        inlineAnnotationWindow?.close()
+        inlineAnnotationWindow = nil
         annotationWindow = AnnotationEditorWindow(
             image: result.image,
             anchorScreen: screen,
@@ -813,6 +953,43 @@ final class CaptureCoordinator {
             }
         )
         annotationWindow?.show()
+    }
+
+    private func openInlineAnnotationEditor(_ result: CaptureResult, screen: NSScreen) -> Bool {
+        let screenLocalRect = CaptureDisplayGeometry.screenLocalRect(
+            fromTopLeftCaptureRect: result.captureRect,
+            screenHeight: screen.frame.height
+        )
+        guard screenLocalRect.width > 0,
+              screenLocalRect.height > 0,
+              CaptureDisplayGeometry.displayScale(
+                imageSize: CGSize(width: result.image.width, height: result.image.height),
+                screenRect: screenLocalRect
+              ) != nil else {
+            return false
+        }
+
+        annotationWindow?.close()
+        annotationWindow = nil
+        inlineAnnotationWindow?.close()
+        inlineAnnotationWindow = InlineAnnotationEditorWindow(
+            image: result.image,
+            screen: screen,
+            screenLocalRect: screenLocalRect,
+            onSave: { [weak self] rendered in
+                self?.saveRenderedImage(rendered)
+                self?.inlineAnnotationWindow = nil
+            },
+            onCopy: { [weak self] rendered in
+                self?.copyRenderedImage(rendered)
+                self?.inlineAnnotationWindow = nil
+            },
+            onClose: { [weak self] in
+                self?.inlineAnnotationWindow = nil
+            }
+        )
+        inlineAnnotationWindow?.show()
+        return true
     }
 
     /// Look up the NSScreen whose displayID matches the capture. Returns nil

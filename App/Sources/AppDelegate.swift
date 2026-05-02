@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shareCoordinator = makeShareCoordinator(settings: settings)
         captureCoordinator!.ocrCoordinator = ocrCoordinator
         captureCoordinator!.translationCoordinator = translationCoordinator
+        captureCoordinator!.recordingCoordinator = recordingCoordinator
         captureCoordinator!.historyCoordinator = historyCoordinator
         captureCoordinator!.shareCoordinator = shareCoordinator
         historyCoordinator!.shareCoordinator = shareCoordinator
@@ -98,6 +99,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerGlobalShortcuts() {
         KeyboardShortcuts.onKeyDown(for: .captureArea) { [weak self] in
             self?.captureCoordinator?.captureArea()
+        }
+        KeyboardShortcuts.onKeyDown(for: .captureAllInOne) { [weak self] in
+            self?.captureCoordinator?.captureAllInOne()
         }
         KeyboardShortcuts.onKeyDown(for: .captureFullscreen) { [weak self] in
             self?.captureCoordinator?.captureFullscreen()

@@ -71,6 +71,12 @@ final class MenuBarController: NSObject {
         let menu = NSMenu()
         menu.delegate = self
 
+        let captureAllInOne = menuItem(String(localized: "All-in-One"), action: #selector(captureAllInOne))
+        captureAllInOne.setShortcut(for: .captureAllInOne)
+        menu.addItem(captureAllInOne)
+
+        menu.addItem(.separator())
+
         let captureArea = menuItem(String(localized: "Capture Area"), action: #selector(captureArea))
         captureArea.setShortcut(for: .captureArea)
         menu.addItem(captureArea)
@@ -160,6 +166,10 @@ final class MenuBarController: NSObject {
         captureCoordinator.captureArea()
     }
 
+    @objc private func captureAllInOne() {
+        captureCoordinator.captureAllInOne()
+    }
+
     @objc private func captureFullscreen() {
         captureCoordinator.captureFullscreen()
     }
@@ -213,6 +223,7 @@ extension MenuBarController: NSMenuDelegate {
         // Refresh shortcut display from KeyboardShortcuts in case user changed them
         for item in menu.items {
             switch item.action {
+            case #selector(captureAllInOne): item.setShortcut(for: .captureAllInOne)
             case #selector(captureArea): item.setShortcut(for: .captureArea)
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)
             case #selector(captureWindow): item.setShortcut(for: .captureWindow)

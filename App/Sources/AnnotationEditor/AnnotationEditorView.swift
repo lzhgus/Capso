@@ -56,6 +56,7 @@ struct AnnotationEditorView: View {
     @State private var refreshTrigger = 0
     @State private var zoomScale: CGFloat = 1.0
     @State private var isCropMode = false
+    @State private var commitEditingTrigger = 0
     /// Cached text line bounding boxes for smart highlighter snapping.
     @State private var textRegions: [CGRect] = []
 
@@ -233,6 +234,7 @@ struct AnnotationEditorView: View {
                                 zoomScale: zoomScale,
                                 refreshTrigger: refreshTrigger,
                                 textRegions: textRegions,
+                                commitEditingTrigger: commitEditingTrigger,
                                 onSwitchToSelect: {
                                     document.clearSelection()
                                     currentTool = .select
@@ -404,14 +406,20 @@ struct AnnotationEditorView: View {
     }
 
     private func save() {
-        if let rendered = renderedOutputImage() {
-            onSave(rendered)
+        commitEditingTrigger += 1
+        DispatchQueue.main.async {
+            if let rendered = renderedOutputImage() {
+                onSave(rendered)
+            }
         }
     }
 
     private func copy() {
-        if let rendered = renderedOutputImage() {
-            onCopy(rendered)
+        commitEditingTrigger += 1
+        DispatchQueue.main.async {
+            if let rendered = renderedOutputImage() {
+                onCopy(rendered)
+            }
         }
     }
 }

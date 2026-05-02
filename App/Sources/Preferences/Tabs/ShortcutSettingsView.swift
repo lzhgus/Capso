@@ -3,6 +3,7 @@ import SwiftUI
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
+    static let captureAllInOne = Self("captureAllInOne")
     static let captureArea = Self("captureArea", default: .init(.one, modifiers: [.option, .shift]))
     static let captureFullscreen = Self("captureFullscreen", default: .init(.two, modifiers: [.option, .shift]))
     static let captureWindow = Self("captureWindow", default: .init(.three, modifiers: [.option, .shift]))
@@ -48,7 +49,8 @@ struct ShortcutSettingsView: View {
 
             SettingGroup(title: "Capture") {
                 SettingCard {
-                    shortcutRow("Capture Area", name: .captureArea)
+                    shortcutRow("All-in-One", name: .captureAllInOne)
+                    shortcutRow("Capture Area", name: .captureArea, showDivider: true)
                     shortcutRow("Capture Fullscreen", name: .captureFullscreen, showDivider: true)
                     shortcutRow("Capture Window", name: .captureWindow, showDivider: true)
                     shortcutRow("Capture Text (OCR)", name: .captureText, showDivider: true)

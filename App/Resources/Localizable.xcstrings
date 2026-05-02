@@ -6253,6 +6253,332 @@
         "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 자격 증명이 Keychain에 남아 있을 수 있습니다: %@.\n\n'키체인 접근.app'을 열고 'com.awesomemacapps.capso.share'를 검색하여 수동으로 삭제하세요." } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分凭据可能仍保留在 Keychain 中：%@。\n\n请打开“钥匙串访问.app”，搜索 'com.awesomemacapps.capso.share' 手动删除。" } }
       }
+    },
+    "All-in-One" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オールインワン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "올인원"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全能截图"
+          }
+        }
+      }
+    },
+    "Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "範囲"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영역"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "区域"
+          }
+        }
+      }
+    },
+    "Scrolling" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクロール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크롤"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滚动"
+          }
+        }
+      }
+    },
+    "Timer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイマー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "타이머"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计时器"
+          }
+        }
+      }
+    },
+    "Annotate in place" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その場で注釈"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제자리에서 주석"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原位标注"
+          }
+        }
+      }
+    },
+    "Copy selected area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択範囲をコピー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택 영역 복사"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制所选区域"
+          }
+        }
+      }
+    },
+    "Capture preset" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャプチャプリセット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캡처 프리셋"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图预设"
+          }
+        }
+      }
+    },
+    "Selected area size" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択範囲のサイズ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택 영역 크기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所选区域尺寸"
+          }
+        }
+      }
+    },
+    "Free" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自由"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자유"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自由"
+          }
+        }
+      }
+    },
+    "Self-Timer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セルフタイマー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "셀프 타이머"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延时截图"
+          }
+        }
+      }
+    },
+    "Capture Previous Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前回の範囲をキャプチャ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 영역 캡처"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取上一区域"
+          }
+        }
+      }
+    },
+    "Font Size" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フォントサイズ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "글꼴 크기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字体大小" } }
+      }
+    },
+    "Block Size" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ブロックサイズ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "블록 크기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "块大小" } }
+      }
+    },
+    "Counter Size" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カウンターサイズ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카운터 크기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "序号大小" } }
+      }
+    },
+    "Highlighter Width" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハイライター幅" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "형광펜 너비" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "荧光笔宽度" } }
+      }
+    },
+    "Line Width" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "線の太さ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "선 두께" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "线条宽度" } }
+      }
+    },
+    "Red" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "赤" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "빨강" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "红色" } }
+      }
+    },
+    "Orange" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "オレンジ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "주황" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "橙色" } }
+      }
+    },
+    "Yellow" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "黄" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "노랑" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "黄色" } }
+      }
+    },
+    "Green" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "緑" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초록" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "绿色" } }
+      }
+    },
+    "Blue" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "青" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "파랑" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "蓝色" } }
+      }
+    },
+    "Purple" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "紫" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보라" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "紫色" } }
+      }
+    },
+    "White" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "白" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "흰색" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "白色" } }
+      }
     }
   },
   "version" : "1.1"
