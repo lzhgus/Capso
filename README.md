@@ -95,6 +95,10 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 - **Instant OCR** — select area, text copied to clipboard
 - **Visual OCR** — highlighted text regions, click to select individual blocks
 
+### Translation
+- **Capture & Translate** — select any screen area, extract text with OCR, and show translated text in a floating card
+- **Flexible language controls** — change the target language from the result card, pin it above other windows, or launch translation from Quick Access
+
 ### Screenshot History
 - **Persistent library** — browse screenshots, GIFs, and recordings in one place
 - **Built-in actions** — filter captures, copy, save, show in Finder, and delete without leaving Capso
@@ -178,7 +182,7 @@ xcodebuild -project Capso.xcodeproj -scheme Capso -configuration Release build
 
 ## Architecture
 
-Capso uses a modular SPM (Swift Package Manager) architecture. The app is a thin SwiftUI + AppKit shell; all core capabilities live in 10 independent packages.
+Capso uses a modular SPM (Swift Package Manager) architecture. The app is a thin SwiftUI + AppKit shell; all core capabilities live in 12 independent packages.
 
 ```
 Capso/
@@ -191,6 +195,7 @@ Capso/
 │   ├── Camera/              # Webcam PiP window
 │   ├── AnnotationEditor/    # Annotation editor, inline annotation + beautify
 │   ├── OCR/                 # OCR coordinator, overlay, toast
+│   ├── Translation/         # Capture translation flow and result card
 │   ├── History/             # Screenshot history window
 │   ├── QuickAccess/         # Floating preview window
 │   └── Preferences/         # Settings window
@@ -204,7 +209,9 @@ Capso/
 │   ├── ExportKit/           # Video/GIF export + composited editor export
 │   ├── EffectsKit/          # Cursor telemetry, click highlights, effects
 │   ├── EditorKit/           # Recording editor models, compositor, zoom/cursor logic
-│   └── HistoryKit/          # Persistent screenshot/recording history
+│   ├── HistoryKit/          # Persistent screenshot/recording history
+│   ├── ShareKit/            # Cloud sharing destinations and uploads
+│   └── TranslationKit/      # OCR-backed translation service models
 └── project.yml              # XcodeGen project definition
 ```
 

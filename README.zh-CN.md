@@ -97,6 +97,10 @@ brew install --cask capso
 - **即时 OCR**：选择区域后文字自动复制到剪贴板
 - **可视化 OCR**：高亮显示识别区域，点击选择单个文本块
 
+### 截图翻译
+- **截图并翻译**：选择任意屏幕区域，先用 OCR 提取文字，再用系统翻译显示结果
+- **灵活的语言控制**：在结果卡片中切换目标语言、将卡片钉在其他窗口上方，也可以从快速操作里直接翻译
+
 ### 截图历史
 - **持久化记录**：在一个窗口中统一浏览截图、GIF 和录屏记录
 - **内置快捷操作**：支持筛选、复制、保存、在 Finder 中显示、删除
@@ -180,7 +184,7 @@ xcodebuild -project Capso.xcodeproj -scheme Capso -configuration Release build
 
 ## 架构
 
-Capso 采用模块化的 SPM 架构。App 本身是一个很薄的 SwiftUI + AppKit 壳层，核心能力分布在 10 个独立的包中。
+Capso 采用模块化的 SPM 架构。App 本身是一个很薄的 SwiftUI + AppKit 壳层，核心能力分布在 12 个独立的包中。
 
 ```
 Capso/
@@ -193,6 +197,7 @@ Capso/
 │   ├── Camera/              # 摄像头画中画
 │   ├── AnnotationEditor/    # 标注编辑器、原位标注 + 美化
 │   ├── OCR/                 # 文字识别
+│   ├── Translation/         # 截图翻译流程与结果卡片
 │   ├── History/             # 截图历史窗口
 │   ├── QuickAccess/         # 快速操作浮窗
 │   └── Preferences/         # 设置
@@ -206,7 +211,9 @@ Capso/
 │   ├── ExportKit/           # 视频/GIF 导出 + 录屏编辑器合成导出
 │   ├── EffectsKit/          # 光标遥测、点击高亮、特效
 │   ├── EditorKit/           # 录屏编辑器模型、合成器、缩放/光标逻辑
-│   └── HistoryKit/          # 持久化截图/录屏历史
+│   ├── HistoryKit/          # 持久化截图/录屏历史
+│   ├── ShareKit/            # 云端分享目标与上传
+│   └── TranslationKit/      # 基于 OCR 的翻译服务模型
 └── project.yml              # XcodeGen 项目定义
 ```
 

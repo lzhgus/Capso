@@ -95,6 +95,10 @@ Capso はその答えです。**完全にネイティブで、機能が充実し
 - **Instant OCR** — 範囲選択後、テキストを即クリップボードへコピー
 - **Visual OCR** — 認識領域をハイライト表示し、個別のテキストブロックを選択可能
 
+### 翻訳
+- **Capture & Translate** — 任意の画面範囲を選択し、OCR で文字を抽出して、翻訳結果をフローティングカードに表示
+- **柔軟な言語設定** — 結果カードから翻訳先言語を変更し、カードを他のウィンドウの上に固定できます。Quick Access から直接翻訳することもできます
+
 ### スクリーンショット履歴
 - **永続ライブラリ** — スクリーンショット、GIF、録画を 1 か所で閲覧
 - **内蔵アクション** — フィルタ、コピー、保存、Finder で表示、削除を Capso 内で実行
@@ -178,7 +182,7 @@ xcodebuild -project Capso.xcodeproj -scheme Capso -configuration Release build
 
 ## アーキテクチャ
 
-Capso はモジュール化された SPM（Swift Package Manager）構成を採用しています。アプリ本体は薄い SwiftUI + AppKit シェルで、主要機能は 10 個の独立したパッケージに分かれています。
+Capso はモジュール化された SPM（Swift Package Manager）構成を採用しています。アプリ本体は薄い SwiftUI + AppKit シェルで、主要機能は 12 個の独立したパッケージに分かれています。
 
 ```
 Capso/
@@ -191,6 +195,7 @@ Capso/
 │   ├── Camera/              # Webcam PiP ウィンドウ
 │   ├── AnnotationEditor/    # 注釈エディタ、インライン注釈 + 美化
 │   ├── OCR/                 # OCR コーディネータ、オーバーレイ、トースト
+│   ├── Translation/         # キャプチャ翻訳フローと結果カード
 │   ├── History/             # スクリーンショット履歴ウィンドウ
 │   ├── QuickAccess/         # フローティングプレビュー
 │   └── Preferences/         # 設定ウィンドウ
@@ -204,7 +209,9 @@ Capso/
 │   ├── ExportKit/           # 動画 / GIF 書き出し + 録画エディタの合成書き出し
 │   ├── EffectsKit/          # カーソルテレメトリ、クリックハイライト、エフェクト
 │   ├── EditorKit/           # 録画エディタのモデル、コンポジタ、ズーム/カーソル処理
-│   └── HistoryKit/          # 永続化されたスクリーンショット / 録画履歴
+│   ├── HistoryKit/          # 永続化されたスクリーンショット / 録画履歴
+│   ├── ShareKit/            # クラウド共有の送信先とアップロード
+│   └── TranslationKit/      # OCR ベースの翻訳サービスモデル
 └── project.yml              # XcodeGen プロジェクト定義
 ```
 
