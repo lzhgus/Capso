@@ -74,6 +74,12 @@ final class RecordingCoordinator {
         }
     }
 
+    func startRecordingFlow(withSelectedArea rect: CGRect, screen: NSScreen) {
+        dismissOverlay()
+        dismissToolbarUI()
+        handleAreaSelected(rect: rect, screen: screen)
+    }
+
     // MARK: - Step 1: Area Selection
 
     private func showAreaSelectionOverlay() {

@@ -60,6 +60,12 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 
 ## Features
 
+### All-in-One Capture
+- **CleanShot-style capture HUD** — choose Area, Fullscreen, Window, Scrolling, Timer, OCR, or Recording from one floating toolbar
+- **Adjustable selection** — resize or move the capture area before committing, with dimmed surroundings and a bright selected region
+- **Aspect-ratio and fixed-size presets** — quickly switch between Freeform, 1:1, 4:3, 16:9, and custom fixed pixel sizes
+- **Inline annotation** — draw arrows, shapes, text, highlights, and pixelation directly on the captured area before saving or copying
+
 ### Screenshots
 - **Area capture** — drag to select with dimension display; press **R** to cycle aspect ratio and fixed-size presets (1:1, 16:9, 1920×1080, custom)
 - **Fullscreen capture** — one-click full screen
@@ -82,6 +88,7 @@ We make our money from [other tools](https://www.awesomemacapp.com/). Capso exis
 - Arrow, rectangle, ellipse, text, freehand drawing, pixelate/blur, crop
 - Highlighter and counter (numbered markers) tools
 - Color picker, stroke controls, undo/redo
+- **Inline edit mode** — annotate an area capture in place without first saving the original screenshot
 - **Screenshot beautification** — background color, padding, rounded corners, shadow
 
 ### OCR (Text Recognition)
@@ -131,6 +138,7 @@ See more screenshots and a full walkthrough on the [**Capso website →**](https
 | | CleanShot X | Shottr | Cap | **Capso** |
 |---|---|---|---|---|
 | Screenshots | Full | Full | Basic | **Full** |
+| All-in-One HUD | Yes | No | No | **Yes** |
 | Recording | Video + GIF | No | Video + GIF | **Video + GIF** |
 | Webcam PiP | Yes | No | Yes | **Yes (4 shapes)** |
 | OCR | Yes | Yes | No | **Yes** |
@@ -170,18 +178,18 @@ xcodebuild -project Capso.xcodeproj -scheme Capso -configuration Release build
 
 ## Architecture
 
-Capso uses a modular SPM (Swift Package Manager) architecture. The app is a thin SwiftUI + AppKit shell; all core capabilities live in 9 independent packages.
+Capso uses a modular SPM (Swift Package Manager) architecture. The app is a thin SwiftUI + AppKit shell; all core capabilities live in 10 independent packages.
 
 ```
 Capso/
 ├── App/                     # Main app target (thin shell)
 │   ├── CapsoApp.swift       # @main entry point
 │   ├── MenuBar/             # Menu bar controller
-│   ├── Capture/             # Capture overlay, pinned screenshots
+│   ├── Capture/             # Capture overlay, All-in-One HUD, pinned screenshots
 │   ├── Recording/           # Recording coordinator, controls, toolbar
 │   ├── Editor/              # Recording editor, timeline, preview, export UI
 │   ├── Camera/              # Webcam PiP window
-│   ├── AnnotationEditor/    # Annotation editor + beautify
+│   ├── AnnotationEditor/    # Annotation editor, inline annotation + beautify
 │   ├── OCR/                 # OCR coordinator, overlay, toast
 │   ├── History/             # Screenshot history window
 │   ├── QuickAccess/         # Floating preview window

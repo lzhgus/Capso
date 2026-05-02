@@ -14,6 +14,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
     let zoomScale: CGFloat
     let refreshTrigger: Int
     var textRegions: [CGRect] = []
+    var commitEditingTrigger: Int = 0
     var onSwitchToSelect: (() -> Void)?
     /// Called when the inline text editor appears. Passes the effective
     /// fontSize (existing object's size when re-editing, current slider
@@ -52,6 +53,10 @@ struct AnnotationCanvasView: NSViewRepresentable {
         return view
     }
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func updateNSView(_ nsView: AnnotationCanvasNSView, context: Context) {
         let toolChanged = nsView.currentTool != currentTool
         nsView.currentTool = currentTool
@@ -66,9 +71,17 @@ struct AnnotationCanvasView: NSViewRepresentable {
         }
         nsView.onTextEditingStarted = { fontSize in onTextEditingStarted?(fontSize) }
         nsView.onTextEditingEnded = { onTextEditingEnded?() }
+        if context.coordinator.lastCommitEditingTrigger != commitEditingTrigger {
+            context.coordinator.lastCommitEditingTrigger = commitEditingTrigger
+            nsView.commitTextEditingIfNeeded()
+        }
         nsView.needsDisplay = true
         if toolChanged {
             nsView.window?.invalidateCursorRects(for: nsView)
         }
+    }
+
+    final class Coordinator {
+        var lastCommitEditingTrigger = 0
     }
 }

@@ -248,20 +248,10 @@ final class CaptureOverlayView: NSView {
     }
 
     private func drawAreaMode(in context: CGContext) {
-        // The overlay is fully transparent. Nothing outside the selection
-        // changes — no dark tint, no visual disruption. While dragging, the
-        // selection area gets a subtle frosted fill so the chosen region reads
-        // more like an active target instead of just a border.
-
         if isDragging {
             let selectionRect = self.selectionRect
 
-            // Subtle inner tint to make the capture target feel active.
-            // Keep it very light so the desktop content remains legible.
-            context.saveGState()
-            context.setFillColor(selectionFillColor.cgColor)
-            context.fill(selectionRect.insetBy(dx: 1, dy: 1))
-            context.restoreGState()
+            drawDimmedBackdrop(clearing: selectionRect, in: context)
 
             // Inner edge to help the fill read on bright backgrounds.
             context.saveGState()
@@ -301,11 +291,7 @@ final class CaptureOverlayView: NSView {
                         height: CGFloat(fixedSize.height)
                     )
 
-                    // Same visual style as the drag selection
-                    context.saveGState()
-                    context.setFillColor(selectionFillColor.cgColor)
-                    context.fill(fixedRect.insetBy(dx: 1, dy: 1))
-                    context.restoreGState()
+                    drawDimmedBackdrop(clearing: fixedRect, in: context)
 
                     context.saveGState()
                     context.setStrokeColor(selectionInnerStrokeColor.cgColor)
@@ -329,6 +315,7 @@ final class CaptureOverlayView: NSView {
                 // Still draw badge even without a mouse location
                 drawPresetBadge(in: context)
             } else {
+                drawDimmedBackdrop(clearing: nil, in: context)
                 // Freeform or aspect-ratio mode: standard crosshair
                 if let currentMouseLocation {
                     drawReticle(at: currentMouseLocation, in: context)
@@ -337,6 +324,17 @@ final class CaptureOverlayView: NSView {
                 drawPresetBadge(in: context)
             }
         }
+    }
+
+    private func drawDimmedBackdrop(clearing clearRect: CGRect?, in context: CGContext) {
+        context.saveGState()
+        context.setFillColor(NSColor.black.withAlphaComponent(0.38).cgColor)
+        context.fill(bounds)
+        if let clearRect {
+            context.setBlendMode(.clear)
+            context.fill(clearRect)
+        }
+        context.restoreGState()
     }
 
     // MARK: - Preset Badge
