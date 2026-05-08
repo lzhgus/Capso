@@ -198,6 +198,23 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "rememberLastRecordingArea") }
     }
 
+    public var lastRecordingArea: StoredCaptureSelection? {
+        get {
+            guard let data = defaults.data(forKey: "lastRecordingArea"),
+                  let value = try? JSONDecoder().decode(StoredCaptureSelection.self, from: data) else {
+                return nil
+            }
+            return value
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: "lastRecordingArea")
+            } else {
+                defaults.removeObject(forKey: "lastRecordingArea")
+            }
+        }
+    }
+
     /// When `true`, the recording editor opens after every recording stops.
     /// When `false` (default), the quick-preview flow is used instead.
     /// Default is `false` to preserve existing behaviour for existing users.

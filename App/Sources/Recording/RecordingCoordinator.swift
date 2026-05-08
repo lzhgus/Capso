@@ -70,7 +70,11 @@ final class RecordingCoordinator {
     /// Start the recording flow: show overlay for area selection.
     func startRecordingFlow() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.showAreaSelectionOverlay()
+            guard let self else { return }
+            if self.showRememberedRecordingArea() {
+                return
+            }
+            self.showAreaSelectionOverlay()
         }
     }
 
@@ -104,9 +108,37 @@ final class RecordingCoordinator {
         }
     }
 
+    private func showRememberedRecordingArea() -> Bool {
+        guard settings.rememberLastRecordingArea,
+              let selection = settings.lastRecordingArea else {
+            return false
+        }
+
+        guard case let .area(x, y, width, height, screenID) = selection,
+              width > 5,
+              height > 5,
+              let screen = NSScreen.screens.first(where: { $0.displayID == screenID }) else {
+            return false
+        }
+
+        let screenBounds = CGRect(origin: .zero, size: screen.frame.size)
+        let rect = CaptureSelectionGeometry.move(
+            CGRect(x: x, y: y, width: width, height: height),
+            by: .zero,
+            in: screenBounds
+        )
+        dismissOverlay()
+        dismissToolbarUI()
+        handleAreaSelected(rect: rect, screen: screen)
+        return true
+    }
+
     private func handleAreaSelected(rect: CGRect, screen: NSScreen) {
         selectedScreen = screen
         selectedDisplayID = screen.displayID
+        if settings.rememberLastRecordingArea {
+            settings.lastRecordingArea = .area(rect: rect, screenID: screen.displayID)
+        }
 
         // `rect` comes from the overlay view in view-local coordinates:
         // (0,0) at the screen's bottom-left, width/height = screen dimensions.
@@ -208,6 +240,11 @@ final class RecordingCoordinator {
                     self?.cameraPiPWindow = nil
                     self?.cameraManager.stop()
                 }
+            },
+            onChangeArea: { [weak self] in
+                guard let self else { return }
+                self.dismissToolbarUI()
+                self.showAreaSelectionOverlay()
             },
             onCancel: { [weak self] in
                 self?.cancelPendingRecordingFlow()

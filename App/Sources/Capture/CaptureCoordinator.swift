@@ -46,13 +46,14 @@ final class CaptureCoordinator {
     enum PostCaptureAction {
         case `default`    // Use Settings (Show Preview / Copy / Auto Save)
         case clipboard    // Copy to clipboard only, no preview
-        case annotate     // Open annotation editor directly
+        case annotate     // Open the full annotation editor directly
+        case inlineAnnotate // Open the All-in-One inline annotation editor
         case ocr          // Open visual OCR directly
         case share        // Upload to cloud, skip Quick Access, save to history
 
         var playsShutterSound: Bool {
             switch self {
-            case .annotate:
+            case .annotate, .inlineAnnotate:
                 false
             case .default, .clipboard, .ocr, .share:
                 true
@@ -61,7 +62,7 @@ final class CaptureCoordinator {
 
         var savesOriginalCaptureToHistory: Bool {
             switch self {
-            case .annotate:
+            case .annotate, .inlineAnnotate:
                 false
             case .default, .clipboard, .ocr, .share:
                 true
@@ -324,7 +325,7 @@ final class CaptureCoordinator {
             guard let self else { return }
             self.dismissAllInOneToolbar()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
-            self.pendingAction = .annotate
+            self.pendingAction = .inlineAnnotate
             self.performAreaCapture(rect: rect, screen: screen)
         }
         toolbar.onCopy = { [weak self] rect in
@@ -782,6 +783,8 @@ final class CaptureCoordinator {
         case .annotate:
             // Open the editor on the same screen the capture came from.
             openAnnotationEditor(result, anchorScreen: screenFor(result: result))
+        case .inlineAnnotate:
+            openInlineAnnotationEditor(result, anchorScreen: screenFor(result: result))
         case .ocr:
             ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: screenFor(result: result))
         case .share:
@@ -925,15 +928,7 @@ final class CaptureCoordinator {
     }
 
     private func openAnnotationEditor(_ result: CaptureResult, anchorScreen: NSScreen? = nil) {
-        // If the caller didn't pass a screen explicitly, derive one from the
-        // capture's displayID so `captureAreaAndAnnotate()` (direct ⌘⇧…
-        // shortcut path) also opens on the right display.
         let screen = anchorScreen ?? screenFor(result: result)
-        if result.mode == .area,
-           let screen,
-           openInlineAnnotationEditor(result, screen: screen) {
-            return
-        }
 
         inlineAnnotationWindow?.close()
         inlineAnnotationWindow = nil
@@ -953,6 +948,16 @@ final class CaptureCoordinator {
             }
         )
         annotationWindow?.show()
+    }
+
+    private func openInlineAnnotationEditor(_ result: CaptureResult, anchorScreen: NSScreen? = nil) {
+        let screen = anchorScreen ?? screenFor(result: result)
+        guard result.mode == .area,
+              let screen,
+              openInlineAnnotationEditor(result, screen: screen) else {
+            openAnnotationEditor(result, anchorScreen: screen)
+            return
+        }
     }
 
     private func openInlineAnnotationEditor(_ result: CaptureResult, screen: NSScreen) -> Bool {

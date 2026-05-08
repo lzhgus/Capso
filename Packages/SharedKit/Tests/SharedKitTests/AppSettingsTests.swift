@@ -211,6 +211,21 @@ struct AppSettingsTests {
         #expect(second.selfTimerPlayTickSound == false)
     }
 
+    @Test("Last recording area persists across instances")
+    func lastRecordingAreaPersists() {
+        let suite = "test.lastRecordingArea.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        let selection = StoredCaptureSelection.area(
+            rect: CGRect(x: 24, y: 48, width: 640, height: 360),
+            screenID: 42
+        )
+        first.lastRecordingArea = selection
+        let second = AppSettings(defaults: defaults)
+        #expect(second.lastRecordingArea == selection)
+    }
+
     @Test("Self-timer HUD position defaults to nil")
     func defaultSelfTimerHUDPosition() {
         let suite = "test.selfTimerHUDPosition.default"

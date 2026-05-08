@@ -15,13 +15,14 @@ final class RecordingToolbarWindow: NSPanel {
         settings: AppSettings,
         onRecord: @escaping (RecordingFormatChoice, Bool, String?, Bool, Bool) -> Void,
         onCameraToggled: @escaping (Bool, String?) -> Void,
+        onChangeArea: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onCameraSettingsChanged: @escaping () -> Void
     ) {
         self.settings = settings
         self.onCancelAction = onCancel
         let width: CGFloat = 240
-        let height: CGFloat = 180
+        let height: CGFloat = 220
 
         let screenFrame = screen.visibleFrame
         var x = selectionRect.midX - width / 2
@@ -50,6 +51,7 @@ final class RecordingToolbarWindow: NSPanel {
             settings: settings,
             onRecord: onRecord,
             onCameraToggled: onCameraToggled,
+            onChangeArea: onChangeArea,
             onCancel: onCancel,
             onCameraSettingsChanged: onCameraSettingsChanged
         )
@@ -80,6 +82,7 @@ private struct RecordingToolbarWrapper: View {
     let settings: AppSettings
     let onRecord: (RecordingFormatChoice, Bool, String?, Bool, Bool) -> Void
     let onCameraToggled: (Bool, String?) -> Void
+    let onChangeArea: () -> Void
     let onCancel: () -> Void
     let onCameraSettingsChanged: () -> Void
 
@@ -103,6 +106,7 @@ private struct RecordingToolbarWrapper: View {
             onRecordGIF: {
                 onRecord(.gif, cameraEnabled, selectedCameraID, micEnabled, systemAudioEnabled)
             },
+            onChangeArea: onChangeArea,
             onCancel: onCancel,
             onCameraSettingsChanged: onCameraSettingsChanged
         )
