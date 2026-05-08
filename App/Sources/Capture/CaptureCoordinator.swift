@@ -948,6 +948,10 @@ final class CaptureCoordinator {
                 self?.copyRenderedImage(rendered)
                 self?.annotationWindow = nil
             },
+            onPin: { [weak self] (rendered: CGImage, anchor: CGRect?) in
+                self?.pinRenderedImage(rendered, anchor: anchor)
+                self?.annotationWindow = nil
+            },
             onClose: { [weak self] in
                 self?.annotationWindow = nil
             }
@@ -982,6 +986,10 @@ final class CaptureCoordinator {
             },
             onCopy: { [weak self] rendered in
                 self?.copyRenderedImage(rendered)
+                self?.inlineAnnotationWindow = nil
+            },
+            onPin: { [weak self] rendered, anchor in
+                self?.pinRenderedImage(rendered, anchor: anchor)
                 self?.inlineAnnotationWindow = nil
             },
             onClose: { [weak self] in
@@ -1021,14 +1029,18 @@ final class CaptureCoordinator {
     }
 
     private func pinToScreen(_ result: CaptureResult, anchor: CGRect) {
+        pinRenderedImage(result.image, anchor: anchor)
+    }
+
+    private func pinRenderedImage(_ image: CGImage, anchor: CGRect?) {
         let controller = PinnedScreenshotController(
-            image: result.image,
+            image: image,
             anchorRect: anchor,
             onCopy: { [weak self] in
-                self?.copyImageToClipboard(result.image)
+                self?.copyImageToClipboard(image)
             },
             onSave: { [weak self] in
-                self?.saveImageToFile(result.image)
+                self?.saveImageToFile(image)
             },
             onDidClose: { [weak self] controllerID in
                 self?.pinnedControllers.removeAll { $0.id == controllerID }
