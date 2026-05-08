@@ -46,21 +46,20 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
-                    // TODO: Re-enable the two rows below once their behaviors
-                    // are implemented. They are stored in AppSettings but
-                    // never consumed by RecordingCoordinator:
+                    // TODO: Re-enable the row below once its behavior is
+                    // implemented. It is stored in AppSettings but never
+                    // consumed by RecordingCoordinator:
                     //   - dimScreenWhileRecording: dim non-captured displays
-                    //   - rememberLastRecordingArea: persist last recording rect
                     // SettingRow(label: "Dim Screen While Recording", showDivider: true) {
                     //     Toggle("", isOn: $viewModel.dimScreenWhileRecording)
                     //         .toggleStyle(.switch)
                     //         .controlSize(.small)
                     // }
-                    // SettingRow(label: "Remember Last Recording Area", showDivider: true) {
-                    //     Toggle("", isOn: $viewModel.rememberLastRecordingArea)
-                    //         .toggleStyle(.switch)
-                    //         .controlSize(.small)
-                    // }
+                    SettingRow(label: "Remember Last Recording Area", showDivider: true) {
+                        Toggle("", isOn: $viewModel.rememberLastRecordingArea)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                 }
             }
 

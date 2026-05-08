@@ -19,6 +19,7 @@ struct RecordingToolbarView: View {
     let settings: SharedKit.AppSettings
     let onRecordVideo: () -> Void
     let onRecordGIF: () -> Void
+    let onChangeArea: () -> Void
     let onCancel: () -> Void
     let onCameraSettingsChanged: () -> Void
 
@@ -122,6 +123,27 @@ struct RecordingToolbarView: View {
                         Spacer()
 
                         shortcutKey("\u{21A9}")  // Return
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .background(.white.opacity(0.1))
+
+                Button(action: onChangeArea) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "selection.pin.in.out")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.8))
+
+                        Text("Change Area")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white)
+
+                        Spacer()
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
