@@ -12,6 +12,7 @@ final class AnnotationEditorWindow: NSPanel {
         anchorScreen: NSScreen? = nil,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
+        onPin: @escaping (CGImage, CGRect?) -> Void,
         onClose: @escaping () -> Void
     ) {
         let imgW = CGFloat(image.width)
@@ -72,6 +73,10 @@ final class AnnotationEditorWindow: NSPanel {
             },
             onCopy: { [weak self] rendered in
                 onCopy(rendered)
+                self?.close()
+            },
+            onPin: { [weak self] rendered in
+                onPin(rendered, self?.frame)
                 self?.close()
             },
             onCancel: { [weak self] in

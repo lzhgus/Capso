@@ -19,6 +19,7 @@ struct AnnotationToolbar: View {
     let onRedo: () -> Void
     let onSave: () -> Void
     let onCopy: () -> Void
+    let onPin: () -> Void
     let onCancel: () -> Void
     let onCrop: () -> Void
 
@@ -209,6 +210,14 @@ struct AnnotationToolbar: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .keyboardShortcut("c", modifiers: .command)
+
+            Button(action: onPin) {
+                Label("Pin", systemImage: "pin")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .keyboardShortcut("p", modifiers: .command)
 
             Button(action: onSave) {
                 Label("Save", systemImage: "square.and.arrow.down")

@@ -8,6 +8,7 @@ struct AnnotationEditorView: View {
     let document: AnnotationDocument
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
+    let onPin: (CGImage) -> Void
     let onCancel: () -> Void
 
     /// The working image shown in the canvas. Starts equal to
@@ -20,12 +21,14 @@ struct AnnotationEditorView: View {
         document: AnnotationDocument,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
+        onPin: @escaping (CGImage) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.initialSourceImage = sourceImage
         self.document = document
         self.onSave = onSave
         self.onCopy = onCopy
+        self.onPin = onPin
         self.onCancel = onCancel
         self._sourceImage = State(initialValue: sourceImage)
     }
@@ -206,6 +209,7 @@ struct AnnotationEditorView: View {
                     onRedo: { document.redo(); refreshTrigger += 1 },
                     onSave: { save() },
                     onCopy: { copy() },
+                    onPin: { pin() },
                     onCancel: onCancel,
                     onCrop: { isCropMode = true }
                 )
@@ -419,6 +423,15 @@ struct AnnotationEditorView: View {
         DispatchQueue.main.async {
             if let rendered = renderedOutputImage() {
                 onCopy(rendered)
+            }
+        }
+    }
+
+    private func pin() {
+        commitEditingTrigger += 1
+        DispatchQueue.main.async {
+            if let rendered = renderedOutputImage() {
+                onPin(rendered)
             }
         }
     }

@@ -14,6 +14,7 @@ final class InlineAnnotationEditorWindow: NSPanel {
         screenLocalRect: CGRect,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
+        onPin: @escaping (CGImage, CGRect?) -> Void,
         onClose: @escaping () -> Void
     ) {
         self.document = AnnotationDocument(
@@ -39,6 +40,13 @@ final class InlineAnnotationEditorWindow: NSPanel {
         self.isRestorable = false
         self.setFrame(screen.frame, display: false)
 
+        let pinAnchor = CGRect(
+            x: screen.frame.minX + screenLocalRect.minX,
+            y: screen.frame.minY + screenLocalRect.minY,
+            width: screenLocalRect.width,
+            height: screenLocalRect.height
+        )
+
         let view = InlineAnnotationEditorView(
             sourceImage: image,
             document: document,
@@ -50,6 +58,10 @@ final class InlineAnnotationEditorWindow: NSPanel {
             },
             onCopy: { [weak self] rendered in
                 onCopy(rendered)
+                self?.close()
+            },
+            onPin: { [weak self] rendered in
+                onPin(rendered, pinAnchor)
                 self?.close()
             },
             onCancel: { [weak self] in
@@ -77,6 +89,7 @@ private struct InlineAnnotationEditorView: View {
     let screenLocalRect: CGRect
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
+    let onPin: (CGImage) -> Void
     let onCancel: () -> Void
 
     @AppStorage("annotationLastTool") private var currentTool: AnnotationTool = .arrow
@@ -207,6 +220,7 @@ private struct InlineAnnotationEditorView: View {
                 },
                 onCancel: onCancel,
                 onCopy: copy,
+                onPin: pin,
                 onSave: save
             )
             .frame(width: toolbarRect.width, height: toolbarRect.height)
@@ -298,6 +312,15 @@ private struct InlineAnnotationEditorView: View {
             }
         }
     }
+
+    private func pin() {
+        commitEditingTrigger += 1
+        DispatchQueue.main.async {
+            if let rendered = renderedOutputImage() {
+                onPin(rendered)
+            }
+        }
+    }
 }
 
 private struct DimmingCutout: Shape {
@@ -324,6 +347,7 @@ private struct InlineAnnotationToolbar: View {
     let onRedo: () -> Void
     let onCancel: () -> Void
     let onCopy: () -> Void
+    let onPin: () -> Void
     let onSave: () -> Void
 
     private var isFontSizeMode: Bool {
@@ -407,6 +431,8 @@ private struct InlineAnnotationToolbar: View {
                     .keyboardShortcut(.escape, modifiers: [])
                 iconButton(systemName: "doc.on.doc", help: "Copy", action: onCopy)
                     .keyboardShortcut("c", modifiers: .command)
+                iconButton(systemName: "pin", help: "Pin to Screen", action: onPin)
+                    .keyboardShortcut("p", modifiers: .command)
                 iconButton(systemName: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
                     .keyboardShortcut("s", modifiers: .command)
             }
