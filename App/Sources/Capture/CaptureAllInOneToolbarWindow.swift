@@ -12,12 +12,14 @@ final class CaptureAllInOneToolbarWindow {
     private var selectionOverlayWindow: NSPanel?
     private weak var selectionOverlayView: AllInOneSelectionOverlayView?
     private var toolbarWindow: NSPanel?
+    private var annotationOverlay: CaptureAllInOneAnnotationOverlay?
     private var globalEscMonitor: Any?
     private var localEscMonitor: Any?
     private var screenLocalSelectionRect: CGRect
     private let toolbarState: CaptureAllInOneToolbarState
     private let presets: [CapturePreset]
     private var activePreset: CapturePreset
+    private let frozenImage: CGImage?
 
     let screen: NSScreen
 
@@ -31,18 +33,22 @@ final class CaptureAllInOneToolbarWindow {
     var onRecording: ((CGRect) -> Void)?
     var onAnnotate: ((CGRect) -> Void)?
     var onCopy: ((CGRect) -> Void)?
+    var onCopyRendered: ((CGImage, CGRect) -> Void)?
+    var onOCRRendered: ((CGImage, CGRect) -> Void)?
     var onCancel: (() -> Void)?
 
     init(
         selectionRect: CGRect,
         screen: NSScreen,
         presets: [CapturePreset],
-        activePreset: CapturePreset
+        activePreset: CapturePreset,
+        frozenImage: CGImage? = nil
     ) {
         let visiblePresets = presets.isEmpty ? [.freeform] : presets
         self.screenLocalSelectionRect = selectionRect.standardized
         self.presets = visiblePresets
         self.activePreset = activePreset
+        self.frozenImage = frozenImage
         self.toolbarState = CaptureAllInOneToolbarState(
             selectionRect: selectionRect.standardized,
             presets: visiblePresets,
@@ -61,11 +67,14 @@ final class CaptureAllInOneToolbarWindow {
 
         showSelectionOverlay()
         showToolbar()
+        showAnnotationOverlayIfPossible()
         installEscMonitor()
     }
 
     func close() {
         removeEscMonitor()
+        annotationOverlay?.close()
+        annotationOverlay = nil
         toolbarWindow?.close()
         toolbarWindow = nil
         selectionOverlayWindow?.close()
@@ -158,7 +167,18 @@ final class CaptureAllInOneToolbarWindow {
             },
             onOCR: { [weak self] in
                 guard let self else { return }
-                self.onOCR?(self.screenLocalSelectionRect)
+                if let annotationOverlay = self.annotationOverlay {
+                    annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
+                        guard let self else { return }
+                        if let rendered {
+                            self.onOCRRendered?(rendered, self.screenLocalSelectionRect)
+                        } else {
+                            self.onOCR?(self.screenLocalSelectionRect)
+                        }
+                    })
+                } else {
+                    self.onOCR?(self.screenLocalSelectionRect)
+                }
             },
             onRecording: { [weak self] in
                 guard let self else { return }
@@ -170,7 +190,18 @@ final class CaptureAllInOneToolbarWindow {
             },
             onCopy: { [weak self] in
                 guard let self else { return }
-                self.onCopy?(self.screenLocalSelectionRect)
+                if let annotationOverlay = self.annotationOverlay {
+                    annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
+                        guard let self else { return }
+                        if let rendered {
+                            self.onCopyRendered?(rendered, self.screenLocalSelectionRect)
+                        } else {
+                            self.onCopy?(self.screenLocalSelectionRect)
+                        }
+                    })
+                } else {
+                    self.onCopy?(self.screenLocalSelectionRect)
+                }
             },
             onPresetSelected: { [weak self] preset in
                 self?.applyPreset(preset)
@@ -193,13 +224,14 @@ final class CaptureAllInOneToolbarWindow {
         let gap: CGFloat = 12
         let toolbarWidth = min(max(980, selectionRect.width), screen.visibleFrame.width - margin * 2)
         let toolbarHeight: CGFloat = 78
+        let annotationHeight: CGFloat = frozenImage == nil ? 0 : 58 + gap
 
         let minX = screen.visibleFrame.minX + margin
         let maxX = screen.visibleFrame.maxX - toolbarWidth - margin
         let x = min(max(selectionRect.midX - toolbarWidth / 2, minX), maxX)
 
-        let belowY = selectionRect.minY - toolbarHeight - gap
-        let aboveY = selectionRect.maxY + gap
+        let belowY = selectionRect.minY - toolbarHeight - gap - annotationHeight
+        let aboveY = selectionRect.maxY + gap + annotationHeight
         let y: CGFloat
         if belowY >= screen.visibleFrame.minY + margin {
             y = belowY
@@ -220,6 +252,7 @@ final class CaptureAllInOneToolbarWindow {
         )
         updateToolbarState()
         toolbarWindow?.setFrame(toolbarFrame(for: globalSelectionRect), display: true)
+        updateAnnotationOverlayIfPossible()
     }
 
     private func updateToolbarState() {
@@ -237,7 +270,37 @@ final class CaptureAllInOneToolbarWindow {
         selectionOverlayView?.setSelectionRect(fittedRect)
         updateToolbarState()
         toolbarWindow?.setFrame(toolbarFrame(for: globalSelectionRect), display: true)
+        updateAnnotationOverlayIfPossible()
         onPresetChanged?(preset)
+    }
+
+    private func showAnnotationOverlayIfPossible() {
+        guard let sourceImage = croppedFrozenImage(for: screenLocalSelectionRect) else { return }
+        let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
+        annotationOverlay = overlay
+        overlay.show(sourceImage: sourceImage, selectionRect: screenLocalSelectionRect)
+    }
+
+    private func updateAnnotationOverlayIfPossible() {
+        guard let sourceImage = croppedFrozenImage(for: screenLocalSelectionRect) else { return }
+        if annotationOverlay == nil {
+            let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
+            annotationOverlay = overlay
+            overlay.show(sourceImage: sourceImage, selectionRect: screenLocalSelectionRect)
+        } else {
+            annotationOverlay?.update(sourceImage: sourceImage, selectionRect: screenLocalSelectionRect)
+        }
+    }
+
+    private func croppedFrozenImage(for selectionRect: CGRect) -> CGImage? {
+        guard let frozenImage else { return nil }
+        let cropRect = CaptureDisplayGeometry.frozenImageCropRect(
+            screenLocalRect: selectionRect,
+            screenSize: screen.frame.size,
+            imageSize: CGSize(width: frozenImage.width, height: frozenImage.height)
+        )
+        guard !cropRect.isEmpty else { return nil }
+        return frozenImage.cropping(to: cropRect)
     }
 
     private func fittedSelectionRect(for preset: CapturePreset) -> CGRect {
@@ -380,7 +443,6 @@ private struct CaptureAllInOneToolbarView: View {
             HStack(spacing: 8) {
                 dimensionPill
                 presetMenu
-                iconButton("pencil", kind: .annotate, help: "Annotate in place", action: onAnnotate)
                 iconButton("doc.on.doc", kind: .copy, help: "Copy selected area", action: onCopy)
                 iconButton("xmark", kind: .cancel, help: "Cancel", action: onCancel)
             }

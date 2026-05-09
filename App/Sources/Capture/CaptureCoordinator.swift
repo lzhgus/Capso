@@ -313,7 +313,8 @@ final class CaptureCoordinator {
             selectionRect: selectionRect,
             screen: screen,
             presets: visiblePresets,
-            activePreset: activePreset
+            activePreset: activePreset,
+            frozenImage: frozenImage
         )
         toolbar.onPresetChanged = { [weak self] preset in
             guard let self, self.settings.capturePresetsEnabled else { return }
@@ -371,6 +372,12 @@ final class CaptureCoordinator {
             self.pendingAction = .ocr
             self.performAreaCapture(rect: rect, screen: screen)
         }
+        toolbar.onOCRRendered = { [weak self] image, _ in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
+            self.ocrCoordinator?.startVisualOCR(image: image, anchorScreen: screen)
+        }
         toolbar.onRecording = { [weak self] rect in
             guard let self else { return }
             self.dismissAllInOneToolbar()
@@ -409,6 +416,12 @@ final class CaptureCoordinator {
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.pendingAction = .clipboard
             self.performAreaCapture(rect: rect, screen: screen)
+        }
+        toolbar.onCopyRendered = { [weak self] image, _ in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
+            self.copyRenderedImage(image)
         }
         toolbar.onCancel = { [weak self] in
             self?.dismissAllInOneToolbar()

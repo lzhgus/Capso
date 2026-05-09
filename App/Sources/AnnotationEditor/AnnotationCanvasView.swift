@@ -16,6 +16,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
     let refreshTrigger: Int
     var textRegions: [CGRect] = []
     var commitEditingTrigger: Int = 0
+    var onDocumentChanged: (() -> Void)?
     var onSwitchToSelect: (() -> Void)?
     /// Called when the inline text editor appears. Passes the effective
     /// fontSize (existing object's size when re-editing, current slider
@@ -45,6 +46,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         view.currentTextFontSize = textFontSize
         view.zoomScale = zoomScale
         view.textRegions = textRegions
+        view.onDocumentChanged = { onDocumentChanged?() }
         view.onObjectCreated = {
             if !Self.stickyTools.contains(currentTool) {
                 onSwitchToSelect?()
@@ -67,6 +69,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         nsView.currentTextFontSize = textFontSize
         nsView.zoomScale = zoomScale
         nsView.textRegions = textRegions
+        nsView.onDocumentChanged = { onDocumentChanged?() }
         nsView.onObjectCreated = {
             if !Self.stickyTools.contains(currentTool) {
                 onSwitchToSelect?()
