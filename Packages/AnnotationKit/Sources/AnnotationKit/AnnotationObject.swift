@@ -26,17 +26,42 @@ public struct ObjectID: Hashable, Sendable {
     public init() { self.value = UUID() }
 }
 
+public enum StrokePattern: String, Codable, CaseIterable, Sendable {
+    case solid
+    case dashed
+    case dotted
+
+    public func apply(to context: CGContext, lineWidth: CGFloat) {
+        switch self {
+        case .solid:
+            context.setLineDash(phase: 0, lengths: [])
+        case .dashed:
+            context.setLineDash(phase: 0, lengths: [lineWidth * 3, lineWidth * 2])
+        case .dotted:
+            context.setLineDash(phase: 0, lengths: [0, max(lineWidth * 2, 6)])
+        }
+    }
+}
+
 public struct StrokeStyle: Sendable {
     public var color: AnnotationColor
     public var lineWidth: CGFloat
     public var opacity: CGFloat
     public var filled: Bool
+    public var pattern: StrokePattern
 
-    public init(color: AnnotationColor = .red, lineWidth: CGFloat = 3, opacity: CGFloat = 1, filled: Bool = false) {
+    public init(
+        color: AnnotationColor = .red,
+        lineWidth: CGFloat = 3,
+        opacity: CGFloat = 1,
+        filled: Bool = false,
+        pattern: StrokePattern = .solid
+    ) {
         self.color = color
         self.lineWidth = lineWidth
         self.opacity = opacity
         self.filled = filled
+        self.pattern = pattern
     }
 }
 

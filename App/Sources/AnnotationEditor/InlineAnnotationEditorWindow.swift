@@ -101,8 +101,10 @@ private struct InlineAnnotationEditorView: View {
     @AppStorage("annotationHighlighterWidth") private var savedHighlighterWidth: Double = 20
     @AppStorage("annotationRedactionMode") private var redactionMode: RedactionMode = .pixelate
     @AppStorage("annotationTextFontSize") private var savedTextFontSize: Double = 48
+    @AppStorage("annotationStrokePattern") private var savedStrokePattern: StrokePattern = .solid
 
     @State private var lineWidth: CGFloat = 3
+    @State private var strokePattern: StrokePattern = .solid
     @State private var isEditingText = false
     @State private var refreshTrigger = 0
     @State private var commitEditingTrigger = 0
@@ -124,7 +126,8 @@ private struct InlineAnnotationEditorView: View {
             color: currentColor,
             lineWidth: lineWidth,
             opacity: currentTool == .highlighter ? 0.35 : 1.0,
-            filled: filled
+            filled: filled,
+            pattern: strokePattern
         )
     }
 
@@ -208,6 +211,7 @@ private struct InlineAnnotationEditorView: View {
                 currentTool: $currentTool,
                 currentColor: $currentColor,
                 lineWidth: $lineWidth,
+                strokePattern: $strokePattern,
                 filled: $filled,
                 redactionMode: $redactionMode,
                 isEditingText: isEditingText,
@@ -233,6 +237,7 @@ private struct InlineAnnotationEditorView: View {
         .background(Color.clear)
         .onAppear {
             lineWidth = savedWidth(for: currentTool)
+            strokePattern = savedStrokePattern
             Task {
                 if let regions = try? await TextRecognizer.recognize(
                     image: sourceImage,
@@ -252,6 +257,10 @@ private struct InlineAnnotationEditorView: View {
         .onChange(of: lineWidth) { _, newValue in
             updateSelectedStyle()
             persistWidth(newValue, for: currentTool)
+        }
+        .onChange(of: strokePattern) { _, newValue in
+            savedStrokePattern = newValue
+            updateSelectedStyle()
         }
         .onChange(of: filled) { _, _ in updateSelectedStyle() }
         .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
@@ -344,6 +353,7 @@ private struct InlineAnnotationToolbar: View {
     @Binding var currentTool: AnnotationTool
     @Binding var currentColor: AnnotationColor
     @Binding var lineWidth: CGFloat
+    @Binding var strokePattern: StrokePattern
     @Binding var filled: Bool
     @Binding var redactionMode: RedactionMode
 
@@ -405,7 +415,25 @@ private struct InlineAnnotationToolbar: View {
                     .help("Redaction Mode")
                 }
 
-                if currentTool != .counter && currentTool != .highlighter && currentTool != .pixelate && !isFontSizeMode {
+                if currentTool == .arrow || currentTool == .line {
+                    Picker("", selection: $strokePattern) {
+                        ForEach(StrokePattern.allCases, id: \.self) { pattern in
+                            StrokePatternGlyph(pattern: pattern)
+                                .tag(pattern)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 104)
+                    .help("Stroke Pattern")
+                }
+
+                if currentTool != .counter
+                    && currentTool != .arrow
+                    && currentTool != .line
+                    && currentTool != .highlighter
+                    && currentTool != .pixelate
+                    && !isFontSizeMode {
                     iconButton(
                         systemName: filled ? "square.fill" : "square",
                         help: "Fill Shape",

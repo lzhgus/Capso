@@ -46,11 +46,13 @@ struct AnnotationEditorView: View {
     @AppStorage("annotationCounterSize") private var savedCounterSize: Double = 20
     @AppStorage("annotationHighlighterWidth") private var savedHighlighterWidth: Double = 20
     @AppStorage("annotationRedactionMode") private var redactionMode: RedactionMode = .pixelate
+    @AppStorage("annotationStrokePattern") private var savedStrokePattern: StrokePattern = .solid
     /// Preserved font size for the Text tool. Swapped in/out of `lineWidth`
     /// as the user toggles tools — same pattern as savedBlockSize etc.
     @AppStorage("annotationTextFontSize") private var savedTextFontSize: Double = 48
 
     @State private var lineWidth: CGFloat = 3
+    @State private var strokePattern: StrokePattern = .solid
     /// True while an inline text editor is active. Lets the toolbar show
     /// the font-size slider even when the tool is `.select` (happens when
     /// re-editing via double-click).
@@ -112,7 +114,8 @@ struct AnnotationEditorView: View {
             color: currentColor,
             lineWidth: lineWidth,
             opacity: currentTool == .highlighter ? 0.35 : 1.0,
-            filled: filled
+            filled: filled,
+            pattern: strokePattern
         )
     }
 
@@ -201,6 +204,7 @@ struct AnnotationEditorView: View {
                     currentTool: $currentTool,
                     currentColor: $currentColor,
                     lineWidth: $lineWidth,
+                    strokePattern: $strokePattern,
                     filled: $filled,
                     redactionMode: $redactionMode,
                     showBeautifyPanel: $showBeautifyPanel,
@@ -292,6 +296,7 @@ struct AnnotationEditorView: View {
                         // Sync the session-local slider to the persisted width
                         // for whichever tool was last used (issue #75).
                         lineWidth = savedWidth(for: currentTool)
+                        strokePattern = savedStrokePattern
                         // Pre-cache text regions for smart highlighter snapping
                         Task {
                             if let regions = try? await TextRecognizer.recognize(
@@ -316,6 +321,10 @@ struct AnnotationEditorView: View {
                         // Persist slider drags live so closing the editor
                         // without switching tools still saves the change.
                         persistWidth(newValue, for: currentTool)
+                    }
+                    .onChange(of: strokePattern) { _, newValue in
+                        savedStrokePattern = newValue
+                        updateSelectedStyle()
                     }
                     .onChange(of: filled) { _, _ in updateSelectedStyle() }
                     .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }

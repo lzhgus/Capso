@@ -18,6 +18,17 @@ struct AnnotationObjectTests {
         #expect(style.color == .red)
         #expect(style.lineWidth == 3.0)
         #expect(style.opacity == 1.0)
+        #expect(style.pattern == .solid)
+    }
+
+    @Test("StrokeStyle stores non-solid line patterns")
+    func strokePatterns() {
+        let dashed = StrokeStyle(pattern: .dashed)
+        let dotted = StrokeStyle(pattern: .dotted)
+
+        #expect(StrokePattern.allCases == [.solid, .dashed, .dotted])
+        #expect(dashed.pattern == .dashed)
+        #expect(dotted.pattern == .dotted)
     }
 
     @Test("AnnotationColor keeps preset raw values")
@@ -102,12 +113,14 @@ struct LineObjectTests {
     func copyPreservesControlPoint() {
         let line = LineObject(start: CGPoint(x: 0, y: 0), end: CGPoint(x: 100, y: 0))
         line.controlPoint = CGPoint(x: 40, y: 60)
+        line.style.pattern = .dashed
 
         let copy = line.copy() as? LineObject
 
         #expect(copy?.start == line.start)
         #expect(copy?.end == line.end)
         #expect(copy?.controlPoint == line.controlPoint)
+        #expect(copy?.style.pattern == .dashed)
     }
 }
 
@@ -136,6 +149,42 @@ struct ArrowObjectTests {
         arrow.move(by: CGSize(width: 5, height: 5))
         #expect(arrow.start == CGPoint(x: 15, y: 15))
         #expect(arrow.end == CGPoint(x: 55, y: 55))
+    }
+
+    @Test("Arrow control point bends hit testing and travels with the arrow")
+    func controlPointBendsArrow() {
+        let arrow = ArrowObject(
+            start: CGPoint(x: 0, y: 0),
+            end: CGPoint(x: 100, y: 0),
+            style: StrokeStyle(lineWidth: 4)
+        )
+        arrow.controlPoint = CGPoint(x: 50, y: 80)
+
+        #expect(arrow.bounds.contains(CGPoint(x: 50, y: 80)))
+        #expect(arrow.hitTest(point: CGPoint(x: 50, y: 40), threshold: 4))
+        #expect(!arrow.hitTest(point: CGPoint(x: 50, y: 0), threshold: 4))
+
+        arrow.move(by: CGSize(width: 10, height: -5))
+        #expect(arrow.start == CGPoint(x: 10, y: -5))
+        #expect(arrow.end == CGPoint(x: 110, y: -5))
+        #expect(arrow.controlPoint == CGPoint(x: 60, y: 75))
+    }
+
+    @Test("Arrow copy preserves bend and stroke pattern")
+    func copyPreservesControlPoint() {
+        let arrow = ArrowObject(
+            start: CGPoint(x: 0, y: 0),
+            end: CGPoint(x: 100, y: 0),
+            style: StrokeStyle(pattern: .dotted)
+        )
+        arrow.controlPoint = CGPoint(x: 60, y: 40)
+
+        let copy = arrow.copy() as? ArrowObject
+
+        #expect(copy?.start == arrow.start)
+        #expect(copy?.end == arrow.end)
+        #expect(copy?.controlPoint == arrow.controlPoint)
+        #expect(copy?.style.pattern == .dotted)
     }
 }
 

@@ -6,8 +6,17 @@ import AnnotationKit
 /// Which visible handle is being dragged for resize or path adjustment.
 private enum ResizeHandle {
     case topLeft, topRight, bottomLeft, bottomRight
-    case lineStart, lineEnd, lineControl
+    case pathStart, pathEnd, pathControl
 }
+
+private protocol PathEditableAnnotation: AnnotationObject {
+    var start: CGPoint { get set }
+    var end: CGPoint { get set }
+    var controlPoint: CGPoint? { get set }
+}
+
+extension LineObject: PathEditableAnnotation {}
+extension ArrowObject: PathEditableAnnotation {}
 
 @MainActor
 final class AnnotationCanvasNSView: NSView {
@@ -102,8 +111,8 @@ final class AnnotationCanvasNSView: NSView {
     // MARK: - Handle Hit Testing
 
     private func handleHitTest(point: CGPoint, object: any AnnotationObject) -> ResizeHandle? {
-        if let line = object as? LineObject {
-            return lineHandleHitTest(point: point, line: line)
+        if let pathObject = object as? any PathEditableAnnotation {
+            return pathHandleHitTest(point: point, object: pathObject)
         }
 
         let r = max(10 / max(zoomScale, 0.1), handleRadius + 4)
@@ -115,9 +124,9 @@ final class AnnotationCanvasNSView: NSView {
         return nil
     }
 
-    private func lineHandleHitTest(point: CGPoint, line: LineObject) -> ResizeHandle? {
+    private func pathHandleHitTest(point: CGPoint, object: any PathEditableAnnotation) -> ResizeHandle? {
         let r = max(10 / max(zoomScale, 0.1), handleRadius + 4)
-        for (handle, center) in lineHandleCenters(for: line) {
+        for (handle, center) in pathHandleCenters(for: object) {
             if hypot(point.x - center.x, point.y - center.y) <= r {
                 return handle
             }
@@ -166,7 +175,7 @@ final class AnnotationCanvasNSView: NSView {
     private func cursorForHandle(_ handle: ResizeHandle) -> NSCursor {
         let symbolName: String
         switch handle {
-        case .lineStart, .lineEnd, .lineControl:
+        case .pathStart, .pathEnd, .pathControl:
             return NSCursor.openHand
         case .topLeft, .bottomRight:
             // ↖↘ diagonal
@@ -223,8 +232,8 @@ final class AnnotationCanvasNSView: NSView {
             }
 
             if let selected = doc.selectedObject {
-                if let line = selected as? LineObject {
-                    drawLineSelectionHandles(ctx: ctx, line: line)
+                if let pathObject = selected as? any PathEditableAnnotation {
+                    drawPathSelectionHandles(ctx: ctx, object: pathObject)
                 } else {
                     drawSelectionHandles(ctx: ctx, bounds: selected.bounds)
                 }
@@ -240,7 +249,7 @@ final class AnnotationCanvasNSView: NSView {
         ctx.restoreGState()
     }
 
-    private func drawLineSelectionHandles(ctx: CGContext, line: LineObject) {
+    private func drawPathSelectionHandles(ctx: CGContext, object: any PathEditableAnnotation) {
         ctx.saveGState()
 
         let scale = max(zoomScale, 0.1)
@@ -250,18 +259,18 @@ final class AnnotationCanvasNSView: NSView {
         let accent = NSColor.controlAccentColor.withAlphaComponent(0.9).cgColor
         let controlFill = NSColor.white.withAlphaComponent(0.92).cgColor
 
-        if let controlPoint = line.controlPoint {
+        if let controlPoint = object.controlPoint {
             ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.36).cgColor)
             ctx.setLineWidth(1 / scale)
             ctx.setLineDash(phase: 0, lengths: [3 / scale, 4 / scale])
-            ctx.move(to: line.start)
+            ctx.move(to: object.start)
             ctx.addLine(to: controlPoint)
-            ctx.addLine(to: line.end)
+            ctx.addLine(to: object.end)
             ctx.strokePath()
             ctx.setLineDash(phase: 0, lengths: [])
         }
 
-        for (_, center) in [(ResizeHandle.lineStart, line.start), (.lineEnd, line.end)] {
+        for (_, center) in [(ResizeHandle.pathStart, object.start), (.pathEnd, object.end)] {
             let rect = CGRect(
                 x: center.x - endpointSize / 2,
                 y: center.y - endpointSize / 2,
@@ -275,7 +284,7 @@ final class AnnotationCanvasNSView: NSView {
             ctx.strokeEllipse(in: rect.insetBy(dx: lw / 2, dy: lw / 2))
         }
 
-        let controlPoint = line.controlPoint ?? lineMidpoint(line)
+        let controlPoint = object.controlPoint ?? pathMidpoint(object)
         let controlRect = CGRect(
             x: controlPoint.x - controlSize / 2,
             y: controlPoint.y - controlSize / 2,
@@ -291,16 +300,16 @@ final class AnnotationCanvasNSView: NSView {
         ctx.restoreGState()
     }
 
-    private func lineHandleCenters(for line: LineObject) -> [(ResizeHandle, CGPoint)] {
+    private func pathHandleCenters(for object: any PathEditableAnnotation) -> [(ResizeHandle, CGPoint)] {
         [
-            (.lineStart, line.start),
-            (.lineEnd, line.end),
-            (.lineControl, line.controlPoint ?? lineMidpoint(line)),
+            (.pathStart, object.start),
+            (.pathEnd, object.end),
+            (.pathControl, object.controlPoint ?? pathMidpoint(object)),
         ]
     }
 
-    private func lineMidpoint(_ line: LineObject) -> CGPoint {
-        CGPoint(x: (line.start.x + line.end.x) / 2, y: (line.start.y + line.end.y) / 2)
+    private func pathMidpoint(_ object: any PathEditableAnnotation) -> CGPoint {
+        CGPoint(x: (object.start.x + object.end.x) / 2, y: (object.start.y + object.end.y) / 2)
     }
 
     private func drawSelectionHandles(ctx: CGContext, bounds: CGRect) {
@@ -406,9 +415,10 @@ final class AnnotationCanvasNSView: NSView {
             resizeOriginalFreehandPoints = (selected as? FreehandObject)?.points
             if let arrow = selected as? ArrowObject {
                 resizeOriginalEndpoints = (arrow.start, arrow.end)
+                resizeOriginalLineControlPoint = arrow.controlPoint ?? pathMidpoint(arrow)
             } else if let line = selected as? LineObject {
                 resizeOriginalEndpoints = (line.start, line.end)
-                resizeOriginalLineControlPoint = line.controlPoint ?? lineMidpoint(line)
+                resizeOriginalLineControlPoint = line.controlPoint ?? pathMidpoint(line)
             }
             if let text = selected as? TextObject {
                 resizeOriginalTextFontSize = text.fontSize
@@ -499,19 +509,19 @@ final class AnnotationCanvasNSView: NSView {
         let dy = dragCurrent.y - dragStart.y
 
         guard let obj = document?.objects.first(where: { $0.id == id }) else { return }
-        if let line = obj as? LineObject {
+        if let pathObject = obj as? any PathEditableAnnotation {
             guard let endpoints = resizeOriginalEndpoints else { return }
             switch handle {
-            case .lineStart:
-                line.start = CGPoint(x: endpoints.start.x + dx, y: endpoints.start.y + dy)
-            case .lineEnd:
-                line.end = CGPoint(x: endpoints.end.x + dx, y: endpoints.end.y + dy)
-            case .lineControl:
+            case .pathStart:
+                pathObject.start = CGPoint(x: endpoints.start.x + dx, y: endpoints.start.y + dy)
+            case .pathEnd:
+                pathObject.end = CGPoint(x: endpoints.end.x + dx, y: endpoints.end.y + dy)
+            case .pathControl:
                 let original = resizeOriginalLineControlPoint ?? CGPoint(
                     x: (endpoints.start.x + endpoints.end.x) / 2,
                     y: (endpoints.start.y + endpoints.end.y) / 2
                 )
-                line.controlPoint = CGPoint(x: original.x + dx, y: original.y + dy)
+                pathObject.controlPoint = CGPoint(x: original.x + dx, y: original.y + dy)
             default:
                 break
             }
@@ -536,7 +546,7 @@ final class AnnotationCanvasNSView: NSView {
         case .bottomRight:
             newRect.size.width = originalBounds.width + dx
             newRect.size.height = originalBounds.height + dy
-        case .lineStart, .lineEnd, .lineControl:
+        case .pathStart, .pathEnd, .pathControl:
             return
         }
 
@@ -585,7 +595,7 @@ final class AnnotationCanvasNSView: NSView {
             case .bottomRight:
                 // Anchor: topLeft of original bounds
                 text.origin = originalBounds.origin
-            case .lineStart, .lineEnd, .lineControl:
+            case .pathStart, .pathEnd, .pathControl:
                 break
             }
         }

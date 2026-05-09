@@ -6,6 +6,7 @@ struct AnnotationToolbar: View {
     @Binding var currentTool: AnnotationTool
     @Binding var currentColor: AnnotationColor
     @Binding var lineWidth: CGFloat
+    @Binding var strokePattern: StrokePattern
     @Binding var filled: Bool
     @Binding var redactionMode: RedactionMode
     @Binding var showBeautifyPanel: Bool
@@ -141,8 +142,22 @@ struct AnnotationToolbar: View {
                     .frame(width: 80)
                     .help("Line Width: \(Int(lineWidth))")
             }
+            if currentTool == .arrow || currentTool == .line {
+                Picker("", selection: $strokePattern) {
+                    ForEach(StrokePattern.allCases, id: \.self) { pattern in
+                        StrokePatternGlyph(pattern: pattern)
+                            .tag(pattern)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 104)
+                .help("Stroke Pattern")
+            }
             // Fill toggle is meaningless for counter / highlighter / text.
             if currentTool != .counter
+                && currentTool != .arrow
+                && currentTool != .line
                 && currentTool != .highlighter
                 && !isFontSizeMode {
                 Toggle(isOn: $filled) {
@@ -281,5 +296,29 @@ struct AnnotationToolbar: View {
     private func actionButtonStroke(isPrimary: Bool) -> some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
             .stroke(isPrimary ? Color.white.opacity(0.18) : Color.primary.opacity(0.08), lineWidth: 0.5)
+    }
+}
+
+struct StrokePatternGlyph: View {
+    let pattern: StrokePattern
+
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            path.move(to: CGPoint(x: 3, y: size.height / 2))
+            path.addLine(to: CGPoint(x: size.width - 3, y: size.height / 2))
+
+            let style: SwiftUI.StrokeStyle
+            switch pattern {
+            case .solid:
+                style = SwiftUI.StrokeStyle(lineWidth: 2, lineCap: .round)
+            case .dashed:
+                style = SwiftUI.StrokeStyle(lineWidth: 2, lineCap: .round, dash: [7, 5])
+            case .dotted:
+                style = SwiftUI.StrokeStyle(lineWidth: 2.4, lineCap: .round, dash: [0, 5])
+            }
+            context.stroke(path, with: .color(.primary), style: style)
+        }
+        .frame(width: 22, height: 14)
     }
 }

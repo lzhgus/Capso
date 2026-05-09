@@ -7,6 +7,7 @@ public final class ArrowObject: AnnotationObject, @unchecked Sendable {
     public var style: StrokeStyle
     public var start: CGPoint
     public var end: CGPoint
+    public var controlPoint: CGPoint?
     public var headLength: CGFloat = 15
 
     public init(start: CGPoint, end: CGPoint, style: StrokeStyle = StrokeStyle()) {
@@ -26,10 +27,27 @@ public final class ArrowObject: AnnotationObject, @unchecked Sendable {
         let minY = min(start.y, end.y) - hl
         let maxX = max(start.x, end.x) + hl
         let maxY = max(start.y, end.y) + hl
+        if let controlPoint {
+            return CGRect(
+                x: min(minX, controlPoint.x - hl),
+                y: min(minY, controlPoint.y - hl),
+                width: max(maxX, controlPoint.x + hl) - min(minX, controlPoint.x - hl),
+                height: max(maxY, controlPoint.y + hl) - min(minY, controlPoint.y - hl)
+            )
+        }
         return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
     public func hitTest(point: CGPoint, threshold: CGFloat) -> Bool {
+        if let controlPoint {
+            return AnnotationGeometry.distanceToQuadraticCurve(
+                point: point,
+                start: start,
+                control: controlPoint,
+                end: end
+            ) <= threshold + style.lineWidth / 2
+        }
+
         let dx = end.x - start.x
         let dy = end.y - start.y
         let lengthSq = dx * dx + dy * dy
@@ -48,10 +66,17 @@ public final class ArrowObject: AnnotationObject, @unchecked Sendable {
         ctx.setLineWidth(style.lineWidth)
         ctx.setAlpha(style.opacity)
         ctx.setLineCap(.round)
+        style.pattern.apply(to: ctx, lineWidth: style.lineWidth)
         ctx.move(to: start)
-        ctx.addLine(to: end)
+        if let controlPoint {
+            ctx.addQuadCurve(to: end, control: controlPoint)
+        } else {
+            ctx.addLine(to: end)
+        }
         ctx.strokePath()
-        let angle = atan2(end.y - start.y, end.x - start.x)
+
+        ctx.setLineDash(phase: 0, lengths: [])
+        let angle = AnnotationGeometry.curveEndAngle(start: start, control: controlPoint, end: end)
         let headAngle: CGFloat = .pi / 6
         let hl = effectiveHeadLength
         let p1 = CGPoint(x: end.x - hl * cos(angle - headAngle), y: end.y - hl * sin(angle - headAngle))
@@ -65,10 +90,13 @@ public final class ArrowObject: AnnotationObject, @unchecked Sendable {
     public func move(by delta: CGSize) {
         start.x += delta.width; start.y += delta.height
         end.x += delta.width; end.y += delta.height
+        controlPoint?.x += delta.width
+        controlPoint?.y += delta.height
     }
 
     public func copy() -> any AnnotationObject {
         let c = ArrowObject(start: start, end: end, style: style)
+        c.controlPoint = controlPoint
         c.headLength = headLength
         return c
     }

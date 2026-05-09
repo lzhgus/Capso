@@ -33,7 +33,7 @@ public final class LineObject: AnnotationObject, @unchecked Sendable {
 
     public func hitTest(point: CGPoint, threshold: CGFloat) -> Bool {
         if let controlPoint {
-            return Self.distanceToQuadraticCurve(
+            return AnnotationGeometry.distanceToQuadraticCurve(
                 point: point,
                 start: start,
                 control: controlPoint,
@@ -58,6 +58,7 @@ public final class LineObject: AnnotationObject, @unchecked Sendable {
         ctx.setLineWidth(style.lineWidth)
         ctx.setAlpha(style.opacity)
         ctx.setLineCap(.round)
+        style.pattern.apply(to: ctx, lineWidth: style.lineWidth)
         ctx.move(to: start)
         if let controlPoint {
             ctx.addQuadCurve(to: end, control: controlPoint)
@@ -81,49 +82,5 @@ public final class LineObject: AnnotationObject, @unchecked Sendable {
         let copy = LineObject(start: start, end: end, style: style)
         copy.controlPoint = controlPoint
         return copy
-    }
-
-    private static func distanceToQuadraticCurve(
-        point: CGPoint,
-        start: CGPoint,
-        control: CGPoint,
-        end: CGPoint
-    ) -> CGFloat {
-        var best = CGFloat.greatestFiniteMagnitude
-        var previous = start
-
-        for i in 1...32 {
-            let t = CGFloat(i) / 32
-            let current = quadraticPoint(t: t, start: start, control: control, end: end)
-            best = min(best, distanceToSegment(point: point, start: previous, end: current))
-            previous = current
-        }
-
-        return best
-    }
-
-    private static func quadraticPoint(
-        t: CGFloat,
-        start: CGPoint,
-        control: CGPoint,
-        end: CGPoint
-    ) -> CGPoint {
-        let u = 1 - t
-        return CGPoint(
-            x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
-            y: u * u * start.y + 2 * u * t * control.y + t * t * end.y
-        )
-    }
-
-    private static func distanceToSegment(point: CGPoint, start: CGPoint, end: CGPoint) -> CGFloat {
-        let dx = end.x - start.x
-        let dy = end.y - start.y
-        let lengthSq = dx * dx + dy * dy
-        guard lengthSq > 0 else { return hypot(point.x - start.x, point.y - start.y) }
-
-        var t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq
-        t = max(0, min(1, t))
-        let projection = CGPoint(x: start.x + t * dx, y: start.y + t * dy)
-        return hypot(point.x - projection.x, point.y - projection.y)
     }
 }
