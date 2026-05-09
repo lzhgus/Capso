@@ -17,7 +17,10 @@ final class CaptureAllInOneAnnotationOverlay {
     }
 
     func show(sourceImage: CGImage, selectionRect: CGRect, avoidingFrame: CGRect?) {
-        let session = AllInOneAnnotationSession(sourceImage: sourceImage)
+        let session = AllInOneAnnotationSession(
+            sourceImage: sourceImage,
+            displayScale: displayScale(for: sourceImage, selectionRect: selectionRect)
+        )
         session.onRequestCanvasFocus = { [weak self] in
             self?.focusCanvas()
         }
@@ -32,10 +35,13 @@ final class CaptureAllInOneAnnotationOverlay {
         showToolbar(session: session, selectionRect: selectionRect, avoidingFrame: avoidingFrame)
     }
 
-    func update(sourceImage: CGImage, selectionRect: CGRect, avoidingFrame: CGRect?) {
+    func update(sourceImage: CGImage, selectionRect: CGRect, avoidingFrame: CGRect?, isLive: Bool = false) {
         let previousSelectionRect = currentSelectionRect
         if session == nil {
-            let newSession = AllInOneAnnotationSession(sourceImage: sourceImage)
+            let newSession = AllInOneAnnotationSession(
+                sourceImage: sourceImage,
+                displayScale: displayScale(for: sourceImage, selectionRect: selectionRect)
+            )
             newSession.onRequestCanvasFocus = { [weak self] in
                 self?.focusCanvas()
             }
@@ -51,7 +57,11 @@ final class CaptureAllInOneAnnotationOverlay {
             to: selectionRect,
             sourceImage: session.sourceImage
         )
-        session.replaceSourceImage(sourceImage, objectOffset: objectOffset)
+        session.replaceSourceImage(
+            sourceImage,
+            displayScale: displayScale(for: sourceImage, selectionRect: selectionRect),
+            objectOffset: objectOffset
+        )
         let wasCompact = session.usesCompactToolbar
         session.availableWidth = selectionRect.width
         if wasCompact != session.usesCompactToolbar {
@@ -60,12 +70,8 @@ final class CaptureAllInOneAnnotationOverlay {
         session.onRequestToolbarLayout = { [weak self] in
             self?.repositionToolbar(selectionRect: selectionRect, avoidingFrame: avoidingFrame, animated: true)
         }
-        canvasWindow?.setFrame(canvasFrame(for: selectionRect), display: true)
-        toolbarWindow?.setFrame(toolbarFrame(for: selectionRect, avoidingFrame: avoidingFrame), display: true)
-        canvasWindow?.contentView = AllInOneCanvasHostingView(rootView: AllInOneAnnotationCanvasView(
-            session: session,
-            displayScale: displayScale(for: sourceImage, selectionRect: selectionRect)
-        ))
+        canvasWindow?.setFrame(canvasFrame(for: selectionRect), display: !isLive)
+        toolbarWindow?.setFrame(toolbarFrame(for: selectionRect, avoidingFrame: avoidingFrame), display: !isLive)
         currentSelectionRect = selectionRect
     }
 
@@ -102,8 +108,7 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
         panel.contentView = AllInOneCanvasHostingView(rootView: AllInOneAnnotationCanvasView(
-            session: session,
-            displayScale: displayScale(for: session.sourceImage, selectionRect: selectionRect)
+            session: session
         ))
         canvasWindow = panel
         panel.orderFrontRegardless()
@@ -312,6 +317,7 @@ private extension NSView {
 @MainActor
 final class AllInOneAnnotationSession: ObservableObject {
     @Published var sourceImage: CGImage
+    @Published var displayScale: CGFloat
     @Published var currentTool: AnnotationTool
     @Published var currentColor: AnnotationColor
     @Published var filled: Bool
@@ -334,8 +340,9 @@ final class AllInOneAnnotationSession: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: "annotationShapeWidth") }
     }
 
-    init(sourceImage: CGImage) {
+    init(sourceImage: CGImage, displayScale: CGFloat) {
         self.sourceImage = sourceImage
+        self.displayScale = displayScale
         self.document = AnnotationDocument(imageSize: CGSize(width: sourceImage.width, height: sourceImage.height))
         self.currentTool = Self.storedTool()
         self.currentColor = Self.storedColor()
@@ -378,8 +385,9 @@ final class AllInOneAnnotationSession: ObservableObject {
         availableWidth < 420
     }
 
-    func replaceSourceImage(_ image: CGImage, objectOffset: CGSize = .zero) {
+    func replaceSourceImage(_ image: CGImage, displayScale: CGFloat, objectOffset: CGSize = .zero) {
         sourceImage = image
+        self.displayScale = displayScale
         document.updateImageSizePreservingObjects(
             size: CGSize(width: image.width, height: image.height),
             objectOffset: objectOffset
@@ -503,7 +511,6 @@ final class AllInOneAnnotationSession: ObservableObject {
 
 private struct AllInOneAnnotationCanvasView: View {
     @ObservedObject var session: AllInOneAnnotationSession
-    let displayScale: CGFloat
 
     var body: some View {
         AnnotationCanvasView(
@@ -513,7 +520,7 @@ private struct AllInOneAnnotationCanvasView: View {
             currentStyle: session.currentStyle,
             redactionMode: session.redactionMode,
             textFontSize: session.effectiveTextFontSize,
-            zoomScale: displayScale,
+            zoomScale: session.displayScale,
             refreshTrigger: session.refreshTrigger,
             textRegions: session.textRegions,
             commitEditingTrigger: session.commitEditingTrigger,

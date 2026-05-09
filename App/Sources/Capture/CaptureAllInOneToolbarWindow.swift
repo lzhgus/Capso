@@ -20,6 +20,7 @@ final class CaptureAllInOneToolbarWindow {
     private let presets: [CapturePreset]
     private var activePreset: CapturePreset
     private let frozenImage: CGImage?
+    private var lastLiveAnnotationUpdateTime: TimeInterval = 0
 
     let screen: NSScreen
 
@@ -119,8 +120,11 @@ final class CaptureAllInOneToolbarWindow {
             activePreset: activePreset
         )
         overlayView.passesThroughSelectionBody = frozenImage != nil
+        overlayView.onSelectionPreviewChanged = { [weak self] selectionRect in
+            self?.updateSelection(selectionRect, phase: .live)
+        }
         overlayView.onSelectionChanged = { [weak self] selectionRect in
-            self?.updateSelection(selectionRect)
+            self?.updateSelection(selectionRect, phase: .final)
         }
         overlayView.onCancel = { [weak self] in
             self?.onCancel?()
@@ -277,15 +281,23 @@ final class CaptureAllInOneToolbarWindow {
         return CGRect(x: x, y: y, width: toolbarWidth, height: toolbarHeight)
     }
 
-    private func updateSelection(_ selectionRect: CGRect) {
+    private enum SelectionUpdatePhase {
+        case live
+        case final
+    }
+
+    private func updateSelection(_ selectionRect: CGRect, phase: SelectionUpdatePhase = .final) {
         screenLocalSelectionRect = CaptureSelectionGeometry.move(
             selectionRect.standardized,
             by: .zero,
             in: screenLocalBounds
         )
         updateToolbarState()
-        layoutChrome(animated: true)
-        updateAnnotationOverlayIfPossible()
+        let isLive = phase == .live
+        layoutChrome(animated: !isLive)
+        if shouldRefreshAnnotationOverlay(isLive: isLive) {
+            updateAnnotationOverlayIfPossible(isLive: isLive)
+        }
     }
 
     private func updateToolbarState() {
@@ -309,7 +321,7 @@ final class CaptureAllInOneToolbarWindow {
         selectionOverlayView?.setSelectionRect(fittedRect)
         updateToolbarState()
         layoutChrome(animated: true)
-        updateAnnotationOverlayIfPossible()
+        updateAnnotationOverlayIfPossible(isLive: false)
         onPresetChanged?(preset)
     }
 
@@ -338,7 +350,7 @@ final class CaptureAllInOneToolbarWindow {
         )
     }
 
-    private func updateAnnotationOverlayIfPossible() {
+    private func updateAnnotationOverlayIfPossible(isLive: Bool) {
         guard let sourceImage = croppedFrozenImage(for: screenLocalSelectionRect) else { return }
         if annotationOverlay == nil {
             let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
@@ -352,9 +364,24 @@ final class CaptureAllInOneToolbarWindow {
             annotationOverlay?.update(
                 sourceImage: sourceImage,
                 selectionRect: screenLocalSelectionRect,
-                avoidingFrame: toolbarWindow?.frame
+                avoidingFrame: toolbarWindow?.frame,
+                isLive: isLive
             )
         }
+    }
+
+    private func shouldRefreshAnnotationOverlay(isLive: Bool) -> Bool {
+        guard isLive else {
+            lastLiveAnnotationUpdateTime = 0
+            return true
+        }
+
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastLiveAnnotationUpdateTime >= 1.0 / 30.0 else {
+            return false
+        }
+        lastLiveAnnotationUpdateTime = now
+        return true
     }
 
     private func croppedFrozenImage(for selectionRect: CGRect) -> CGImage? {
@@ -954,6 +981,7 @@ private struct CaptureAllInOneToolbarView: View {
 }
 
 private final class AllInOneSelectionOverlayView: NSView {
+    var onSelectionPreviewChanged: ((CGRect) -> Void)?
     var onSelectionChanged: ((CGRect) -> Void)?
     var onCancel: (() -> Void)?
     var passesThroughSelectionBody = false
@@ -992,6 +1020,7 @@ private final class AllInOneSelectionOverlayView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var acceptsFirstResponder: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         if passesThroughSelectionBody,
@@ -1121,7 +1150,7 @@ private final class AllInOneSelectionOverlayView: NSView {
             )
             selectionRect = fixedRect
             dragOperation = .move(startRect: fixedRect, startPoint: point)
-            onSelectionChanged?(selectionRect)
+            onSelectionPreviewChanged?(selectionRect)
             NSCursor.closedHand.set()
             return
         }
@@ -1193,7 +1222,7 @@ private final class AllInOneSelectionOverlayView: NSView {
             }
         }
 
-        onSelectionChanged?(selectionRect)
+        onSelectionPreviewChanged?(selectionRect)
     }
 
     override func mouseUp(with event: NSEvent) {

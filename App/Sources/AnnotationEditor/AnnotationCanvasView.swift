@@ -63,6 +63,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
 
     func updateNSView(_ nsView: AnnotationCanvasNSView, context: Context) {
         let toolChanged = nsView.currentTool != currentTool
+        nsView.sourceImage = sourceImage
         nsView.currentTool = currentTool
         nsView.currentStyle = currentStyle
         nsView.redactionMode = redactionMode
