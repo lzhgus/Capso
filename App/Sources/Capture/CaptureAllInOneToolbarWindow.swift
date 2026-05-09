@@ -1129,6 +1129,7 @@ private final class AllInOneSelectionOverlayView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        window?.makeKey()
         window?.makeFirstResponder(self)
 
         let point = convert(event.locationInWindow, from: nil)

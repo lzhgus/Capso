@@ -70,7 +70,7 @@ final class CaptureAllInOneAnnotationOverlay {
         session.onRequestToolbarLayout = { [weak self] in
             self?.repositionToolbar(selectionRect: selectionRect, avoidingFrame: avoidingFrame, animated: true)
         }
-        canvasWindow?.setFrame(canvasFrame(for: selectionRect), display: !isLive)
+        canvasWindow?.setFrame(canvasFrame(for: selectionRect), display: true)
         toolbarWindow?.setFrame(toolbarFrame(for: selectionRect, avoidingFrame: avoidingFrame), display: !isLive)
         currentSelectionRect = selectionRect
     }
