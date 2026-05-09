@@ -23,4 +23,29 @@ public enum CaptureDisplayGeometry {
 
         return min(screenRect.width / imageSize.width, screenRect.height / imageSize.height)
     }
+
+    public static func frozenImageCropRect(
+        screenLocalRect: CGRect,
+        screenSize: CGSize,
+        imageSize: CGSize
+    ) -> CGRect {
+        guard screenLocalRect.width > 0,
+              screenLocalRect.height > 0,
+              screenSize.width > 0,
+              screenSize.height > 0,
+              imageSize.width > 0,
+              imageSize.height > 0 else {
+            return .null
+        }
+
+        let scaleX = imageSize.width / screenSize.width
+        let scaleY = imageSize.height / screenSize.height
+
+        return CGRect(
+            x: screenLocalRect.origin.x * scaleX,
+            y: (screenSize.height - screenLocalRect.origin.y - screenLocalRect.height) * scaleY,
+            width: screenLocalRect.width * scaleX,
+            height: screenLocalRect.height * scaleY
+        ).integral
+    }
 }

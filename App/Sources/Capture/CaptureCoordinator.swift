@@ -118,7 +118,7 @@ final class CaptureCoordinator {
     func captureAllInOne() {
         pendingAction = .default
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.showOverlay(mode: .area, isAllInOne: true)
+            self?.showFrozenAllInOneOverlay()
         }
     }
 
@@ -262,7 +262,49 @@ final class CaptureCoordinator {
         }
     }
 
-    private func showAllInOneToolbar(selectionRect: CGRect, screen: NSScreen) {
+    private func showFrozenAllInOneOverlay() {
+        dismissOverlay()
+
+        let frozenScreens = captureFrozenScreens()
+        guard !frozenScreens.isEmpty else {
+            showOverlay(mode: .area, isAllInOne: true)
+            return
+        }
+
+        showFreezeWindows(frozenScreens)
+        let frozenImagesByDisplayID = Dictionary(
+            uniqueKeysWithValues: frozenScreens.map { ($0.0.displayID, $0.1) }
+        )
+
+        for (screen, _) in frozenScreens {
+            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            overlay.onAreaSelected = { [weak self] rect, screen in
+                guard let self else { return }
+                self.dismissSelectionOverlays()
+                self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+                self.showAllInOneToolbar(
+                    selectionRect: rect,
+                    screen: screen,
+                    frozenImage: frozenImagesByDisplayID[screen.displayID]
+                )
+            }
+            overlay.onWindowSelected = { [weak self] windowID in
+                self?.dismissOverlay()
+                self?.performWindowCapture(windowID: windowID)
+            }
+            overlay.onCancelled = { [weak self] in
+                self?.dismissOverlay()
+            }
+            overlay.activate(mode: .area)
+            overlayWindows.append(overlay)
+        }
+    }
+
+    private func showAllInOneToolbar(
+        selectionRect: CGRect,
+        screen: NSScreen,
+        frozenImage: CGImage? = nil
+    ) {
         dismissAllInOneToolbar()
 
         let visiblePresets = settings.capturePresetsEnabled ? settings.visiblePresets : [.freeform]
@@ -280,27 +322,32 @@ final class CaptureCoordinator {
         toolbar.onArea = { [weak self] _ in
             guard let self else { return }
             self.dismissAllInOneToolbar()
-            self.showOverlay(mode: .area, isAllInOne: true)
+            self.dismissFreezeWindows()
+            self.captureAllInOne()
         }
         toolbar.onFullscreen = { [weak self] in
             guard let self else { return }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.captureFullscreen()
         }
         toolbar.onWindow = { [weak self] in
             guard let self else { return }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.captureWindow()
         }
         toolbar.onScrolling = { [weak self] rect in
             guard let self else { return }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.startScrollingCapture(rect: rect, screen: screen)
         }
         toolbar.onTimer = { [weak self] rect in
             guard let self else { return }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.runSelfTimerThenCapture(
                 rect: rect,
@@ -310,7 +357,16 @@ final class CaptureCoordinator {
         }
         toolbar.onOCR = { [weak self] rect in
             guard let self else { return }
+            if self.handleFrozenAllInOneAction(
+                rect: rect,
+                screen: screen,
+                frozenImage: frozenImage,
+                action: .ocr
+            ) {
+                return
+            }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.pendingAction = .ocr
             self.performAreaCapture(rect: rect, screen: screen)
@@ -318,25 +374,45 @@ final class CaptureCoordinator {
         toolbar.onRecording = { [weak self] rect in
             guard let self else { return }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.recordingCoordinator?.startRecordingFlow(withSelectedArea: rect, screen: screen)
         }
         toolbar.onAnnotate = { [weak self] rect in
             guard let self else { return }
+            if self.handleFrozenAllInOneAction(
+                rect: rect,
+                screen: screen,
+                frozenImage: frozenImage,
+                action: .inlineAnnotate
+            ) {
+                return
+            }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.pendingAction = .inlineAnnotate
             self.performAreaCapture(rect: rect, screen: screen)
         }
         toolbar.onCopy = { [weak self] rect in
             guard let self else { return }
+            if self.handleFrozenAllInOneAction(
+                rect: rect,
+                screen: screen,
+                frozenImage: frozenImage,
+                action: .clipboard
+            ) {
+                return
+            }
             self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
             self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
             self.pendingAction = .clipboard
             self.performAreaCapture(rect: rect, screen: screen)
         }
         toolbar.onCancel = { [weak self] in
             self?.dismissAllInOneToolbar()
+            self?.dismissFreezeWindows()
         }
 
         allInOneToolbarWindow = toolbar
@@ -383,19 +459,40 @@ final class CaptureCoordinator {
     private func showFrozenOverlay() {
         dismissOverlay()
 
-        var frozenScreens: [(NSScreen, CGImage)] = []
-        for screen in NSScreen.screens {
-            if let image = Self.syncCaptureDisplay(screen.displayID) {
-                frozenScreens.append((screen, image))
-            }
-        }
-
+        let frozenScreens = captureFrozenScreens()
         guard !frozenScreens.isEmpty else {
             showOverlay()
             return
         }
 
-        // Step 1: Create opaque freeze windows (bottom layer)
+        showFreezeWindows(frozenScreens)
+
+        // Step 2: Create transparent overlay windows (top layer) for selection
+        for (screen, frozenImage) in frozenScreens {
+            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            overlay.onAreaSelected = { [weak self] rect, screen in
+                self?.dismissOverlay()
+                self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+                if let result = self?.frozenAreaResult(rect: rect, screen: screen, frozenImage: frozenImage) {
+                    self?.handleCaptureResult(result)
+                }
+            }
+            overlay.onCancelled = { [weak self] in
+                self?.dismissOverlay()
+            }
+            overlay.activate(mode: .area)
+            overlayWindows.append(overlay)
+        }
+    }
+
+    private func captureFrozenScreens() -> [(NSScreen, CGImage)] {
+        NSScreen.screens.compactMap { screen in
+            guard let image = Self.syncCaptureDisplay(screen.displayID) else { return nil }
+            return (screen, image)
+        }
+    }
+
+    private func showFreezeWindows(_ frozenScreens: [(NSScreen, CGImage)]) {
         for (screen, frozenImage) in frozenScreens {
             let freezeWin = NSWindow(
                 contentRect: screen.frame,
@@ -413,49 +510,9 @@ final class CaptureCoordinator {
             imageView.image = NSImage(cgImage: frozenImage, size: screen.frame.size)
             imageView.imageScaling = .scaleAxesIndependently
             freezeWin.contentView = imageView
-
-            // Pre-render and show
             freezeWin.displayIfNeeded()
             freezeWin.orderFrontRegardless()
             freezeWindows.append(freezeWin)
-        }
-
-        // Step 2: Create transparent overlay windows (top layer) for selection
-        for (screen, frozenImage) in frozenScreens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
-            overlay.onAreaSelected = { [weak self] rect, screen in
-                self?.dismissOverlay()
-                self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
-                let screenFrame = screen.frame
-                let scaleX = CGFloat(frozenImage.width) / screenFrame.width
-                let scaleY = CGFloat(frozenImage.height) / screenFrame.height
-                let cropRect = CGRect(
-                    x: rect.origin.x * scaleX,
-                    y: (screenFrame.height - rect.origin.y - rect.height) * scaleY,
-                    width: rect.width * scaleX,
-                    height: rect.height * scaleY
-                )
-                if let cropped = frozenImage.cropping(to: cropRect) {
-                    let captureRect = CGRect(
-                        x: rect.origin.x,
-                        y: screenFrame.height - rect.origin.y - rect.height,
-                        width: rect.width,
-                        height: rect.height
-                    )
-                    let result = CaptureResult(
-                        image: cropped,
-                        mode: .area,
-                        captureRect: captureRect,
-                        displayID: screen.displayID
-                    )
-                    self?.handleCaptureResult(result)
-                }
-            }
-            overlay.onCancelled = { [weak self] in
-                self?.dismissOverlay()
-            }
-            overlay.activate(mode: .area)
-            overlayWindows.append(overlay)
         }
     }
 
@@ -615,12 +672,18 @@ final class CaptureCoordinator {
     }
 
     private func dismissOverlay() {
+        dismissSelectionOverlays()
+        dismissFreezeWindows()
+    }
+
+    private func dismissSelectionOverlays() {
         for window in overlayWindows {
             window.deactivate()
         }
         overlayWindows.removeAll()
+    }
 
-        // Fade out freeze windows smoothly instead of instant removal
+    private func dismissFreezeWindows() {
         let windows = freezeWindows
         freezeWindows.removeAll()
         if windows.isEmpty { return }
@@ -760,6 +823,54 @@ final class CaptureCoordinator {
                 print("Area capture failed: \(error)")
             }
         }
+    }
+
+    private func handleFrozenAllInOneAction(
+        rect: CGRect,
+        screen: NSScreen,
+        frozenImage: CGImage?,
+        action: PostCaptureAction
+    ) -> Bool {
+        guard let frozenImage,
+              let result = frozenAreaResult(rect: rect, screen: screen, frozenImage: frozenImage) else {
+            return false
+        }
+
+        dismissAllInOneToolbar()
+        settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+        pendingAction = action
+        handleCaptureResult(result)
+        dismissFreezeWindows()
+        return true
+    }
+
+    private func frozenAreaResult(
+        rect: CGRect,
+        screen: NSScreen,
+        frozenImage: CGImage
+    ) -> CaptureResult? {
+        let cropRect = CaptureDisplayGeometry.frozenImageCropRect(
+            screenLocalRect: rect,
+            screenSize: screen.frame.size,
+            imageSize: CGSize(width: frozenImage.width, height: frozenImage.height)
+        )
+        guard !cropRect.isEmpty,
+              let cropped = frozenImage.cropping(to: cropRect) else {
+            return nil
+        }
+
+        let captureRect = CGRect(
+            x: rect.origin.x,
+            y: screen.frame.height - rect.origin.y - rect.height,
+            width: rect.width,
+            height: rect.height
+        )
+        return CaptureResult(
+            image: cropped,
+            mode: .area,
+            captureRect: captureRect,
+            displayID: screen.displayID
+        )
     }
 
     private func handleCaptureResult(_ result: CaptureResult) {
