@@ -116,7 +116,13 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.acceptsMouseMovedEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
-        panel.contentView = NSHostingView(rootView: AllInOneAnnotationToolbarView(session: session))
+        let hostingView = AllInOneAnnotationToolbarHostingView(rootView: AllInOneAnnotationToolbarView(session: session))
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.layer?.cornerRadius = 14
+        hostingView.layer?.cornerCurve = .continuous
+        hostingView.layer?.masksToBounds = true
+        panel.contentView = hostingView
         toolbarWindow = panel
         panel.orderFrontRegardless()
     }
@@ -261,6 +267,13 @@ private final class AllInOneCanvasHostingView<Content: View>: NSHostingView<Cont
             window?.makeFirstResponder(canvas)
         }
         super.mouseDown(with: event)
+    }
+}
+
+private final class AllInOneAnnotationToolbarHostingView<Content: View>: NSHostingView<Content> {
+    override var isOpaque: Bool {
+        get { false }
+        set { }
     }
 }
 
@@ -584,12 +597,12 @@ private struct AllInOneAnnotationToolbarView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(toolbarBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
         .environment(\.colorScheme, .dark)
         .animation(.spring(response: 0.20, dampingFraction: 0.88), value: session.showsOverflow)
     }
@@ -619,13 +632,19 @@ private struct AllInOneAnnotationToolbarView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(toolbarBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
         .environment(\.colorScheme, .dark)
+    }
+
+    private var toolbarBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(.regularMaterial)
+            .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
     }
 
     private var primaryTools: [AnnotationTool] {

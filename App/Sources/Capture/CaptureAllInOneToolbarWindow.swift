@@ -553,14 +553,12 @@ private struct CaptureAllInOneToolbarView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(toolbarBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.30), radius: 18, y: 8)
-        .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
         .environment(\.colorScheme, .dark)
         .onHover { hovering in
             if hovering {
@@ -572,13 +570,13 @@ private struct CaptureAllInOneToolbarView: View {
     private var sideRail: some View {
         VStack(spacing: 7) {
             if !state.isCompact || state.showsOverflow {
-                railActionButton(.area, icon: "viewfinder", title: "Area", action: onArea)
-                railActionButton(.fullscreen, icon: "display", title: "Fullscreen", action: onFullscreen)
-                railActionButton(.window, icon: "macwindow", title: "Window", action: onWindow)
-                railActionButton(.scrolling, icon: "arrow.down.to.line.compact", title: "Scrolling", action: onScrolling)
-                railActionButton(.timer, icon: "timer", title: "Timer", action: onTimer)
-                railActionButton(.ocr, textIcon: "Aa", title: "OCR", action: onOCR)
-                railActionButton(.recording, icon: "video", title: "Recording", action: onRecording)
+                railActionButton(.area, icon: "viewfinder", title: "Area", label: String(localized: "Area"), action: onArea)
+                railActionButton(.fullscreen, icon: "display", title: "Fullscreen", label: String(localized: "Full"), action: onFullscreen)
+                railActionButton(.window, icon: "macwindow", title: "Window", label: String(localized: "Window"), action: onWindow)
+                railActionButton(.scrolling, icon: "arrow.down.to.line.compact", title: "Scrolling", label: String(localized: "Scroll"), action: onScrolling)
+                railActionButton(.timer, icon: "timer", title: "Timer", label: String(localized: "Timer"), action: onTimer)
+                railActionButton(.ocr, textIcon: "Aa", title: "OCR", label: String(localized: "OCR"), action: onOCR)
+                railActionButton(.recording, icon: "video", title: "Recording", label: String(localized: "Record"), action: onRecording)
 
                 railDivider
             }
@@ -589,8 +587,8 @@ private struct CaptureAllInOneToolbarView: View {
                 railPresetMenu
             }
 
-            railIconButton("doc.on.doc", kind: .copy, help: "Copy selected area", action: onCopy)
-            railIconButton("xmark", kind: .cancel, help: "Cancel", action: onCancel)
+            railIconButton("doc.on.doc", kind: .copy, help: "Copy selected area", label: String(localized: "Copy"), action: onCopy)
+            railIconButton("xmark", kind: .cancel, help: "Cancel", label: String(localized: "Close"), action: onCancel)
 
             if state.isCompact {
                 railDivider
@@ -598,6 +596,7 @@ private struct CaptureAllInOneToolbarView: View {
                     state.showsOverflow ? "chevron.up" : "ellipsis",
                     kind: .overflow,
                     help: state.showsOverflow ? "Hide actions" : "More actions",
+                    label: state.showsOverflow ? String(localized: "Less") : String(localized: "More"),
                     action: toggleOverflow
                 )
             }
@@ -605,13 +604,12 @@ private struct CaptureAllInOneToolbarView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(toolbarBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.30), radius: 18, y: 8)
         .environment(\.colorScheme, .dark)
         .animation(.spring(response: 0.20, dampingFraction: 0.88), value: state.showsOverflow)
         .onHover { hovering in
@@ -619,6 +617,13 @@ private struct CaptureAllInOneToolbarView: View {
                 NSCursor.arrow.set()
             }
         }
+    }
+
+    private var toolbarBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(.regularMaterial)
+            .shadow(color: .black.opacity(0.30), radius: 18, y: 8)
+            .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
     }
 
     private var divider: some View {
@@ -842,16 +847,28 @@ private struct CaptureAllInOneToolbarView: View {
         icon: String? = nil,
         textIcon: String? = nil,
         title: LocalizedStringKey,
+        label: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Group {
-                if let textIcon {
-                    Text(verbatim: textIcon)
-                        .font(.system(size: 15, weight: .bold))
-                } else if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
+            VStack(spacing: hoveredMode == kind ? 1 : 0) {
+                Group {
+                    if let textIcon {
+                        Text(verbatim: textIcon)
+                            .font(.system(size: 15, weight: .bold))
+                    } else if let icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                }
+                .frame(height: hoveredMode == kind ? 17 : 38)
+
+                if hoveredMode == kind {
+                    Text(label)
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                        .transition(.opacity)
                 }
             }
             .foregroundStyle(.white)
@@ -894,18 +911,30 @@ private struct CaptureAllInOneToolbarView: View {
         _ systemName: String,
         kind: UtilityAction,
         help: LocalizedStringKey,
+        label: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 60, height: 38)
-                .background(utilityBackground(kind), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-                )
+            VStack(spacing: hoveredUtility == kind ? 1 : 0) {
+                Image(systemName: systemName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(height: hoveredUtility == kind ? 17 : 38)
+
+                if hoveredUtility == kind {
+                    Text(label)
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                        .transition(.opacity)
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(width: 60, height: 38)
+            .background(utilityBackground(kind), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+            )
         }
         .buttonStyle(.plain)
         .onHover { hoveredUtility = $0 ? kind : nil }
