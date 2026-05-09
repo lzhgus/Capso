@@ -3,8 +3,6 @@ import CoreGraphics
 import CoreImage
 
 public final class PixelateObject: AnnotationObject, @unchecked Sendable {
-    private static let ciContext = CIContext()
-
     public let id = ObjectID()
     public var style: StrokeStyle
     public var rect: CGRect
@@ -87,7 +85,7 @@ public final class PixelateObject: AnnotationObject, @unchecked Sendable {
             filter?.setValue(ciImage.clampedToExtent(), forKey: kCIInputImageKey)
             filter?.setValue(max(4, blockSize * 0.9), forKey: kCIInputRadiusKey)
             if let outputImage = filter?.outputImage?.cropped(to: ciImage.extent) {
-                redacted = Self.ciContext.createCGImage(outputImage, from: ciImage.extent)
+                redacted = CIContext().createCGImage(outputImage, from: ciImage.extent)
             } else {
                 redacted = nil
             }
