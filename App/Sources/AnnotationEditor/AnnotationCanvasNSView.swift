@@ -86,6 +86,7 @@ final class AnnotationCanvasNSView: NSView {
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     // Ensure we become first responder when added to a window so that
     // keyDown events (e.g. Delete to remove selected annotation) are delivered.
@@ -395,6 +396,7 @@ final class AnnotationCanvasNSView: NSView {
 
         // Make sure we own keyboard focus so subsequent keyDown events
         // (Delete, etc.) actually reach us. Safe to call even if we already are.
+        window?.makeKey()
         window?.makeFirstResponder(self)
 
         guard let doc = document else { return }

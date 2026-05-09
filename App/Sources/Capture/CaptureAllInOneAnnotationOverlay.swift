@@ -15,25 +15,47 @@ final class CaptureAllInOneAnnotationOverlay {
         self.screen = screen
     }
 
-    func show(sourceImage: CGImage, selectionRect: CGRect) {
+    func show(sourceImage: CGImage, selectionRect: CGRect, avoidingFrame: CGRect?) {
         let session = AllInOneAnnotationSession(sourceImage: sourceImage)
+        session.onRequestCanvasFocus = { [weak self] in
+            self?.focusCanvas()
+        }
+        session.onRequestToolbarLayout = { [weak self] in
+            self?.repositionToolbar(selectionRect: selectionRect, avoidingFrame: avoidingFrame, animated: true)
+        }
+        session.availableWidth = selectionRect.width
         self.session = session
 
         showCanvas(session: session, selectionRect: selectionRect)
-        showToolbar(session: session, selectionRect: selectionRect)
+        showToolbar(session: session, selectionRect: selectionRect, avoidingFrame: avoidingFrame)
     }
 
-    func update(sourceImage: CGImage, selectionRect: CGRect) {
+    func update(sourceImage: CGImage, selectionRect: CGRect, avoidingFrame: CGRect?) {
         if let session, session.document.objects.isEmpty {
             session.replaceSourceImage(sourceImage)
         } else if session == nil {
-            session = AllInOneAnnotationSession(sourceImage: sourceImage)
+            let newSession = AllInOneAnnotationSession(sourceImage: sourceImage)
+            newSession.onRequestCanvasFocus = { [weak self] in
+                self?.focusCanvas()
+            }
+            newSession.onRequestToolbarLayout = { [weak self] in
+                self?.repositionToolbar(selectionRect: selectionRect, avoidingFrame: avoidingFrame, animated: true)
+            }
+            session = newSession
         }
 
         guard let session else { return }
+        let wasCompact = session.usesCompactToolbar
+        session.availableWidth = selectionRect.width
+        if wasCompact != session.usesCompactToolbar {
+            session.showsOverflow = false
+        }
+        session.onRequestToolbarLayout = { [weak self] in
+            self?.repositionToolbar(selectionRect: selectionRect, avoidingFrame: avoidingFrame, animated: true)
+        }
         canvasWindow?.setFrame(canvasFrame(for: selectionRect), display: true)
-        toolbarWindow?.setFrame(toolbarFrame(for: selectionRect), display: true)
-        canvasWindow?.contentView = NSHostingView(rootView: AllInOneAnnotationCanvasView(
+        toolbarWindow?.setFrame(toolbarFrame(for: selectionRect, avoidingFrame: avoidingFrame), display: true)
+        canvasWindow?.contentView = AllInOneCanvasHostingView(rootView: AllInOneAnnotationCanvasView(
             session: session,
             displayScale: displayScale(for: sourceImage, selectionRect: selectionRect)
         ))
@@ -70,7 +92,7 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.acceptsMouseMovedEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
-        panel.contentView = NSHostingView(rootView: AllInOneAnnotationCanvasView(
+        panel.contentView = AllInOneCanvasHostingView(rootView: AllInOneAnnotationCanvasView(
             session: session,
             displayScale: displayScale(for: session.sourceImage, selectionRect: selectionRect)
         ))
@@ -79,9 +101,9 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.makeKey()
     }
 
-    private func showToolbar(session: AllInOneAnnotationSession, selectionRect: CGRect) {
+    private func showToolbar(session: AllInOneAnnotationSession, selectionRect: CGRect, avoidingFrame: CGRect?) {
         let panel = AllInOneAnnotationPanel(
-            contentRect: toolbarFrame(for: selectionRect),
+            contentRect: toolbarFrame(for: selectionRect, avoidingFrame: avoidingFrame),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -99,6 +121,23 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.orderFrontRegardless()
     }
 
+    func repositionToolbar(selectionRect: CGRect, avoidingFrame: CGRect?, animated: Bool) {
+        let frame = toolbarFrame(for: selectionRect, avoidingFrame: avoidingFrame)
+        if animated {
+            toolbarWindow?.setFrame(frame, display: true, animate: true)
+        } else {
+            toolbarWindow?.setFrame(frame, display: true)
+        }
+    }
+
+    private func focusCanvas() {
+        guard let canvasWindow else { return }
+        canvasWindow.makeKey()
+        if let canvas = canvasWindow.contentView?.firstSubview(of: AnnotationCanvasNSView.self) {
+            canvasWindow.makeFirstResponder(canvas)
+        }
+    }
+
     private func canvasFrame(for selectionRect: CGRect) -> CGRect {
         let inset: CGFloat = 2
         let rect = selectionRect.insetBy(dx: inset, dy: inset)
@@ -110,34 +149,94 @@ final class CaptureAllInOneAnnotationOverlay {
         )
     }
 
-    private func toolbarFrame(for selectionRect: CGRect) -> CGRect {
+    private func toolbarFrame(for selectionRect: CGRect, avoidingFrame: CGRect?) -> CGRect {
         let margin: CGFloat = 12
         let gap: CGFloat = 10
-        let width = min(max(760, selectionRect.width), screen.visibleFrame.width - margin * 2)
-        let height: CGFloat = 58
         let globalRect = CGRect(
             x: screen.frame.minX + selectionRect.minX,
             y: screen.frame.minY + selectionRect.minY,
             width: selectionRect.width,
             height: selectionRect.height
         )
+        let session = session
+        let usesCompact = session?.usesCompactToolbar ?? (globalRect.width < 760)
+        let usesMini = session?.usesMiniToolbar ?? (globalRect.width < 420)
+        let showsOverflow = session?.showsOverflow ?? false
+        let width: CGFloat
+        let height: CGFloat
+        let maxToolbarWidth = screen.visibleFrame.width - margin * 2
+        if usesCompact {
+            if usesMini && !showsOverflow {
+                width = min(268, maxToolbarWidth)
+            } else if showsOverflow {
+                width = min(760, maxToolbarWidth)
+            } else {
+                width = min(max(420, globalRect.width), min(760, maxToolbarWidth))
+            }
+            height = showsOverflow ? 102 : 54
+        } else {
+            width = min(max(760, globalRect.width), min(960, maxToolbarWidth))
+            height = 58
+        }
 
-        let minX = screen.visibleFrame.minX + margin
-        let maxX = screen.visibleFrame.maxX - width - margin
-        let x = min(max(globalRect.midX - width / 2, minX), maxX)
+        func clampedX(width: CGFloat) -> CGFloat {
+            let minX = screen.visibleFrame.minX + margin
+            let maxX = screen.visibleFrame.maxX - width - margin
+            return min(max(globalRect.midX - width / 2, minX), maxX)
+        }
 
         let belowY = globalRect.minY - height - gap
         let aboveY = globalRect.maxY + gap
-        let y: CGFloat
+
+        var candidates: [CGRect] = []
         if belowY >= screen.visibleFrame.minY + margin {
-            y = belowY
-        } else if aboveY + height <= screen.visibleFrame.maxY - margin {
-            y = aboveY
-        } else {
-            y = max(screen.visibleFrame.minY + margin, min(globalRect.minY + margin, screen.visibleFrame.maxY - height - margin))
+            candidates.append(CGRect(x: clampedX(width: width), y: belowY, width: width, height: height))
+        }
+        if aboveY + height <= screen.visibleFrame.maxY - margin {
+            candidates.append(CGRect(x: clampedX(width: width), y: aboveY, width: width, height: height))
+        }
+        candidates.append(CGRect(
+            x: clampedX(width: width),
+            y: max(screen.visibleFrame.minY + margin, min(globalRect.minY + margin, screen.visibleFrame.maxY - height - margin)),
+            width: width,
+            height: height
+        ))
+
+        guard let avoidingFrame else {
+            return candidates[0]
         }
 
-        return CGRect(x: x, y: y, width: width, height: height)
+        let inflatedAvoidance = avoidingFrame.insetBy(dx: -8, dy: -8)
+        for candidate in candidates {
+            let adjusted = toolbarFrame(candidate, avoiding: inflatedAvoidance, margin: margin, gap: gap)
+            if !adjusted.intersects(inflatedAvoidance) {
+                return adjusted
+            }
+        }
+
+        return toolbarFrame(candidates[0], avoiding: inflatedAvoidance, margin: margin, gap: gap)
+    }
+
+    private func toolbarFrame(_ frame: CGRect, avoiding avoidance: CGRect, margin: CGFloat, gap: CGFloat) -> CGRect {
+        guard frame.maxY > avoidance.minY && frame.minY < avoidance.maxY else {
+            return frame
+        }
+
+        let visible = screen.visibleFrame
+        let leftWidth = avoidance.minX - gap - (visible.minX + margin)
+        let rightWidth = (visible.maxX - margin) - (avoidance.maxX + gap)
+
+        if frame.midX <= avoidance.midX, leftWidth >= frame.width {
+            return CGRect(x: avoidance.minX - gap - frame.width, y: frame.minY, width: frame.width, height: frame.height)
+        }
+        if rightWidth >= frame.width {
+            return CGRect(x: avoidance.maxX + gap, y: frame.minY, width: frame.width, height: frame.height)
+        }
+        if leftWidth >= frame.width {
+            return CGRect(x: avoidance.minX - gap - frame.width, y: frame.minY, width: frame.width, height: frame.height)
+        }
+
+        return frame
     }
 
     private func displayScale(for image: CGImage, selectionRect: CGRect) -> CGFloat {
@@ -153,6 +252,32 @@ private final class AllInOneAnnotationPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+private final class AllInOneCanvasHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeKey()
+        if let canvas = firstSubview(of: AnnotationCanvasNSView.self) {
+            window?.makeFirstResponder(canvas)
+        }
+        super.mouseDown(with: event)
+    }
+}
+
+private extension NSView {
+    func firstSubview<T: NSView>(of type: T.Type) -> T? {
+        if let view = self as? T {
+            return view
+        }
+        for subview in subviews {
+            if let match = subview.firstSubview(of: type) {
+                return match
+            }
+        }
+        return nil
+    }
+}
+
 @MainActor
 final class AllInOneAnnotationSession: ObservableObject {
     @Published var sourceImage: CGImage
@@ -166,8 +291,12 @@ final class AllInOneAnnotationSession: ObservableObject {
     @Published var refreshTrigger = 0
     @Published var commitEditingTrigger = 0
     @Published var textRegions: [CGRect] = []
+    @Published var availableWidth: CGFloat = 0
+    @Published var showsOverflow = false
 
     let document: AnnotationDocument
+    var onRequestCanvasFocus: (() -> Void)?
+    var onRequestToolbarLayout: (() -> Void)?
 
     private var savedLineWidth: Double {
         get { UserDefaults.standard.object(forKey: "annotationShapeWidth") as? Double ?? 3 }
@@ -210,6 +339,14 @@ final class AllInOneAnnotationSession: ObservableObject {
         (currentTool == .text || isEditingText) ? lineWidth : Self.storedTextFontSize()
     }
 
+    var usesCompactToolbar: Bool {
+        availableWidth < 760
+    }
+
+    var usesMiniToolbar: Bool {
+        availableWidth < 420
+    }
+
     func replaceSourceImage(_ image: CGImage) {
         sourceImage = image
         document.replaceImage(size: CGSize(width: image.width, height: image.height))
@@ -222,6 +359,13 @@ final class AllInOneAnnotationSession: ObservableObject {
         currentTool = newTool
         lineWidth = Self.storedWidth(for: newTool)
         UserDefaults.standard.set(newTool.rawValue, forKey: "annotationLastTool")
+        onRequestCanvasFocus?()
+    }
+
+    func toggleOverflow() {
+        guard usesCompactToolbar else { return }
+        showsOverflow.toggle()
+        onRequestToolbarLayout?()
     }
 
     func updateSelectedStyle() {
@@ -367,131 +511,74 @@ private struct AllInOneAnnotationToolbarView: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 4) {
-                toolButton(.select)
-                toolButton(.arrow)
-                toolButton(.line)
-                toolButton(.rectangle)
-                toolButton(.ellipse)
-                toolButton(.text)
-                toolButton(.freehand)
-                toolButton(.pixelate)
-                toolButton(.counter)
-                toolButton(.highlighter)
-            }
+        if session.usesMiniToolbar && !session.showsOverflow {
+            miniToolbar
+        } else {
+            adaptiveToolbar
+        }
+    }
 
-            divider
+    private var adaptiveToolbar: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                toolRow(primaryTools)
 
-            AnnotationColorControls(
-                currentColor: Binding(
-                    get: { session.currentColor },
-                    set: {
-                        session.currentColor = $0
-                        UserDefaults.standard.set($0.rawValue, forKey: "annotationLastColor")
-                        session.updateSelectedStyle()
-                    }
-                ),
-                swatchSize: 17,
-                selectedRingColor: .white
-            )
+                divider
 
-            divider
-
-            HStack(spacing: 7) {
-                if !(session.currentTool == .pixelate && session.redactionMode == .solid) {
-                    Slider(value: Binding(
-                        get: { session.lineWidth },
-                        set: {
-                            session.lineWidth = $0
-                            session.persistWidth($0, for: session.currentTool)
-                            session.updateSelectedStyle()
-                        }
-                    ), in: sliderRange, step: sliderStep)
-                    .frame(width: 92)
-                    .help(sliderHelp)
-                }
-
-                if session.currentTool == .pixelate {
-                    Picker("", selection: Binding(
-                        get: { session.redactionMode },
-                        set: {
-                            session.redactionMode = $0
-                            UserDefaults.standard.set($0.rawValue, forKey: "annotationRedactionMode")
-                            session.updateSelectedStyle()
-                        }
-                    )) {
-                        ForEach(RedactionMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 168)
-                    .help("Redaction Mode")
-                }
-
-                if session.currentTool == .arrow || session.currentTool == .line {
-                    Picker("", selection: Binding(
-                        get: { session.strokePattern },
-                        set: {
-                            session.strokePattern = $0
-                            UserDefaults.standard.set($0.rawValue, forKey: "annotationStrokePattern")
-                            session.updateSelectedStyle()
-                        }
-                    )) {
-                        ForEach(StrokePattern.allCases, id: \.self) { pattern in
-                            StrokePatternGlyph(pattern: pattern)
-                                .tag(pattern)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 104)
-                    .help("Stroke Pattern")
-                }
-
-                if session.currentTool != .counter
-                    && session.currentTool != .arrow
-                    && session.currentTool != .line
-                    && session.currentTool != .highlighter
-                    && session.currentTool != .pixelate
-                    && !isFontSizeMode {
-                    iconButton(
-                        systemName: session.filled ? "square.fill" : "square",
-                        help: "Fill Shape",
-                        isActive: session.filled,
-                        action: {
-                            session.filled.toggle()
-                            UserDefaults.standard.set(session.filled, forKey: "annotationFilled")
-                            session.updateSelectedStyle()
-                        }
+                if !session.usesCompactToolbar {
+                    AnnotationColorControls(
+                        currentColor: Binding(
+                            get: { session.currentColor },
+                            set: {
+                                session.currentColor = $0
+                                UserDefaults.standard.set($0.rawValue, forKey: "annotationLastColor")
+                                session.updateSelectedStyle()
+                            }
+                        ),
+                        swatchSize: 17,
+                        selectedRingColor: .white
                     )
+
+                    divider
+                    primaryControls
+                } else {
+                    compactStatus
+                }
+
+                if session.usesCompactToolbar {
+                    iconButton(
+                        systemName: session.showsOverflow ? "chevron.up" : "ellipsis",
+                        help: session.showsOverflow ? "Hide tools" : "More tools",
+                        action: { session.toggleOverflow() }
+                    )
+                } else {
+                    divider
+                    undoRedoControls
                 }
             }
 
-            divider
-
-            HStack(spacing: 4) {
-                iconButton(
-                    systemName: "arrow.uturn.backward",
-                    help: "Undo",
-                    isEnabled: session.document.canUndo,
-                    action: {
-                        session.document.undo()
-                        session.markChanged()
-                    }
-                )
-
-                iconButton(
-                    systemName: "arrow.uturn.forward",
-                    help: "Redo",
-                    isEnabled: session.document.canRedo,
-                    action: {
-                        session.document.redo()
-                        session.markChanged()
-                    }
-                )
+            if session.usesCompactToolbar && session.showsOverflow {
+                HStack(spacing: 10) {
+                    toolRow(overflowTools)
+                    divider
+                    AnnotationColorControls(
+                        currentColor: Binding(
+                            get: { session.currentColor },
+                            set: {
+                                session.currentColor = $0
+                                UserDefaults.standard.set($0.rawValue, forKey: "annotationLastColor")
+                                session.updateSelectedStyle()
+                            }
+                        ),
+                        swatchSize: 17,
+                        selectedRingColor: .white
+                    )
+                    divider
+                    primaryControls
+                    divider
+                    undoRedoControls
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 14)
@@ -504,6 +591,163 @@ private struct AllInOneAnnotationToolbarView: View {
         )
         .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
         .environment(\.colorScheme, .dark)
+        .animation(.spring(response: 0.20, dampingFraction: 0.88), value: session.showsOverflow)
+    }
+
+    private var miniToolbar: some View {
+        HStack(spacing: 9) {
+            currentToolGlyph
+                .frame(width: 30, height: 28)
+                .background(Color.accentColor.opacity(0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            Circle()
+                .fill(Color(cgColor: session.currentColor.cgColor))
+                .frame(width: 18, height: 18)
+                .overlay(Circle().stroke(Color.white.opacity(0.62), lineWidth: 1.5))
+
+            Text(compactValueLabel)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.86))
+                .frame(minWidth: 34)
+
+            iconButton(
+                systemName: "ellipsis",
+                help: "More tools",
+                action: { session.toggleOverflow() }
+            )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
+        .environment(\.colorScheme, .dark)
+    }
+
+    private var primaryTools: [AnnotationTool] {
+        session.usesCompactToolbar
+            ? [.select, .arrow, .line, .rectangle, .text, .freehand]
+            : AnnotationTool.allCases
+    }
+
+    private var overflowTools: [AnnotationTool] {
+        [.ellipse, .pixelate, .counter, .highlighter]
+    }
+
+    private var compactStatus: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color(cgColor: session.currentColor.cgColor))
+                .frame(width: 18, height: 18)
+                .overlay(Circle().stroke(Color.white.opacity(0.62), lineWidth: 1.5))
+
+            Text(compactValueLabel)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.86))
+                .frame(minWidth: 36)
+        }
+    }
+
+    private var primaryControls: some View {
+        HStack(spacing: 7) {
+            if !(session.currentTool == .pixelate && session.redactionMode == .solid) {
+                Slider(value: Binding(
+                    get: { session.lineWidth },
+                    set: {
+                        session.lineWidth = $0
+                        session.persistWidth($0, for: session.currentTool)
+                        session.updateSelectedStyle()
+                    }
+                ), in: sliderRange, step: sliderStep)
+                .frame(width: 92)
+                .help(sliderHelp)
+            }
+
+            if session.currentTool == .pixelate {
+                redactionModeControl
+            }
+
+            if session.currentTool == .arrow || session.currentTool == .line {
+                strokePatternControl
+            }
+
+            if session.currentTool != .counter
+                && session.currentTool != .arrow
+                && session.currentTool != .line
+                && session.currentTool != .highlighter
+                && session.currentTool != .pixelate
+                && !isFontSizeMode {
+                iconButton(
+                    systemName: session.filled ? "square.fill" : "square",
+                    help: "Fill Shape",
+                    isActive: session.filled,
+                    action: {
+                        session.filled.toggle()
+                        UserDefaults.standard.set(session.filled, forKey: "annotationFilled")
+                        session.updateSelectedStyle()
+                    }
+                )
+            }
+        }
+    }
+
+    private var undoRedoControls: some View {
+        HStack(spacing: 4) {
+            iconButton(
+                systemName: "arrow.uturn.backward",
+                help: "Undo",
+                isEnabled: session.document.canUndo,
+                action: {
+                    session.document.undo()
+                    session.markChanged()
+                }
+            )
+
+            iconButton(
+                systemName: "arrow.uturn.forward",
+                help: "Redo",
+                isEnabled: session.document.canRedo,
+                action: {
+                    session.document.redo()
+                    session.markChanged()
+                }
+            )
+        }
+    }
+
+    private func toolRow(_ tools: [AnnotationTool]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(tools, id: \.self) { tool in
+                toolButton(tool)
+            }
+        }
+    }
+
+    private var currentToolGlyph: some View {
+        Group {
+            if session.currentTool == .text {
+                Text(verbatim: "Aa")
+                    .font(.system(size: 13, weight: .semibold))
+            } else {
+                Image(systemName: iconName(for: session.currentTool))
+                    .font(.system(size: 14, weight: .medium))
+            }
+        }
+        .foregroundStyle(.white)
+    }
+
+    private var compactValueLabel: String {
+        if session.currentTool == .pixelate {
+            return "\(Int(session.lineWidth))px"
+        }
+        if isFontSizeMode {
+            return "\(Int(session.lineWidth))pt"
+        }
+        return "\(Int(session.lineWidth))px"
     }
 
     private var divider: some View {
@@ -537,6 +781,65 @@ private struct AllInOneAnnotationToolbarView: View {
         case .highlighter: return "\(String(localized: "Highlighter Width")): \(Int(session.lineWidth))"
         default: return "\(String(localized: "Line Width")): \(Int(session.lineWidth))"
         }
+    }
+
+    private var redactionModeControl: some View {
+        HStack(spacing: 2) {
+            ForEach(RedactionMode.allCases, id: \.self) { mode in
+                Button {
+                    session.redactionMode = mode
+                    UserDefaults.standard.set(mode.rawValue, forKey: "annotationRedactionMode")
+                    session.updateSelectedStyle()
+                } label: {
+                    Text(mode.label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 26)
+                        .background(optionBackground(isActive: session.redactionMode == mode))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help(Text(mode.label))
+            }
+        }
+        .padding(2)
+        .background(optionGroupBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .help("Redaction Mode")
+    }
+
+    private var strokePatternControl: some View {
+        HStack(spacing: 2) {
+            ForEach(StrokePattern.allCases, id: \.self) { pattern in
+                Button {
+                    session.strokePattern = pattern
+                    UserDefaults.standard.set(pattern.rawValue, forKey: "annotationStrokePattern")
+                    session.updateSelectedStyle()
+                } label: {
+                    StrokePatternGlyph(pattern: pattern)
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 26)
+                        .background(optionBackground(isActive: session.strokePattern == pattern))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help(Text(pattern.rawValue.capitalized))
+            }
+        }
+        .padding(2)
+        .background(optionGroupBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .help("Stroke Pattern")
+    }
+
+    private var optionGroupBackground: Color {
+        Color.white.opacity(0.09)
+    }
+
+    private func optionBackground(isActive: Bool) -> Color {
+        isActive ? Color.accentColor.opacity(0.48) : Color.white.opacity(0.001)
     }
 
     @ViewBuilder

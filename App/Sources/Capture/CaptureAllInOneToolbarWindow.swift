@@ -151,6 +151,10 @@ final class CaptureAllInOneToolbarWindow {
 
         let hostingView = AllInOneToolbarHostingView(rootView: CaptureAllInOneToolbarView(
             state: toolbarState,
+            isSideRail: frozenImage != nil,
+            onChromeStateChanged: { [weak self] in
+                self?.layoutChrome(animated: true)
+            },
             onArea: { [weak self] in
                 guard let self else { return }
                 self.onArea?(self.screenLocalSelectionRect)
@@ -220,18 +224,21 @@ final class CaptureAllInOneToolbarWindow {
     }
 
     private func toolbarFrame(for selectionRect: CGRect) -> CGRect {
+        if frozenImage != nil {
+            return sideRailFrame(for: selectionRect)
+        }
+
         let margin: CGFloat = 12
         let gap: CGFloat = 12
         let toolbarWidth = min(max(980, selectionRect.width), screen.visibleFrame.width - margin * 2)
         let toolbarHeight: CGFloat = 78
-        let annotationHeight: CGFloat = frozenImage == nil ? 0 : 58 + gap
 
         let minX = screen.visibleFrame.minX + margin
         let maxX = screen.visibleFrame.maxX - toolbarWidth - margin
         let x = min(max(selectionRect.midX - toolbarWidth / 2, minX), maxX)
 
-        let belowY = selectionRect.minY - toolbarHeight - gap - annotationHeight
-        let aboveY = selectionRect.maxY + gap + annotationHeight
+        let belowY = selectionRect.minY - toolbarHeight - gap
+        let aboveY = selectionRect.maxY + gap
         let y: CGFloat
         if belowY >= screen.visibleFrame.minY + margin {
             y = belowY
@@ -244,6 +251,31 @@ final class CaptureAllInOneToolbarWindow {
         return CGRect(x: x, y: y, width: toolbarWidth, height: toolbarHeight)
     }
 
+    private func sideRailFrame(for selectionRect: CGRect) -> CGRect {
+        let margin: CGFloat = 12
+        let gap: CGFloat = 10
+        let toolbarWidth: CGFloat = 84
+        let toolbarHeight = min(toolbarState.preferredRailHeight, screen.visibleFrame.height - margin * 2)
+
+        let preferredRightX = selectionRect.maxX + gap
+        let preferredLeftX = selectionRect.minX - toolbarWidth - gap
+        let x: CGFloat
+        if preferredRightX + toolbarWidth <= screen.visibleFrame.maxX - margin {
+            x = preferredRightX
+        } else if preferredLeftX >= screen.visibleFrame.minX + margin {
+            x = preferredLeftX
+        } else {
+            x = screen.visibleFrame.maxX - toolbarWidth - margin
+        }
+
+        let y = min(
+            max(selectionRect.midY - toolbarHeight / 2, screen.visibleFrame.minY + margin),
+            screen.visibleFrame.maxY - toolbarHeight - margin
+        )
+
+        return CGRect(x: x, y: y, width: toolbarWidth, height: toolbarHeight)
+    }
+
     private func updateSelection(_ selectionRect: CGRect) {
         screenLocalSelectionRect = CaptureSelectionGeometry.move(
             selectionRect.standardized,
@@ -251,13 +283,19 @@ final class CaptureAllInOneToolbarWindow {
             in: screenLocalBounds
         )
         updateToolbarState()
-        toolbarWindow?.setFrame(toolbarFrame(for: globalSelectionRect), display: true)
+        layoutChrome(animated: true)
         updateAnnotationOverlayIfPossible()
     }
 
     private func updateToolbarState() {
         toolbarState.width = max(1, Int(screenLocalSelectionRect.width.rounded()))
         toolbarState.height = max(1, Int(screenLocalSelectionRect.height.rounded()))
+        let shouldCompact = frozenImage != nil
+            && screenLocalSelectionRect.height < 520
+        if toolbarState.isCompact != shouldCompact {
+            toolbarState.isCompact = shouldCompact
+            toolbarState.showsOverflow = false
+        }
     }
 
     private func applyPreset(_ preset: CapturePreset) {
@@ -269,16 +307,34 @@ final class CaptureAllInOneToolbarWindow {
         screenLocalSelectionRect = fittedRect
         selectionOverlayView?.setSelectionRect(fittedRect)
         updateToolbarState()
-        toolbarWindow?.setFrame(toolbarFrame(for: globalSelectionRect), display: true)
+        layoutChrome(animated: true)
         updateAnnotationOverlayIfPossible()
         onPresetChanged?(preset)
+    }
+
+    private func layoutChrome(animated: Bool) {
+        let frame = toolbarFrame(for: globalSelectionRect)
+        if animated {
+            toolbarWindow?.setFrame(frame, display: true, animate: true)
+        } else {
+            toolbarWindow?.setFrame(frame, display: true)
+        }
+        annotationOverlay?.repositionToolbar(
+            selectionRect: screenLocalSelectionRect,
+            avoidingFrame: toolbarWindow?.frame,
+            animated: animated
+        )
     }
 
     private func showAnnotationOverlayIfPossible() {
         guard let sourceImage = croppedFrozenImage(for: screenLocalSelectionRect) else { return }
         let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
         annotationOverlay = overlay
-        overlay.show(sourceImage: sourceImage, selectionRect: screenLocalSelectionRect)
+        overlay.show(
+            sourceImage: sourceImage,
+            selectionRect: screenLocalSelectionRect,
+            avoidingFrame: toolbarWindow?.frame
+        )
     }
 
     private func updateAnnotationOverlayIfPossible() {
@@ -286,9 +342,17 @@ final class CaptureAllInOneToolbarWindow {
         if annotationOverlay == nil {
             let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
             annotationOverlay = overlay
-            overlay.show(sourceImage: sourceImage, selectionRect: screenLocalSelectionRect)
+            overlay.show(
+                sourceImage: sourceImage,
+                selectionRect: screenLocalSelectionRect,
+                avoidingFrame: toolbarWindow?.frame
+            )
         } else {
-            annotationOverlay?.update(sourceImage: sourceImage, selectionRect: screenLocalSelectionRect)
+            annotationOverlay?.update(
+                sourceImage: sourceImage,
+                selectionRect: screenLocalSelectionRect,
+                avoidingFrame: toolbarWindow?.frame
+            )
         }
     }
 
@@ -392,6 +456,35 @@ private final class CaptureAllInOneToolbarState {
     var height: Int
     let presets: [CapturePreset]
     var activePreset: CapturePreset
+    var isCompact = false
+    var showsOverflow = false
+
+    var preferredRailHeight: CGFloat {
+        let gap: CGFloat = 7
+        let verticalPadding: CGFloat = 20
+        let rowHeight: CGFloat = 38
+        let presetHeight: CGFloat = 42
+        let dimensionHeight: CGFloat = 54
+        let dividerHeight: CGFloat = 5
+
+        let itemHeights: [CGFloat]
+        if isCompact && !showsOverflow {
+            itemHeights = [dimensionHeight, rowHeight, rowHeight, dividerHeight, rowHeight]
+        } else {
+            itemHeights = [
+                rowHeight, rowHeight, rowHeight, rowHeight, rowHeight, rowHeight, rowHeight,
+                dividerHeight,
+                dimensionHeight,
+                presetHeight,
+                rowHeight,
+                rowHeight
+            ]
+        }
+
+        return verticalPadding
+            + itemHeights.reduce(0, +)
+            + CGFloat(max(0, itemHeights.count - 1)) * gap
+    }
 
     init(selectionRect: CGRect, presets: [CapturePreset], activePreset: CapturePreset) {
         self.width = max(1, Int(selectionRect.width.rounded()))
@@ -407,10 +500,12 @@ private struct CaptureAllInOneToolbarView: View {
     }
 
     private enum UtilityAction: Hashable {
-        case annotate, copy, cancel
+        case annotate, copy, cancel, overflow
     }
 
     let state: CaptureAllInOneToolbarState
+    let isSideRail: Bool
+    let onChromeStateChanged: () -> Void
     let onArea: () -> Void
     let onFullscreen: () -> Void
     let onWindow: () -> Void
@@ -427,6 +522,14 @@ private struct CaptureAllInOneToolbarView: View {
     @State private var hoveredUtility: UtilityAction?
 
     var body: some View {
+        if isSideRail {
+            sideRail
+        } else {
+            horizontalBar
+        }
+    }
+
+    private var horizontalBar: some View {
         HStack(spacing: 12) {
             HStack(spacing: 3) {
                 modeButton(.area, icon: "viewfinder", title: "Area", action: onArea)
@@ -466,10 +569,69 @@ private struct CaptureAllInOneToolbarView: View {
         }
     }
 
+    private var sideRail: some View {
+        VStack(spacing: 7) {
+            if !state.isCompact || state.showsOverflow {
+                railActionButton(.area, icon: "viewfinder", title: "Area", action: onArea)
+                railActionButton(.fullscreen, icon: "display", title: "Fullscreen", action: onFullscreen)
+                railActionButton(.window, icon: "macwindow", title: "Window", action: onWindow)
+                railActionButton(.scrolling, icon: "arrow.down.to.line.compact", title: "Scrolling", action: onScrolling)
+                railActionButton(.timer, icon: "timer", title: "Timer", action: onTimer)
+                railActionButton(.ocr, textIcon: "Aa", title: "OCR", action: onOCR)
+                railActionButton(.recording, icon: "video", title: "Recording", action: onRecording)
+
+                railDivider
+            }
+
+            railDimensionPill
+
+            if !state.isCompact || state.showsOverflow {
+                railPresetMenu
+            }
+
+            railIconButton("doc.on.doc", kind: .copy, help: "Copy selected area", action: onCopy)
+            railIconButton("xmark", kind: .cancel, help: "Cancel", action: onCancel)
+
+            if state.isCompact {
+                railDivider
+                railIconButton(
+                    state.showsOverflow ? "chevron.up" : "ellipsis",
+                    kind: .overflow,
+                    help: state.showsOverflow ? "Hide actions" : "More actions",
+                    action: toggleOverflow
+                )
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.30), radius: 18, y: 8)
+        .environment(\.colorScheme, .dark)
+        .animation(.spring(response: 0.20, dampingFraction: 0.88), value: state.showsOverflow)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.arrow.set()
+            }
+        }
+    }
+
     private var divider: some View {
         Rectangle()
             .fill(Color.white.opacity(0.13))
             .frame(width: 1, height: 44)
+    }
+
+    private var railDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.13))
+            .frame(width: 42, height: 1)
+            .padding(.vertical, 2)
     }
 
     private var presetMenu: some View {
@@ -511,6 +673,44 @@ private struct CaptureAllInOneToolbarView: View {
         .help("Capture preset")
     }
 
+    private var railPresetMenu: some View {
+        Menu {
+            ForEach(state.presets) { preset in
+                Button {
+                    onPresetSelected(preset)
+                } label: {
+                    if preset == state.activePreset {
+                        Label(localizedPresetDisplayName(preset), systemImage: "checkmark")
+                    } else {
+                        Text(localizedPresetDisplayName(preset))
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(railPresetLabel)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+                    .frame(maxWidth: .infinity)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .heavy))
+                    .foregroundStyle(.white.opacity(0.72))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .frame(width: 60, height: 42)
+            .background(Color.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .help(localizedPresetDisplayName(state.activePreset))
+    }
+
     private var presetLabel: String {
         switch state.activePreset {
         case .freeform:
@@ -519,6 +719,20 @@ private struct CaptureAllInOneToolbarView: View {
             return "\(width):\(height)"
         case .fixedSize(let width, let height, let name):
             return name ?? "\(width)x\(height)"
+        }
+    }
+
+    private var railPresetLabel: String {
+        switch state.activePreset {
+        case .freeform:
+            return String(localized: "Free")
+        case .aspectRatio(let width, let height, _):
+            return "\(width):\(height)"
+        case .fixedSize(let width, let height, let name):
+            if let name, name.count <= 6 {
+                return localizedPresetName(name)
+            }
+            return "\(width)x\(height)"
         }
     }
 
@@ -567,6 +781,27 @@ private struct CaptureAllInOneToolbarView: View {
         .help("Selected area size")
     }
 
+    private var railDimensionPill: some View {
+        VStack(spacing: 1) {
+            Text("\(state.width)")
+            Text("x")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.58))
+            Text("\(state.height)")
+        }
+        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+        .minimumScaleFactor(0.68)
+        .frame(width: 60, height: 54)
+        .background(Color.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+        .help("Selected area size")
+    }
+
     private func modeButton(
         _ kind: ModeAction,
         icon: String? = nil,
@@ -602,6 +837,33 @@ private struct CaptureAllInOneToolbarView: View {
         .help(title)
     }
 
+    private func railActionButton(
+        _ kind: ModeAction,
+        icon: String? = nil,
+        textIcon: String? = nil,
+        title: LocalizedStringKey,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Group {
+                if let textIcon {
+                    Text(verbatim: textIcon)
+                        .font(.system(size: 15, weight: .bold))
+                } else if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(width: 60, height: 38)
+            .background(modeBackground(kind), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hoveredMode = $0 ? kind : nil }
+        .help(title)
+    }
+
     private func modeBackground(_ kind: ModeAction) -> Color {
         hoveredMode == kind ? Color.white.opacity(0.12) : Color.white.opacity(0.001)
     }
@@ -628,8 +890,36 @@ private struct CaptureAllInOneToolbarView: View {
         .help(help)
     }
 
+    private func railIconButton(
+        _ systemName: String,
+        kind: UtilityAction,
+        help: LocalizedStringKey,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 60, height: 38)
+                .background(utilityBackground(kind), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { hoveredUtility = $0 ? kind : nil }
+        .help(help)
+    }
+
     private func utilityBackground(_ kind: UtilityAction) -> Color {
         hoveredUtility == kind ? Color.white.opacity(0.18) : Color.white.opacity(0.11)
+    }
+
+    private func toggleOverflow() {
+        guard state.isCompact else { return }
+        state.showsOverflow.toggle()
+        onChromeStateChanged()
     }
 }
 
