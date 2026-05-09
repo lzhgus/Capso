@@ -32,15 +32,15 @@ struct AnnotationToolbar: View {
     var body: some View {
         HStack(spacing: 12) {
             toolGroup
-            Divider().frame(height: 24)
+            toolbarDivider
             colorGroup
-            Divider().frame(height: 24)
+            toolbarDivider
             strokeGroup
-            Divider().frame(height: 24)
+            toolbarDivider
             cropGroup
-            Divider().frame(height: 24)
+            toolbarDivider
             beautifyGroup
-            Divider().frame(height: 24)
+            toolbarDivider
             undoGroup
             Spacer()
             actionGroup
@@ -66,10 +66,12 @@ struct AnnotationToolbar: View {
     private func toolButton(_ tool: AnnotationTool, icon: String, label: LocalizedStringKey) -> some View {
         Button(action: { currentTool = tool }) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(toolbarIconForeground(isActive: currentTool == tool))
                 .frame(width: 30, height: 26)
-                .background(currentTool == tool ? Color.accentColor.opacity(0.2) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .background(toolbarButtonBackground(isActive: currentTool == tool))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(toolbarButtonStroke)
         }
         .buttonStyle(.plain)
         .help(label)
@@ -87,9 +89,11 @@ struct AnnotationToolbar: View {
         Button(action: { currentTool = .text }) {
             Text(verbatim: "Aa")
                 .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(toolbarIconForeground(isActive: currentTool == .text))
                 .frame(width: 30, height: 26)
-                .background(currentTool == .text ? Color.accentColor.opacity(0.2) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .background(toolbarButtonBackground(isActive: currentTool == .text))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(toolbarButtonStroke)
         }
         .buttonStyle(.plain)
         .help("Text")
@@ -101,9 +105,14 @@ struct AnnotationToolbar: View {
                 Button(action: { currentColor = color }) {
                     Circle()
                         .fill(Color(cgColor: color.cgColor))
-                        .frame(width: 18, height: 18)
-                        .overlay(Circle().stroke(currentColor == color ? Color.white : Color.clear, lineWidth: 2))
-                        .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 0.5))
+                        .frame(width: 19, height: 19)
+                        .overlay(Circle().stroke(currentColor == color ? Color.accentColor : Color.clear, lineWidth: 2))
+                        .overlay(Circle().stroke(Color.black.opacity(0.24), lineWidth: 0.5))
+                        .padding(2)
+                        .background(
+                            Circle()
+                                .fill(currentColor == color ? Color.accentColor.opacity(0.12) : Color.clear)
+                        )
                 }
                 .buttonStyle(.plain)
                 .help(Text(color.rawValue.capitalized))
@@ -152,10 +161,12 @@ struct AnnotationToolbar: View {
     private var cropGroup: some View {
         Button(action: onCrop) {
             Image(systemName: "crop")
-                .font(.system(size: 14))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(toolbarIconForeground(isActive: false))
                 .frame(width: 30, height: 26)
-                .background(Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .background(toolbarButtonBackground(isActive: false))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(toolbarButtonStroke)
         }
         .buttonStyle(.plain)
         .help("Crop")
@@ -165,10 +176,12 @@ struct AnnotationToolbar: View {
     private var beautifyGroup: some View {
         Button(action: { showBeautifyPanel.toggle() }) {
             Image(systemName: showBeautifyPanel ? "sparkles.rectangle.stack.fill" : "sparkles")
-                .font(.system(size: 14))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(toolbarIconForeground(isActive: showBeautifyPanel))
                 .frame(width: 30, height: 26)
-                .background(showBeautifyPanel ? Color.accentColor.opacity(0.2) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .background(toolbarButtonBackground(isActive: showBeautifyPanel))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(toolbarButtonStroke)
         }
         .buttonStyle(.plain)
         .help("Beautify")
@@ -195,37 +208,81 @@ struct AnnotationToolbar: View {
 
     private var actionGroup: some View {
         HStack(spacing: 6) {
-            Button(action: onCancel) {
-                Label("Close", systemImage: "xmark")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .keyboardShortcut(.escape, modifiers: [])
+            actionButton(icon: "xmark", help: "Close", isDestructive: true, action: onCancel)
+                .keyboardShortcut(.escape, modifiers: [])
 
-            Button(action: onCopy) {
-                Label("Copy", systemImage: "doc.on.doc")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .keyboardShortcut("c", modifiers: .command)
+            actionButton(icon: "doc.on.doc", help: "Copy", action: onCopy)
+                .keyboardShortcut("c", modifiers: .command)
 
-            Button(action: onPin) {
-                Label("Pin", systemImage: "pin")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .keyboardShortcut("p", modifiers: .command)
+            actionButton(icon: "pin", help: "Pin", action: onPin)
+                .keyboardShortcut("p", modifiers: .command)
 
-            Button(action: onSave) {
-                Label("Save", systemImage: "square.and.arrow.down")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .keyboardShortcut("s", modifiers: .command)
+            actionButton(icon: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
+                .keyboardShortcut("s", modifiers: .command)
         }
+    }
+
+    private func actionButton(
+        icon: String,
+        help: LocalizedStringKey,
+        isPrimary: Bool = false,
+        isDestructive: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(actionIconForeground(isPrimary: isPrimary, isDestructive: isDestructive))
+                .frame(width: 34, height: 26)
+                .background(actionButtonBackground(isPrimary: isPrimary, isDestructive: isDestructive))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(actionButtonStroke(isPrimary: isPrimary))
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private var toolbarDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.12))
+            .frame(width: 1, height: 24)
+    }
+
+    private func toolbarButtonBackground(isActive: Bool) -> Color {
+        isActive ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.04)
+    }
+
+    private func toolbarIconForeground(isActive: Bool) -> Color {
+        isActive ? Color.accentColor : Color.primary.opacity(0.82)
+    }
+
+    private var toolbarButtonStroke: some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+    }
+
+    private func actionButtonBackground(isPrimary: Bool, isDestructive: Bool) -> Color {
+        if isPrimary {
+            return Color.accentColor
+        }
+        if isDestructive {
+            return Color.primary.opacity(0.045)
+        }
+        return Color.primary.opacity(0.055)
+    }
+
+    private func actionIconForeground(isPrimary: Bool, isDestructive: Bool) -> Color {
+        if isPrimary {
+            return .white
+        }
+        if isDestructive {
+            return Color.primary.opacity(0.72)
+        }
+        return Color.primary.opacity(0.84)
+    }
+
+    private func actionButtonStroke(isPrimary: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .stroke(isPrimary ? Color.white.opacity(0.18) : Color.primary.opacity(0.08), lineWidth: 0.5)
     }
 }

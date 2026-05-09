@@ -40,16 +40,19 @@ struct QuickAccessView: View {
     }
 
     private var isRevealed: Bool { isHovering || isFocused }
+    private static let panelCornerRadius: CGFloat = 14
+    private static let thumbnailSize = CGSize(width: 268, height: 116)
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 9) {
             thumbnailFrame
 
-            // Caption at rest / Chrome on hover — crossfade in the same slot
+            // Caption at rest / chrome on hover share the same slot so the
+            // panel does not resize while the user's pointer moves across it.
             ZStack {
                 captionRow
                     .opacity(isRevealed ? 0 : 1)
@@ -60,13 +63,17 @@ struct QuickAccessView: View {
         }
         .padding(8)
         .background(hiddenEscapeButton)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: Self.panelCornerRadius, style: .continuous)
         )
-        .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: Self.panelCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Self.panelCornerRadius, style: .continuous)
+                .stroke(panelStroke, lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.24), radius: 18, y: 8)
+        .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
         .offset(y: isRevealed ? -2 : 0)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.26), value: isRevealed)
         .onHover { isHovering = $0 }
@@ -84,6 +91,10 @@ struct QuickAccessView: View {
         }
     }
 
+    private var panelStroke: Color {
+        isRevealed ? Color.primary.opacity(0.14) : Color.primary.opacity(0.08)
+    }
+
     // MARK: - Thumbnail
 
     private var thumbnailFrame: some View {
@@ -91,23 +102,25 @@ struct QuickAccessView: View {
             Image(nsImage: thumbnail)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: 268, maxHeight: 116)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .frame(width: Self.thumbnailSize.width, height: Self.thumbnailSize.height)
+                .background(Color.black.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.black.opacity(0.25), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
                 )
 
             if isRevealed {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 18, height: 18)
-                        .background(Circle().fill(.regularMaterial))
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.78))
+                        .frame(width: 24, height: 24)
+                        .background(.regularMaterial, in: Circle())
+                        .overlay(Circle().stroke(Color.primary.opacity(0.10), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
-                .padding(6)
+                .padding(7)
                 .transition(.opacity)
                 .help("Close")
             }
@@ -118,14 +131,18 @@ struct QuickAccessView: View {
 
     private var captionRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("Capture,")
-                .font(.system(size: 14, design: .serif).italic())
-                .foregroundStyle(.primary)
+            Label {
+                Text("Captured")
+                    .font(.system(size: 13, weight: .semibold))
+            } icon: {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.green)
+            }
             Spacer()
             Text(metaLine)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .tracking(0.6)
                 .textCase(.uppercase)
         }
         .padding(.horizontal, 6)
@@ -153,7 +170,7 @@ struct QuickAccessView: View {
     private var contextLine: some View {
         HStack(alignment: .center, spacing: 8) {
             Text(contextTitle)
-                .font(.system(size: 13, design: .serif).italic())
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
             Spacer()
             contextHintView
@@ -206,7 +223,7 @@ struct QuickAccessView: View {
     private var toolbar: some View {
         HStack(spacing: 2) {
             toolButton(.copy, icon: "doc.on.doc", action: onCopy)
-            toolButton(.save, icon: "square.and.arrow.down", action: onSave)
+            toolButton(.save, icon: "square.and.arrow.down", isPrimary: true, action: onSave)
             if shareCoordinator != nil {
                 toolDivider
                 uploadButton
@@ -221,6 +238,9 @@ struct QuickAccessView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Quick Access actions"))
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     @ViewBuilder
@@ -287,15 +307,21 @@ struct QuickAccessView: View {
     }
 
     @ViewBuilder
-    private func toolButton(_ kind: HoverAction, icon: String, action: @escaping () -> Void) -> some View {
+    private func toolButton(
+        _ kind: HoverAction,
+        icon: String,
+        isPrimary: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         let button = Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: 14, weight: .medium))
                 .symbolRenderingMode(.monochrome)
-                .frame(width: 28, height: 26)
+                .foregroundStyle(toolForeground(kind, isPrimary: isPrimary))
+                .frame(width: 29, height: 28)
                 .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(hoveredAction == kind ? Color.primary.opacity(0.10) : Color.clear)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(toolBackground(kind, isPrimary: isPrimary))
                 )
         }
         .buttonStyle(.plain)
@@ -313,6 +339,19 @@ struct QuickAccessView: View {
         } else {
             button
         }
+    }
+
+    private func toolForeground(_ kind: HoverAction, isPrimary: Bool) -> Color {
+        if isPrimary { return .white }
+        if kind == .linkCopied { return .green }
+        return Color.primary.opacity(hoveredAction == kind ? 0.96 : 0.78)
+    }
+
+    private func toolBackground(_ kind: HoverAction, isPrimary: Bool) -> Color {
+        if isPrimary {
+            return Color.accentColor.opacity(hoveredAction == kind ? 0.92 : 0.78)
+        }
+        return hoveredAction == kind ? Color.primary.opacity(0.12) : Color.clear
     }
 
     private func shortcut(for kind: HoverAction) -> (key: KeyEquivalent, modifiers: EventModifiers)? {
@@ -337,7 +376,7 @@ struct QuickAccessView: View {
 
     private var toolDivider: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.08))
+            .fill(Color.primary.opacity(0.10))
             .frame(width: 1, height: 14)
     }
 
@@ -426,7 +465,6 @@ private struct ShortcutKeyPill: View {
     var body: some View {
         Text(text)
             .font(.system(size: 10, weight: .medium, design: .monospaced))
-            .tracking(1.5)  // breathing room between modifier + key glyphs
             .foregroundStyle(.primary.opacity(0.85))
             .padding(.horizontal, 6)
             .padding(.vertical, 1.5)

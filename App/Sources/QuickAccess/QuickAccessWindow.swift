@@ -7,6 +7,8 @@ import ShareKit
 
 @MainActor
 final class QuickAccessWindow: NSPanel {
+    private static let cornerRadius: CGFloat = 14
+
     override var canBecomeKey: Bool { true }
 
     var onCopy: (() -> Void)?
@@ -80,7 +82,16 @@ final class QuickAccessWindow: NSPanel {
             onClose:     { [weak self] in self?.onClose?() }
         )
 
-        self.contentView = NSHostingView(rootView: view)
+        let hostingView = NSHostingView(rootView: view)
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.layer?.cornerRadius = Self.cornerRadius
+        hostingView.layer?.cornerCurve = .continuous
+        hostingView.layer?.masksToBounds = true
+
+        self.contentView = hostingView
+        self.contentView?.wantsLayer = true
+        self.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
     }
 
     private static func targetLanguageDisplay(settings: AppSettings) -> String? {

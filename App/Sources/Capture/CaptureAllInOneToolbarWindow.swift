@@ -7,6 +7,7 @@ import SwiftUI
 @MainActor
 final class CaptureAllInOneToolbarWindow {
     private static let minimumSelectionSize = CGSize(width: 24, height: 24)
+    private static let toolbarCornerRadius: CGFloat = 14
 
     private var selectionOverlayWindow: NSPanel?
     private weak var selectionOverlayView: AllInOneSelectionOverlayView?
@@ -138,7 +139,8 @@ final class CaptureAllInOneToolbarWindow {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
         panel.acceptsMouseMovedEvents = true
-        panel.contentView = AllInOneToolbarHostingView(rootView: CaptureAllInOneToolbarView(
+
+        let hostingView = AllInOneToolbarHostingView(rootView: CaptureAllInOneToolbarView(
             state: toolbarState,
             onArea: { [weak self] in
                 guard let self else { return }
@@ -175,6 +177,12 @@ final class CaptureAllInOneToolbarWindow {
             },
             onCancel: { [weak self] in self?.onCancel?() }
         ))
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.layer?.cornerRadius = Self.toolbarCornerRadius
+        hostingView.layer?.cornerCurve = .continuous
+        hostingView.layer?.masksToBounds = true
+        panel.contentView = hostingView
 
         toolbarWindow = panel
         panel.orderFrontRegardless()
@@ -331,6 +339,14 @@ private final class CaptureAllInOneToolbarState {
 }
 
 private struct CaptureAllInOneToolbarView: View {
+    private enum ModeAction: Hashable {
+        case area, fullscreen, window, scrolling, timer, ocr, recording
+    }
+
+    private enum UtilityAction: Hashable {
+        case annotate, copy, cancel
+    }
+
     let state: CaptureAllInOneToolbarState
     let onArea: () -> Void
     let onFullscreen: () -> Void
@@ -344,16 +360,19 @@ private struct CaptureAllInOneToolbarView: View {
     let onPresetSelected: (CapturePreset) -> Void
     let onCancel: () -> Void
 
+    @State private var hoveredMode: ModeAction?
+    @State private var hoveredUtility: UtilityAction?
+
     var body: some View {
-        HStack(spacing: 14) {
-            HStack(spacing: 4) {
-                modeButton(icon: "viewfinder", title: "Area", action: onArea)
-                modeButton(icon: "display", title: "Fullscreen", action: onFullscreen)
-                modeButton(icon: "macwindow", title: "Window", action: onWindow)
-                modeButton(icon: "arrow.down.to.line.compact", title: "Scrolling", action: onScrolling)
-                modeButton(icon: "timer", title: "Timer", action: onTimer)
-                modeButton(textIcon: "Aa", title: "OCR", action: onOCR)
-                modeButton(icon: "video", title: "Recording", action: onRecording)
+        HStack(spacing: 12) {
+            HStack(spacing: 3) {
+                modeButton(.area, icon: "viewfinder", title: "Area", action: onArea)
+                modeButton(.fullscreen, icon: "display", title: "Fullscreen", action: onFullscreen)
+                modeButton(.window, icon: "macwindow", title: "Window", action: onWindow)
+                modeButton(.scrolling, icon: "arrow.down.to.line.compact", title: "Scrolling", action: onScrolling)
+                modeButton(.timer, icon: "timer", title: "Timer", action: onTimer)
+                modeButton(.ocr, textIcon: "Aa", title: "OCR", action: onOCR)
+                modeButton(.recording, icon: "video", title: "Recording", action: onRecording)
             }
 
             divider
@@ -361,21 +380,22 @@ private struct CaptureAllInOneToolbarView: View {
             HStack(spacing: 8) {
                 dimensionPill
                 presetMenu
-                iconButton("pencil", help: "Annotate in place", action: onAnnotate)
-                iconButton("doc.on.doc", help: "Copy selected area", action: onCopy)
-                iconButton("xmark", help: "Cancel", action: onCancel)
+                iconButton("pencil", kind: .annotate, help: "Annotate in place", action: onAnnotate)
+                iconButton("doc.on.doc", kind: .copy, help: "Copy selected area", action: onCopy)
+                iconButton("xmark", kind: .cancel, help: "Cancel", action: onCancel)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.36), radius: 20, y: 8)
+        .shadow(color: .black.opacity(0.30), radius: 18, y: 8)
+        .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
         .environment(\.colorScheme, .dark)
         .onHover { hovering in
             if hovering {
@@ -386,7 +406,7 @@ private struct CaptureAllInOneToolbarView: View {
 
     private var divider: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.16))
+            .fill(Color.white.opacity(0.13))
             .frame(width: 1, height: 44)
     }
 
@@ -419,8 +439,11 @@ private struct CaptureAllInOneToolbarView: View {
             }
             .foregroundStyle(.white)
             .frame(width: 74, height: 36)
-            .background(Color.white.opacity(0.10))
-            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .background(Color.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+            )
         }
         .menuStyle(.borderlessButton)
         .help("Capture preset")
@@ -474,12 +497,16 @@ private struct CaptureAllInOneToolbarView: View {
         .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, 12)
         .frame(minWidth: 116, minHeight: 36)
-        .background(Color.white.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .background(Color.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
         .help("Selected area size")
     }
 
     private func modeButton(
+        _ kind: ModeAction,
         icon: String? = nil,
         textIcon: String? = nil,
         title: LocalizedStringKey,
@@ -505,14 +532,21 @@ private struct CaptureAllInOneToolbarView: View {
             }
             .foregroundStyle(.white)
             .frame(width: 78, height: 54)
-            .contentShape(Rectangle())
+            .background(modeBackground(kind), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { hoveredMode = $0 ? kind : nil }
         .help(title)
+    }
+
+    private func modeBackground(_ kind: ModeAction) -> Color {
+        hoveredMode == kind ? Color.white.opacity(0.12) : Color.white.opacity(0.001)
     }
 
     private func iconButton(
         _ systemName: String,
+        kind: UtilityAction,
         help: LocalizedStringKey,
         action: @escaping () -> Void
     ) -> some View {
@@ -521,11 +555,19 @@ private struct CaptureAllInOneToolbarView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 36, height: 36)
-                .background(Color.white.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 9))
+                .background(utilityBackground(kind), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                )
         }
         .buttonStyle(.plain)
+        .onHover { hoveredUtility = $0 ? kind : nil }
         .help(help)
+    }
+
+    private func utilityBackground(_ kind: UtilityAction) -> Color {
+        hoveredUtility == kind ? Color.white.opacity(0.18) : Color.white.opacity(0.11)
     }
 }
 

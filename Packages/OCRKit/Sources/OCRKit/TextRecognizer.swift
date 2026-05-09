@@ -25,14 +25,15 @@ public enum TextRecognizer {
         let imageHeight = CGFloat(image.height)
 
         return try await withCheckedThrowingContinuation { continuation in
+            let oneShot = OneShotContinuation(continuation)
             let request = VNRecognizeTextRequest { request, error in
                 if let error {
-                    continuation.resume(throwing: error)
+                    oneShot.resume(throwing: error)
                     return
                 }
 
                 guard let observations = request.results as? [VNRecognizedTextObservation] else {
-                    continuation.resume(returning: [])
+                    oneShot.resume(returning: [])
                     return
                 }
 
@@ -77,7 +78,7 @@ public enum TextRecognizer {
                     return a.boundingBox.minY < b.boundingBox.minY
                 }
 
-                continuation.resume(returning: regions)
+                oneShot.resume(returning: regions)
             }
 
             request.recognitionLevel = level == .fast
@@ -92,7 +93,7 @@ public enum TextRecognizer {
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(throwing: error)
+                oneShot.resume(throwing: error)
             }
         }
     }
@@ -111,5 +112,37 @@ public enum TextRecognizer {
         )
         let separator = keepLineBreaks ? "\n" : " "
         return regions.map(\.text).joined(separator: separator)
+    }
+}
+
+final class OneShotContinuation<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value, Error>?
+
+    init(_ continuation: CheckedContinuation<Value, Error>) {
+        self.continuation = continuation
+    }
+
+    @discardableResult
+    func resume(returning value: Value) -> Bool {
+        guard let continuation = takeContinuation() else { return false }
+        continuation.resume(returning: value)
+        return true
+    }
+
+    @discardableResult
+    func resume(throwing error: Error) -> Bool {
+        guard let continuation = takeContinuation() else { return false }
+        continuation.resume(throwing: error)
+        return true
+    }
+
+    private func takeContinuation() -> CheckedContinuation<Value, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let continuation = continuation
+        self.continuation = nil
+        return continuation
     }
 }
