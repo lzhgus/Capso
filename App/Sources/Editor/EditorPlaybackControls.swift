@@ -32,6 +32,35 @@ struct EditorPlaybackControls: View {
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.tertiary)
 
+            Divider()
+                .frame(height: 18)
+
+            Menu {
+                Button {
+                    coordinator.addCut(at: coordinator.currentTime)
+                } label: {
+                    Label("Cut", systemImage: "scissors")
+                }
+
+                Button {
+                    coordinator.addZoomSegment(at: coordinator.currentTime)
+                } label: {
+                    Label("Zoom", systemImage: "magnifyingglass")
+                }
+
+                Button {
+                    coordinator.addBlurEffect(at: coordinator.currentTime)
+                } label: {
+                    Label("Blur", systemImage: "drop.fill")
+                }
+            } label: {
+                Label("Add Effect", systemImage: "plus")
+                    .labelStyle(.titleAndIcon)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
             Spacer()
 
             if coordinator.isExporting {
@@ -52,18 +81,16 @@ struct EditorPlaybackControls: View {
                     }
                 }
             } else {
-                // Copy to clipboard
+                Button(action: { exportToFile() }) {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
                 Button(action: { exportToClipboard() }) {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                // Save to file
-                Button(action: { exportToFile() }) {
-                    Label("Export", systemImage: "square.and.arrow.down")
-                }
-                .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
         }

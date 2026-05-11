@@ -159,6 +159,53 @@ final class EditorCoordinator {
 
     func removeTrimRegion(id: UUID) {
         project.trimRegions.removeAll { $0.id == id }
+        if selectedCutRegionID == id { selectedCutRegionID = nil }
+    }
+
+    func addCut(at time: TimeInterval) {
+        let dur = min(1.0, duration - time)
+        guard dur > 0.2 else { return }
+        let region = TrimRegion(startTime: time, endTime: time + dur)
+        project.trimRegions.append(region)
+        selectedCutRegionID = region.id
+        selectedEffectSegmentID = nil
+        if currentTime >= region.startTime && currentTime < region.endTime {
+            seek(to: region.endTime)
+        }
+    }
+
+    var selectedCutRegionID: UUID?
+
+    var selectedCutRegion: TrimRegion? {
+        guard let id = selectedCutRegionID else { return nil }
+        return project.trimRegions.first { $0.id == id }
+    }
+
+    var timelineCuts: [TrimRegion] {
+        project.trimRegions
+            .filter { $0.startTime > 0.01 && $0.endTime < duration - 0.01 }
+            .sorted { $0.startTime < $1.startTime }
+    }
+
+    func moveCutRegion(id: UUID, to newStart: TimeInterval) {
+        guard let index = project.trimRegions.firstIndex(where: { $0.id == id }) else { return }
+        let dur = project.trimRegions[index].duration
+        let clamped = max(0, min(duration - dur, newStart))
+        project.trimRegions[index].startTime = clamped
+        project.trimRegions[index].endTime = clamped + dur
+        if currentTime >= clamped && currentTime < clamped + dur {
+            seek(to: clamped + dur)
+        }
+    }
+
+    func resizeCutRegion(id: UUID, newStart: TimeInterval? = nil, newEnd: TimeInterval? = nil) {
+        guard let index = project.trimRegions.firstIndex(where: { $0.id == id }) else { return }
+        if let newStart {
+            project.trimRegions[index].startTime = max(0, min(project.trimRegions[index].endTime - 0.2, newStart))
+        }
+        if let newEnd {
+            project.trimRegions[index].endTime = min(duration, max(project.trimRegions[index].startTime + 0.2, newEnd))
+        }
     }
 
     func skipTrimRegions(from time: TimeInterval) -> TimeInterval {
@@ -172,21 +219,43 @@ final class EditorCoordinator {
         return min(result, duration)
     }
 
-    // MARK: - Zoom Segments
+    // MARK: - Timeline Effects
 
-    var selectedZoomSegmentID: UUID?
+    var selectedEffectSegmentID: UUID?
+
+    var selectedEffectSegment: RecordingEffectSegment? {
+        guard let id = selectedEffectSegmentID else { return nil }
+        return project.effectSegments.first { $0.id == id }
+    }
 
     var selectedZoomSegment: ZoomSegment? {
-        guard let id = selectedZoomSegmentID else { return nil }
-        return project.zoomSegments.first { $0.id == id }
+        selectedEffectSegment?.zoomSegment
     }
 
     func addZoomSegment(at time: TimeInterval) {
         let dur = min(3.0, self.duration - time)
         guard dur > 0.5 else { return }
-        let segment = ZoomSegment(startTime: time, endTime: time + dur, zoomLevel: 1.5, focusMode: .followCursor)
-        project.zoomSegments.append(segment)
-        selectedZoomSegmentID = segment.id
+        let segment = RecordingEffectSegment(
+            startTime: time,
+            endTime: time + dur,
+            payload: .zoom(ZoomEffectPayload(zoomLevel: 1.5, focusMode: .followCursor))
+        )
+        project.effectSegments.append(segment)
+        selectedEffectSegmentID = segment.id
+        selectedCutRegionID = nil
+    }
+
+    func addBlurEffect(at time: TimeInterval) {
+        let dur = min(3.0, self.duration - time)
+        guard dur > 0.5 else { return }
+        let segment = RecordingEffectSegment(
+            startTime: time,
+            endTime: time + dur,
+            payload: .blur(BlurEffectPayload())
+        )
+        project.effectSegments.append(segment)
+        selectedEffectSegmentID = segment.id
+        selectedCutRegionID = nil
     }
 
     // MARK: - Auto-zoom
@@ -218,52 +287,82 @@ final class EditorCoordinator {
         )
 
         // Build the final segment list locally and assign once so `@Observable`
-        // fires a single notification — avoids intermediate-state diffs that
-        // would be visible to SwiftUI transitions on ZoomTrackView.
+        // fires a single notification, avoiding visible intermediate-state
+        // diffs in the timeline.
         var updated = project.zoomSegments.filter { $0.source != .auto }
         updated.append(contentsOf: suggested)
         updated.sort { $0.startTime < $1.startTime }
         project.zoomSegments = updated
 
-        if let selID = selectedZoomSegmentID,
+        if let selID = selectedEffectSegmentID,
            !updated.contains(where: { $0.id == selID }) {
-            selectedZoomSegmentID = nil
+            selectedEffectSegmentID = nil
         }
 
         return suggested.count
     }
 
     func removeZoomSegment(id: UUID) {
-        project.zoomSegments.removeAll { $0.id == id }
-        if selectedZoomSegmentID == id { selectedZoomSegmentID = nil }
+        removeEffectSegment(id: id)
+    }
+
+    func removeEffectSegment(id: UUID) {
+        project.effectSegments.removeAll { $0.id == id }
+        if selectedEffectSegmentID == id { selectedEffectSegmentID = nil }
     }
 
     func moveZoomSegment(id: UUID, to newStart: TimeInterval) {
-        guard let index = project.zoomSegments.firstIndex(where: { $0.id == id }) else { return }
-        let dur = project.zoomSegments[index].duration
+        moveEffectSegment(id: id, to: newStart)
+    }
+
+    func moveEffectSegment(id: UUID, to newStart: TimeInterval) {
+        guard let index = project.effectSegments.firstIndex(where: { $0.id == id }) else { return }
+        let dur = project.effectSegments[index].duration
         let clamped = max(0, min(duration - dur, newStart))
-        project.zoomSegments[index].startTime = clamped
-        project.zoomSegments[index].endTime = clamped + dur
+        project.effectSegments[index].startTime = clamped
+        project.effectSegments[index].endTime = clamped + dur
     }
 
     func resizeZoomSegment(id: UUID, newStart: TimeInterval? = nil, newEnd: TimeInterval? = nil) {
-        guard let index = project.zoomSegments.firstIndex(where: { $0.id == id }) else { return }
+        resizeEffectSegment(id: id, newStart: newStart, newEnd: newEnd)
+    }
+
+    func resizeEffectSegment(id: UUID, newStart: TimeInterval? = nil, newEnd: TimeInterval? = nil) {
+        guard let index = project.effectSegments.firstIndex(where: { $0.id == id }) else { return }
         if let newStart {
-            project.zoomSegments[index].startTime = max(0, min(project.zoomSegments[index].endTime - 0.5, newStart))
+            project.effectSegments[index].startTime = max(0, min(project.effectSegments[index].endTime - 0.5, newStart))
         }
         if let newEnd {
-            project.zoomSegments[index].endTime = min(duration, max(project.zoomSegments[index].startTime + 0.5, newEnd))
+            project.effectSegments[index].endTime = min(duration, max(project.effectSegments[index].startTime + 0.5, newEnd))
         }
     }
 
     func setZoomLevel(id: UUID, level: Double) {
-        guard let index = project.zoomSegments.firstIndex(where: { $0.id == id }) else { return }
-        project.zoomSegments[index].zoomLevel = max(1.25, min(5.0, level))
+        guard let index = project.effectSegments.firstIndex(where: { $0.id == id }),
+              case .zoom(var payload) = project.effectSegments[index].payload else { return }
+        payload.zoomLevel = max(1.25, min(5.0, level))
+        project.effectSegments[index].payload = .zoom(payload)
     }
 
     func setZoomFocusMode(id: UUID, mode: ZoomFocusMode) {
-        guard let index = project.zoomSegments.firstIndex(where: { $0.id == id }) else { return }
-        project.zoomSegments[index].focusMode = mode
+        guard let index = project.effectSegments.firstIndex(where: { $0.id == id }),
+              case .zoom(var payload) = project.effectSegments[index].payload else { return }
+        payload.focusMode = mode
+        project.effectSegments[index].payload = .zoom(payload)
+    }
+
+    func setBlurRadius(id: UUID, radius: Double) {
+        guard let index = project.effectSegments.firstIndex(where: { $0.id == id }),
+              case .blur(var payload) = project.effectSegments[index].payload else { return }
+        payload.radius = max(2, min(48, radius))
+        project.effectSegments[index].payload = .blur(payload)
+    }
+
+    func setBlurRect(id: UUID, rect: NormalizedRect) {
+        guard let index = project.effectSegments.firstIndex(where: { $0.id == id }),
+              case .blur(var payload) = project.effectSegments[index].payload else { return }
+        payload.rect = rect.clamped(minSize: 0.04)
+        project.effectSegments[index].payload = .blur(payload)
     }
 
     // MARK: - Cursor Timeline
@@ -418,7 +517,7 @@ final class EditorCoordinator {
 
     /// Use CompositorExporter when visual effects need to be baked into the export.
     var hasCompositingEffects: Bool {
-        project.backgroundStyle.enabled || !project.zoomSegments.isEmpty || shouldRenderCursorOverlay
+        project.backgroundStyle.enabled || !project.effectSegments.isEmpty || shouldRenderCursorOverlay
     }
 
     func exportVideo(format: ExportFormat, quality: ExportQuality, destination: URL) async throws -> URL {
@@ -431,21 +530,50 @@ final class EditorCoordinator {
         }
 
         if hasCompositingEffects {
-            return try await exportWithCompositor(format: format, quality: quality, destination: destination)
+            let rendered = try await exportWithCompositor(format: format, quality: quality, destination: destination)
+            if !project.trimRegions.isEmpty {
+                let cutDestination = destination
+                let uncutDestination = rendered.deletingLastPathComponent()
+                    .appendingPathComponent("\(UUID().uuidString)-uncut.mp4")
+                try FileManager.default.moveItem(at: rendered, to: uncutDestination)
+                defer { try? FileManager.default.removeItem(at: uncutDestination) }
+                return try await CutExporter.exportMP4(
+                    source: uncutDestination,
+                    trimRegions: project.trimRegions,
+                    quality: quality,
+                    destination: cutDestination
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.exportProgress = progress
+                    }
+                } status: { [weak self] status in
+                    Task { @MainActor in
+                        self?.exportProgress = status.fractionCompleted
+                        self?.exportStatusMessage = status.stage.userDescription
+                    }
+                }
+            }
+            return rendered
         } else {
-            // Build a time range from trim handles (head/tail trim)
-            let start = effectiveStartTime
-            let end = effectiveEndTime
-            let trimRange: CMTimeRange?
-            if start > 0.01 || end < duration - 0.01 {
-                let cmStart = CMTime(seconds: start, preferredTimescale: 600)
-                let cmDuration = CMTime(seconds: end - start, preferredTimescale: 600)
-                trimRange = CMTimeRange(start: cmStart, duration: cmDuration)
-            } else {
-                trimRange = nil
+            if format == .mp4, !project.trimRegions.isEmpty {
+                return try await CutExporter.exportMP4(
+                    source: project.sourceVideoURL,
+                    trimRegions: project.trimRegions,
+                    quality: quality,
+                    destination: destination
+                ) { [weak self] progress in
+                    Task { @MainActor in
+                        self?.exportProgress = progress
+                    }
+                } status: { [weak self] status in
+                    Task { @MainActor in
+                        self?.exportProgress = status.fractionCompleted
+                        self?.exportStatusMessage = status.stage.userDescription
+                    }
+                }
             }
 
-            let options = ExportOptions(format: format, quality: quality, destination: destination, timeRange: trimRange)
+            let options = ExportOptions(format: format, quality: quality, destination: destination)
             return try await VideoExporter.export(
                 source: project.sourceVideoURL,
                 options: options
@@ -478,6 +606,7 @@ final class EditorCoordinator {
                 frameSize: project.videoSize
             )
         }
+        let blurEffects = project.effectSegments.filter { $0.kind == .blur }
 
         // Wrap `cursorCIImage` (MainActor-isolated, non-Sendable CIImage) in
         // a Sendable box so Swift 6.0's region analysis lets us cross into
@@ -489,8 +618,10 @@ final class EditorCoordinator {
             project: project,
             cursorTimeline: cursorTimeline,
             zoomInterpolator: zoomInterpolator,
+            blurEffects: blurEffects,
             cursorImage: SendableCIImage(cursorCIImage),
             cursorOverlayProvider: cursorOverlayProvider,
+            applyTrimRegions: false,
             destination: destination,
             quality: quality
         ) { [weak self] progress in

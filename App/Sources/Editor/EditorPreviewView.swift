@@ -2,14 +2,14 @@ import SwiftUI
 import AVKit
 @preconcurrency import EditorKit
 
-/// Video preview with real-time zoom (Metal) + background effects (SwiftUI).
+/// Video preview with real-time timeline effects (Metal) + background effects (SwiftUI).
 ///
 /// Architecture:
-/// - Zoom: rendered in real-time via MetalPreviewView (AVPlayerItemVideoOutput → CIImage → FrameCompositor zoom only → MTKView)
+/// - Timeline effects: rendered in real time via MetalPreviewView
 /// - Background: SwiftUI decorations (padding, color, shadow, corners) — reliable and flicker-free
 ///
 /// The FrameCompositor in the Metal renderer is configured with background DISABLED
-/// so it only applies zoom transforms. Background styling is handled by the SwiftUI layer.
+/// so it only applies timeline effects. Background styling is handled by the SwiftUI layer.
 struct EditorPreviewView: View {
     let coordinator: EditorCoordinator
 
@@ -88,17 +88,22 @@ struct EditorPreviewView: View {
     /// un-clipped (users reported the top corners rounded but the right
     /// side rendered as a straight vertical line).
     private func metalPreview(cornerRadius: CGFloat) -> some View {
-        MetalPreviewView(
-            player: coordinator.player,
-            playerItem: coordinator.playerItem,
-            backgroundStyle: EditorKit.BackgroundStyle(enabled: false), // zoom only
-            zoomSegments: coordinator.project.zoomSegments,
-            videoSize: coordinator.project.videoSize,
-            cursorTimeline: coordinator.cursorTimeline,
-            cursorCIImage: coordinator.cursorCIImage,
-            cursorOverlayProvider: coordinator.cursorOverlayProvider,
-            cornerRadius: cornerRadius
-        )
+        ZStack {
+            MetalPreviewView(
+                player: coordinator.player,
+                playerItem: coordinator.playerItem,
+                backgroundStyle: EditorKit.BackgroundStyle(enabled: false),
+                zoomSegments: coordinator.project.zoomSegments,
+                effectSegments: coordinator.project.effectSegments,
+                videoSize: coordinator.project.videoSize,
+                cursorTimeline: coordinator.cursorTimeline,
+                cursorCIImage: coordinator.cursorCIImage,
+                cursorOverlayProvider: coordinator.cursorOverlayProvider,
+                cornerRadius: cornerRadius
+            )
+
+            BlurRegionOverlay(coordinator: coordinator)
+        }
     }
 
     /// Renders the framed preview at a given preview→source scale.
@@ -150,6 +155,7 @@ struct EditorPreviewView: View {
                 playerItem: coordinator.playerItem,
                 backgroundStyle: EditorKit.BackgroundStyle(enabled: false),
                 zoomSegments: [],
+                effectSegments: [],
                 videoSize: coordinator.project.videoSize,
                 cursorTimeline: nil,
                 cursorCIImage: nil,

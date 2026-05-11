@@ -48,6 +48,83 @@ struct RecordingProjectTests {
         #expect(loaded.zoomSegments.count == original.zoomSegments.count)
     }
 
+    @Test("legacy zoom segments decode into timeline effects")
+    func legacyZoomSegmentsDecodeIntoEffects() throws {
+        let legacyJSON = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "sourceVideoURL": "file:///tmp/test.mov",
+          "showsCursor": true,
+          "videoDuration": 12,
+          "videoSizeWidth": 1920,
+          "videoSizeHeight": 1080,
+          "recordingAreaWidth": 1920,
+          "recordingAreaHeight": 1080,
+          "trimRegions": [],
+          "zoomSegments": [
+            {
+              "id": "22222222-2222-2222-2222-222222222222",
+              "startTime": 1,
+              "endTime": 4,
+              "zoomLevel": 1.5,
+              "focusMode": { "followCursor": {} },
+              "source": "auto"
+            }
+          ],
+          "backgroundStyle": {
+            "enabled": false,
+            "colorType": "solid",
+            "solidColor": { "red": 0.2, "green": 0.2, "blue": 0.2, "alpha": 1 },
+            "gradientFrom": { "red": 0, "green": 0, "blue": 0, "alpha": 1 },
+            "gradientTo": { "red": 0.2, "green": 0.2, "blue": 0.2, "alpha": 1 },
+            "gradientAngle": 135,
+            "padding": 20,
+            "cornerRadius": 12,
+            "shadowEnabled": true,
+            "shadowRadius": 15,
+            "shadowOpacity": 0.5
+          },
+          "cursorSmoothing": {
+            "enabled": true,
+            "stiffness": 800,
+            "damping": 56,
+            "mass": 1
+          },
+          "createdAt": "2026-04-18T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(RecordingProject.self, from: legacyJSON)
+
+        #expect(decoded.effectSegments.count == 1)
+        #expect(decoded.zoomSegments.count == 1)
+        #expect(decoded.zoomSegments[0].source == .auto)
+    }
+
+    @Test("blur effect payload round-trips through project JSON")
+    func blurEffectRoundTrip() throws {
+        let blur = RecordingEffectSegment(
+            startTime: 2,
+            endTime: 5,
+            payload: .blur(
+                BlurEffectPayload(
+                    rect: NormalizedRect(x: 0.25, y: 0.3, width: 0.5, height: 0.2),
+                    radius: 24
+                )
+            )
+        )
+        let original = makeProject(duration: 10)
+        var project = original
+        project.effectSegments.append(blur)
+
+        let data = try JSONEncoder().encode(project)
+        let decoded = try JSONDecoder().decode(RecordingProject.self, from: data)
+
+        #expect(decoded.effectSegments == project.effectSegments)
+    }
+
     @Test("cursor visibility round-trips through JSON")
     func cursorVisibilityRoundTrip() throws {
         let original = makeProject(showsCursor: false)
@@ -139,6 +216,52 @@ struct TrimRegionTests {
         let b = TrimRegion(startTime: 0, endTime: 1)
         #expect(a.id != b.id)
     }
+
+    @Test("kept ranges split around middle cuts")
+    func keptRangesSplitAroundMiddleCuts() {
+        let cuts = [
+            TrimRegion(startTime: 2, endTime: 4),
+            TrimRegion(startTime: 7, endTime: 8),
+        ]
+
+        let ranges = TrimRegion.keptRanges(duration: 10, removing: cuts)
+
+        #expect(ranges == [
+            TrimRegion.TimeRange(start: 0, end: 2),
+            TrimRegion.TimeRange(start: 4, end: 7),
+            TrimRegion.TimeRange(start: 8, end: 10),
+        ])
+    }
+
+    @Test("kept ranges merge overlapping cuts")
+    func keptRangesMergeOverlappingCuts() {
+        let cuts = [
+            TrimRegion(startTime: 2, endTime: 5),
+            TrimRegion(startTime: 4, endTime: 6),
+        ]
+
+        let ranges = TrimRegion.keptRanges(duration: 8, removing: cuts)
+
+        #expect(ranges == [
+            TrimRegion.TimeRange(start: 0, end: 2),
+            TrimRegion.TimeRange(start: 6, end: 8),
+        ])
+    }
+
+    @Test("kept ranges ignore invalid and clamp out-of-bounds cuts")
+    func keptRangesClampCuts() {
+        let cuts = [
+            TrimRegion(startTime: -2, endTime: 1),
+            TrimRegion(startTime: 3, endTime: 3),
+            TrimRegion(startTime: 5, endTime: 12),
+        ]
+
+        let ranges = TrimRegion.keptRanges(duration: 8, removing: cuts)
+
+        #expect(ranges == [
+            TrimRegion.TimeRange(start: 1, end: 5),
+        ])
+    }
 }
 
 // MARK: - ZoomSegment Suite
@@ -212,6 +335,34 @@ struct ZoomSegmentTests {
     func defaultSourceIsManual() {
         let seg = ZoomSegment(startTime: 0, endTime: 3)
         #expect(seg.source == .manual)
+    }
+}
+
+// MARK: - NormalizedRect Suite
+
+@Suite("NormalizedRect")
+struct NormalizedRectTests {
+
+    @Test("clamped keeps rect inside unit bounds")
+    func clampedKeepsRectInsideUnitBounds() {
+        let rect = NormalizedRect(x: -0.2, y: 0.9, width: 1.4, height: 0.4)
+        let clamped = rect.clamped(minSize: 0.1)
+
+        #expect(clamped.x == 0)
+        #expect(clamped.y == 0.6)
+        #expect(clamped.width == 1)
+        #expect(clamped.height == 0.4)
+    }
+
+    @Test("clamped preserves minimum visible size")
+    func clampedPreservesMinimumVisibleSize() {
+        let rect = NormalizedRect(x: 0.98, y: 0.98, width: 0.01, height: 0.01)
+        let clamped = rect.clamped(minSize: 0.08)
+
+        #expect(clamped.width == 0.08)
+        #expect(clamped.height == 0.08)
+        #expect(clamped.x == 0.92)
+        #expect(clamped.y == 0.92)
     }
 }
 

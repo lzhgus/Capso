@@ -94,8 +94,13 @@ public struct RecordingProject: Codable, Sendable {
     public var recordingAreaSize: CGSize
     /// Regions that have been cut from the timeline.
     public var trimRegions: [TrimRegion]
+    /// Time-bounded effects overlaid on the video.
+    public var effectSegments: [RecordingEffectSegment]
     /// Time-bounded zoom effects overlaid on the video.
-    public var zoomSegments: [ZoomSegment]
+    public var zoomSegments: [ZoomSegment] {
+        get { effectSegments.zoomSegments }
+        set { effectSegments.replaceZoomSegments(with: newValue) }
+    }
     /// Background decoration style applied in the final export.
     public var backgroundStyle: BackgroundStyle
     /// Cursor motion smoothing parameters.
@@ -124,7 +129,7 @@ public struct RecordingProject: Codable, Sendable {
         self.videoSize = videoSize
         self.recordingAreaSize = recordingAreaSize
         self.trimRegions = trimRegions
-        self.zoomSegments = zoomSegments
+        self.effectSegments = zoomSegments.map(RecordingEffectSegment.init(zoom:))
         self.backgroundStyle = backgroundStyle
         self.cursorSmoothing = cursorSmoothing
         self.createdAt = createdAt
@@ -144,7 +149,7 @@ public struct RecordingProject: Codable, Sendable {
         case id, sourceVideoURL, cursorTelemetryURL, showsCursor, videoDuration
         case videoSizeWidth, videoSizeHeight
         case recordingAreaWidth, recordingAreaHeight
-        case trimRegions, zoomSegments, backgroundStyle, cursorSmoothing, createdAt
+        case trimRegions, zoomSegments, effectSegments, backgroundStyle, cursorSmoothing, createdAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -161,7 +166,12 @@ public struct RecordingProject: Codable, Sendable {
         let raH = try c.decode(Double.self, forKey: .recordingAreaHeight)
         recordingAreaSize = CGSize(width: raW, height: raH)
         trimRegions = try c.decode([TrimRegion].self, forKey: .trimRegions)
-        zoomSegments = try c.decode([ZoomSegment].self, forKey: .zoomSegments)
+        if let decodedEffects = try c.decodeIfPresent([RecordingEffectSegment].self, forKey: .effectSegments) {
+            effectSegments = decodedEffects
+        } else {
+            let decodedZooms = try c.decode([ZoomSegment].self, forKey: .zoomSegments)
+            effectSegments = decodedZooms.map(RecordingEffectSegment.init(zoom:))
+        }
         backgroundStyle = try c.decode(BackgroundStyle.self, forKey: .backgroundStyle)
         cursorSmoothing = try c.decode(CursorSmoothingConfig.self, forKey: .cursorSmoothing)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
@@ -180,6 +190,7 @@ public struct RecordingProject: Codable, Sendable {
         try c.encode(recordingAreaSize.height, forKey: .recordingAreaHeight)
         try c.encode(trimRegions, forKey: .trimRegions)
         try c.encode(zoomSegments, forKey: .zoomSegments)
+        try c.encode(effectSegments, forKey: .effectSegments)
         try c.encode(backgroundStyle, forKey: .backgroundStyle)
         try c.encode(cursorSmoothing, forKey: .cursorSmoothing)
         try c.encode(createdAt, forKey: .createdAt)

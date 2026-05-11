@@ -72,18 +72,23 @@ public final class FrameCompositor: Sendable {
         frame: CIImage,
         zoomTransform: FrameTransform,
         cursorPosition: CGPoint?,
-        cursorImage: CIImage?
+        cursorImage: CIImage?,
+        blurEffects: [RecordingEffectSegment] = [],
+        time: TimeInterval = 0
     ) -> CIImage {
         // 1. Zoom
         var result = applyZoom(to: frame, transform: zoomTransform)
 
-        // 2. Cursor overlay — also passed the zoom transform so the cursor
+        // 2. Blur effects
+        result = applyBlurEffects(blurEffects, at: time, to: result)
+
+        // 3. Cursor overlay — also passed the zoom transform so the cursor
         // lands on the zoomed content, not the original unzoomed position.
         if let position = cursorPosition, let cursor = cursorImage {
             result = applyCursor(cursor, at: position, zoomTransform: zoomTransform, over: result)
         }
 
-        // 3 – 5. Background
+        // 4. Background
         if backgroundStyle.enabled {
             result = applyBackground(to: result)
         }
@@ -124,6 +129,36 @@ public final class FrameCompositor: Sendable {
         // Crop back to the original source viewport so the output size stays fixed.
         let viewport = CGRect(x: 0, y: 0, width: w, height: h)
         return zoomed.cropped(to: viewport)
+    }
+
+    // MARK: - Private: Blur
+
+    private func applyBlurEffects(
+        _ effects: [RecordingEffectSegment],
+        at time: TimeInterval,
+        to image: CIImage
+    ) -> CIImage {
+        var result = image
+
+        for effect in effects where effect.contains(time) {
+            guard case .blur(let payload) = effect.payload else { continue }
+            let rect = payload.rect.cgRect(in: sourceSize)
+            guard rect.width > 0, rect.height > 0 else { continue }
+
+            let radius = max(0, payload.radius)
+            guard radius > 0 else { continue }
+
+            let blurred = result
+                .clampedToExtent()
+                .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
+                .cropped(to: rect)
+
+            result = blurred
+                .composited(over: result)
+                .cropped(to: image.extent)
+        }
+
+        return result
     }
 
     // MARK: - Private: Cursor

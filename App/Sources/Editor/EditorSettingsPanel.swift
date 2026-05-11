@@ -22,7 +22,7 @@ struct EditorSettingsPanel: View {
                     .padding(.top, 4)
 
                 backgroundSection
-                zoomSection
+                timelineEffectsSection
                 cursorSection
             }
             .padding(16)
@@ -297,11 +297,11 @@ struct EditorSettingsPanel: View {
         )
     }
 
-    // MARK: - Zoom Section
+    // MARK: - Timeline Effects Section
 
-    private var zoomSection: some View {
+    private var timelineEffectsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("Zoom")
+            sectionLabel("Timeline Effects")
 
             settingCard {
                 autoZoomRow
@@ -309,48 +309,55 @@ struct EditorSettingsPanel: View {
                 cardDivider
 
                 HStack {
-                    Text("Segments")
+                    Text("Add Effect")
                         .font(.system(size: 13))
                     Spacer()
-                    Text("\(coordinator.project.zoomSegments.count)")
+                    addEffectMenu
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+                cardDivider
+
+                HStack {
+                    Text("Effects")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Text("\(coordinator.project.effectSegments.count + coordinator.timelineCuts.count)")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
 
-                if let segment = coordinator.selectedZoomSegment {
+                if let cut = coordinator.selectedCutRegion {
                     cardDivider
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Selected Segment")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 8)
-                    .padding(.bottom, 2)
-
-                    verticalSliderRow(
-                        "Zoom Level",
-                        value: zoomLevelBinding(for: segment.id),
-                        range: 1.25...5.0,
-                        unit: "x",
-                        precision: 1,
-                        step: 0.25
-                    )
-
-                    settingPickerRow("Focus", selection: focusModeBinding(for: segment.id)) {
-                        Text("Follow Cursor").tag(ZoomFocusTag.followCursor)
-                        Text("Center").tag(ZoomFocusTag.center)
-                    }
+                    selectedCutControls(cut)
 
                     cardDivider
 
                     Button(role: .destructive) {
-                        coordinator.removeZoomSegment(id: segment.id)
+                        coordinator.removeTrimRegion(id: cut.id)
                     } label: {
-                        Label("Delete Segment", systemImage: "trash")
+                        Label("Delete Cut", systemImage: "trash")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                } else if let segment = coordinator.selectedEffectSegment {
+                    cardDivider
+
+                    selectedEffectControls(segment)
+
+                    cardDivider
+
+                    Button(role: .destructive) {
+                        coordinator.removeEffectSegment(id: segment.id)
+                    } label: {
+                        Label("Delete Effect", systemImage: "trash")
                             .font(.system(size: 12))
                     }
                     .buttonStyle(.plain)
@@ -360,13 +367,104 @@ struct EditorSettingsPanel: View {
                 } else {
                     cardDivider
 
-                    Text("Double-click the zoom track to add segments.")
+                    Text("Use Add Effect or double-click an effects lane.")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                 }
             }
+        }
+    }
+
+    private var addEffectMenu: some View {
+        Menu {
+            Button {
+                coordinator.addCut(at: coordinator.currentTime)
+            } label: {
+                Label("Cut", systemImage: "scissors")
+            }
+
+            Button {
+                coordinator.addZoomSegment(at: coordinator.currentTime)
+            } label: {
+                Label("Zoom", systemImage: "magnifyingglass")
+            }
+
+            Button {
+                coordinator.addBlurEffect(at: coordinator.currentTime)
+            } label: {
+                Label("Blur", systemImage: "drop.fill")
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .medium))
+                Text("Add")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private func selectedCutControls(_ cut: TrimRegion) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Selected Cut")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+
+            HStack {
+                Text("Removed")
+                    .font(.system(size: 13))
+                Spacer()
+                Text(coordinator.formatTime(cut.duration))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private func selectedEffectControls(_ segment: RecordingEffectSegment) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Selected \(segment.kind.displayName)")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+
+        switch segment.payload {
+        case .zoom:
+            verticalSliderRow(
+                "Zoom Level",
+                value: zoomLevelBinding(for: segment.id),
+                range: 1.25...5.0,
+                unit: "x",
+                precision: 1,
+                step: 0.25
+            )
+
+            settingPickerRow("Focus", selection: focusModeBinding(for: segment.id)) {
+                Text("Follow Cursor").tag(ZoomFocusTag.followCursor)
+                Text("Center").tag(ZoomFocusTag.center)
+            }
+        case .blur:
+            verticalSliderRow(
+                "Blur",
+                value: blurRadiusBinding(for: segment.id),
+                range: 2...48,
+                unit: "px",
+                precision: 0,
+                step: 1
+            )
         }
     }
 
@@ -439,7 +537,11 @@ struct EditorSettingsPanel: View {
 
     private func zoomLevelBinding(for id: UUID) -> Binding<Double> {
         Binding(
-            get: { coordinator.project.zoomSegments.first { $0.id == id }?.zoomLevel ?? 1.5 },
+            get: {
+                guard let segment = coordinator.project.effectSegments.first(where: { $0.id == id }),
+                      case .zoom(let payload) = segment.payload else { return 1.5 }
+                return payload.zoomLevel
+            },
             set: { coordinator.setZoomLevel(id: id, level: $0) }
         )
     }
@@ -447,8 +549,9 @@ struct EditorSettingsPanel: View {
     private func focusModeBinding(for id: UUID) -> Binding<ZoomFocusTag> {
         Binding(
             get: {
-                guard let seg = coordinator.project.zoomSegments.first(where: { $0.id == id }) else { return .followCursor }
-                if case .followCursor = seg.focusMode { return .followCursor }
+                guard let segment = coordinator.project.effectSegments.first(where: { $0.id == id }),
+                      case .zoom(let payload) = segment.payload else { return .followCursor }
+                if case .followCursor = payload.focusMode { return .followCursor }
                 return .center
             },
             set: { tag in
@@ -457,6 +560,17 @@ struct EditorSettingsPanel: View {
                 case .center: coordinator.setZoomFocusMode(id: id, mode: .manual(x: 0.5, y: 0.5))
                 }
             }
+        )
+    }
+
+    private func blurRadiusBinding(for id: UUID) -> Binding<Double> {
+        Binding(
+            get: {
+                guard let segment = coordinator.project.effectSegments.first(where: { $0.id == id }),
+                      case .blur(let payload) = segment.payload else { return 18 }
+                return payload.radius
+            },
+            set: { coordinator.setBlurRadius(id: id, radius: $0) }
         )
     }
 

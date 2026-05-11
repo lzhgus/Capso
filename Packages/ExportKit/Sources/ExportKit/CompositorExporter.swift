@@ -26,7 +26,7 @@ public struct SendableCIImage: @unchecked Sendable {
     public init(_ image: CIImage?) { self.image = image }
 }
 
-/// Exports a recording with visual effects (background, zoom) baked in.
+/// Exports a recording with visual effects baked in.
 ///
 /// Uses `AVMutableVideoComposition` with a CIFilter handler for per-frame
 /// compositing via `FrameCompositor`. Audio is passed through automatically
@@ -38,8 +38,10 @@ public enum CompositorExporter {
         project: RecordingProject,
         cursorTimeline: SmoothedCursorTimeline?,
         zoomInterpolator: ZoomInterpolator?,
+        blurEffects: [RecordingEffectSegment] = [],
         cursorImage: SendableCIImage = SendableCIImage(nil),
         cursorOverlayProvider: CursorOverlayProvider? = nil,
+        applyTrimRegions: Bool = true,
         destination: URL,
         quality: ExportQuality,
         progress: (@Sendable (Double) -> Void)? = nil,
@@ -110,7 +112,9 @@ public enum CompositorExporter {
                     frame: sourceImage.cropped(to: sourceRect),
                     zoomTransform: zoomTransform,
                     cursorPosition: cgCursorPos,
-                    cursorImage: scaledCursor
+                    cursorImage: scaledCursor,
+                    blurEffects: blurEffects,
+                    time: timeSec
                 )
 
                 // Ensure output extent starts at origin and matches renderSize
@@ -146,7 +150,7 @@ public enum CompositorExporter {
         let duration = try await asset.load(.duration).seconds
         let effectiveEnd = sortedTrims.filter { $0.endTime >= duration - 0.01 }.map(\.startTime).min() ?? duration
 
-        if effectiveStart > 0.01 || effectiveEnd < duration - 0.01 {
+        if applyTrimRegions && (effectiveStart > 0.01 || effectiveEnd < duration - 0.01) {
             let cmStart = CMTime(seconds: effectiveStart, preferredTimescale: 600)
             let cmDuration = CMTime(seconds: effectiveEnd - effectiveStart, preferredTimescale: 600)
             session.timeRange = CMTimeRange(start: cmStart, duration: cmDuration)

@@ -32,6 +32,7 @@ final class MetalPreviewRenderer: NSObject {
 
     private var compositor: FrameCompositor?
     private var zoomInterpolator: ZoomInterpolator?
+    private var blurEffects: [RecordingEffectSegment] = []
     private var cursorTimeline: SmoothedCursorTimeline?
     private var cursorCIImage: CIImage?
     private var cursorOverlayProvider: CursorOverlayProvider?
@@ -82,6 +83,11 @@ final class MetalPreviewRenderer: NSObject {
         zoomInterpolator = segments.isEmpty
             ? nil
             : ZoomInterpolator(segments: segments, frameSize: frameSize)
+        needsRecomposite = true
+    }
+
+    func updateEffects(_ effects: [RecordingEffectSegment]) {
+        blurEffects = effects.filter { $0.kind == .blur }
         needsRecomposite = true
     }
 
@@ -162,7 +168,9 @@ final class MetalPreviewRenderer: NSObject {
                     frame: raw,
                     zoomTransform: zoomTransform,
                     cursorPosition: cursorPos,
-                    cursorImage: scaledCursor
+                    cursorImage: scaledCursor,
+                    blurEffects: blurEffects,
+                    time: time
                 )
             } else {
                 frameImage = raw
