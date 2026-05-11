@@ -6,7 +6,7 @@ import MetalKit
 /// A SwiftUI view that wraps an `MTKView` to display a Metal-composited video preview.
 ///
 /// Unlike `AVPlayerView`, this view runs every frame through `FrameCompositor`, which
-/// applies zoom transforms, background styles, and cursor overlays in real time via
+/// applies timeline effects, background styles, and cursor overlays in real time via
 /// Core Image and Metal.
 ///
 /// Usage: swap `EditorPreviewView` for `MetalPreviewView` in `RecordingEditorView`.
@@ -18,6 +18,7 @@ struct MetalPreviewView: NSViewRepresentable {
     let playerItem: AVPlayerItem
     let backgroundStyle: EditorKit.BackgroundStyle
     let zoomSegments: [ZoomSegment]
+    let effectSegments: [RecordingEffectSegment]
     let videoSize: CGSize
     let cursorTimeline: SmoothedCursorTimeline?
     let cursorCIImage: CIImage?
@@ -85,6 +86,7 @@ struct MetalPreviewView: NSViewRepresentable {
         if let renderer = MetalPreviewRenderer(player: player, videoOutput: videoOutput) {
             renderer.updateCompositor(sourceSize: videoSize, backgroundStyle: backgroundStyle)
             renderer.updateZoom(segments: zoomSegments, frameSize: videoSize)
+            renderer.updateEffects(effectSegments)
             renderer.updateCursorTimeline(cursorTimeline)
             renderer.updateCursor(image: cursorCIImage, provider: cursorOverlayProvider)
             view.device = MTLCreateSystemDefaultDevice()
@@ -111,6 +113,7 @@ struct MetalPreviewView: NSViewRepresentable {
         guard let renderer = context.coordinator.renderer else { return }
         renderer.updateCompositor(sourceSize: videoSize, backgroundStyle: backgroundStyle)
         renderer.updateZoom(segments: zoomSegments, frameSize: videoSize)
+        renderer.updateEffects(effectSegments)
         renderer.updateCursorTimeline(cursorTimeline)
         renderer.updateCursor(image: cursorCIImage, provider: cursorOverlayProvider)
         // Keep container-level rounding in sync with the slider value.

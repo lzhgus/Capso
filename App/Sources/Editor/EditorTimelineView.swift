@@ -6,6 +6,8 @@ struct EditorTimelineView: View {
     @State private var isScrubbingTimeline = false
     @State private var shouldResumePlaybackAfterScrub = false
 
+    private let trimTrackHeight: Double = 36
+
     var body: some View {
         VStack(spacing: 6) {
             trimRegionRow
@@ -51,9 +53,10 @@ struct EditorTimelineView: View {
                 .contentShape(Rectangle())
                 .gesture(trackScrubGesture(trackWidth: trackWidth))
             }
-            .frame(height: 40)
+            .frame(height: trimTrackHeight)
+            .clipped()
 
-            ZoomTrackView(coordinator: coordinator)
+            EffectsTrackView(coordinator: coordinator)
 
             timeMarkers
         }
@@ -63,27 +66,21 @@ struct EditorTimelineView: View {
 
     private func playhead(trackWidth: Double) -> some View {
         let x = timeToX(coordinator.currentTime, in: trackWidth)
-        return ZStack {
-            Rectangle()
-                .fill(Color.accentColor)
-                .frame(width: 2, height: 48)
+        let handleWidth: Double = 12
+        let offsetX = max(0, min(trackWidth - handleWidth, x - handleWidth / 2))
 
+        return VStack(spacing: 0) {
             Circle()
                 .fill(Color.accentColor)
                 .frame(width: 10, height: 10)
-                .offset(y: -24)
+
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(width: 2, height: trimTrackHeight - 10)
         }
-        .offset(x: x - 1)
-        .gesture(
-            DragGesture(minimumDistance: 1)
-                .onChanged { value in
-                    beginScrubbing()
-                    scrub(to: value.location.x, trackWidth: trackWidth)
-                }
-                .onEnded { _ in
-                    endScrubbing()
-                }
-        )
+        .frame(width: handleWidth, height: trimTrackHeight, alignment: .top)
+        .offset(x: offsetX)
+        .allowsHitTesting(false)
     }
 
     private func trackScrubGesture(trackWidth: Double) -> some Gesture {
@@ -106,10 +103,8 @@ struct EditorTimelineView: View {
         onDrag: @escaping (TimeInterval) -> Void
     ) -> some View {
         let x = timeToX(time, in: trackWidth)
-        // Visible handle: 12pt wide so it's easier to see
-        let handleWidth: Double = 12
-        // Invisible hit area: 28pt wide so small touches at the edge register
-        let hitAreaWidth: Double = 28
+        let handleWidth: Double = 10
+        let hitAreaWidth: Double = 24
 
         // Keep the visible bar inset from the edge so it's never clipped:
         // leading handle sits to the RIGHT of x, trailing sits to the LEFT.
@@ -124,12 +119,11 @@ struct EditorTimelineView: View {
         return ZStack {
             // Invisible oversized tap/drag region gives a larger click target
             Color.clear
-                .frame(width: hitAreaWidth, height: 44)
+                .frame(width: hitAreaWidth, height: trimTrackHeight)
 
-            // Visible orange bar
             RoundedRectangle(cornerRadius: 3)
                 .fill(Color.orange.opacity(0.85))
-                .frame(width: handleWidth, height: 44)
+                .frame(width: handleWidth, height: trimTrackHeight - 4)
         }
         .offset(x: hitOffset)
         // highPriorityGesture ensures the handle drag takes precedence over

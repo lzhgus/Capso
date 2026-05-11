@@ -13,6 +13,19 @@ struct FrameCompositorTests {
         CIImage(color: color).cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
     }
 
+    private func renderedBytes(_ image: CIImage, width: Int, height: Int) -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        CIContext().render(
+            image,
+            toBitmap: &bytes,
+            rowBytes: width * 4,
+            bounds: CGRect(x: 0, y: 0, width: width, height: height),
+            format: .RGBA8,
+            colorSpace: CGColorSpaceCreateDeviceRGB()
+        )
+        return bytes
+    }
+
     @Test("Identity transform returns image with same dimensions")
     func identityTransform() {
         let source = makeTestImage()
@@ -87,5 +100,53 @@ struct FrameCompositorTests {
         let size = compositor.outputSize
         #expect(size.width == 1920)
         #expect(size.height == 1080)
+    }
+
+    @Test("Blur effect changes only while active")
+    func blurEffectChangesOnlyWhileActive() {
+        let base = CIImage(color: .white)
+            .cropped(to: CGRect(x: 0, y: 0, width: 120, height: 80))
+        let centerBlock = CIImage(color: .black)
+            .cropped(to: CGRect(x: 46, y: 26, width: 28, height: 28))
+        let source = centerBlock.composited(over: base)
+        let effect = RecordingEffectSegment(
+            startTime: 1,
+            endTime: 3,
+            payload: .blur(
+                BlurEffectPayload(
+                    rect: NormalizedRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5),
+                    radius: 12
+                )
+            )
+        )
+        let compositor = FrameCompositor(
+            sourceSize: CGSize(width: 120, height: 80),
+            backgroundStyle: BackgroundStyle(enabled: false),
+            outputScale: 1.0
+        )
+
+        let inactive = compositor.compose(
+            frame: source,
+            zoomTransform: .identity,
+            cursorPosition: nil,
+            cursorImage: nil,
+            blurEffects: [effect],
+            time: 0.5
+        )
+        let active = compositor.compose(
+            frame: source,
+            zoomTransform: .identity,
+            cursorPosition: nil,
+            cursorImage: nil,
+            blurEffects: [effect],
+            time: 2
+        )
+
+        #expect(inactive.extent == source.extent)
+        #expect(active.extent == source.extent)
+        #expect(
+            renderedBytes(active, width: 120, height: 80) !=
+                renderedBytes(inactive, width: 120, height: 80)
+        )
     }
 }
