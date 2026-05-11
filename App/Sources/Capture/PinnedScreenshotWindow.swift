@@ -1,5 +1,6 @@
 // App/Sources/Capture/PinnedScreenshotWindow.swift
 import AppKit
+import CaptureKit
 
 @MainActor
 final class PinnedScreenshotWindow: NSPanel {
@@ -150,7 +151,7 @@ final class PinnedScreenshotWindow: NSPanel {
         max(100, CGFloat(image.width) * min(1.0, 400 / max(CGFloat(image.width), CGFloat(image.height))))
     }
 
-    private func adjustScale(by factor: CGFloat) {
+    private func adjustScale(by factor: CGFloat, animate: Bool = true) {
         let oldFrame = frame
         let newWidth = min(max(160, oldFrame.width * factor), 1400)
         let aspect = CGFloat(image.height) / CGFloat(image.width)
@@ -161,10 +162,24 @@ final class PinnedScreenshotWindow: NSPanel {
             y: oldFrame.midY - newHeight / 2
         )
 
-        setFrame(NSRect(origin: newOrigin, size: NSSize(width: newWidth, height: newHeight)), display: true, animate: true)
+        setFrame(NSRect(origin: newOrigin, size: NSSize(width: newWidth, height: newHeight)), display: true, animate: animate)
         currentScale = newWidth / baseDisplayWidth
         onFrameChanged?(frame)
         onScaleChanged?(Int(currentScale * 100))
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard event.momentumPhase == [] else { return }
+        guard let factor = ScrollZoomBehavior.scaleFactor(
+            verticalDelta: event.scrollingDeltaY,
+            horizontalDelta: event.scrollingDeltaX,
+            hasPreciseDeltas: event.hasPreciseScrollingDeltas
+        ) else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        adjustScale(by: factor, animate: false)
     }
 
     override func mouseDown(with event: NSEvent) {
