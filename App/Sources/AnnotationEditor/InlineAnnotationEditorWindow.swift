@@ -102,6 +102,9 @@ private struct InlineAnnotationEditorView: View {
     @AppStorage("annotationRedactionMode") private var redactionMode: RedactionMode = .pixelate
     @AppStorage("annotationTextFontSize") private var savedTextFontSize: Double = 48
     @AppStorage("annotationStrokePattern") private var savedStrokePattern: StrokePattern = .solid
+    @AppStorage("annotationTextFillEnabled") private var textFillEnabled: Bool = false
+    @AppStorage("annotationTextOutlineEnabled") private var textOutlineEnabled: Bool = false
+    @AppStorage("annotationTextStrokeEnabled") private var textStrokeEnabled: Bool = true
 
     @State private var lineWidth: CGFloat = 3
     @State private var strokePattern: StrokePattern = .solid
@@ -135,6 +138,18 @@ private struct InlineAnnotationEditorView: View {
         (currentTool == .text || isEditingText) ? lineWidth : CGFloat(savedTextFontSize)
     }
 
+    private var textFillColor: AnnotationColor? {
+        textFillEnabled ? .black : nil
+    }
+
+    private var textOutlineColor: AnnotationColor? {
+        textOutlineEnabled ? .white : nil
+    }
+
+    private var textGlyphStrokeColor: AnnotationColor? {
+        textStrokeEnabled ? .white : nil
+    }
+
     private var canvasRect: CGRect {
         let width = imageSize.width * displayScale
         let height = imageSize.height * displayScale
@@ -151,7 +166,7 @@ private struct InlineAnnotationEditorView: View {
         let margin: CGFloat = 16
         let gap: CGFloat = 12
         let toolbarWidth = max(360, min(screenSize.width - margin * 2, 880))
-        let toolbarHeight: CGFloat = 58
+        let toolbarHeight: CGFloat = (currentTool == .text || isEditingText) ? 102 : 58
         let targetX = canvasRect.midX - toolbarWidth / 2
         let maxX = max(margin, screenSize.width - toolbarWidth - margin)
         let x = min(max(targetX, margin), maxX)
@@ -179,6 +194,9 @@ private struct InlineAnnotationEditorView: View {
                 currentStyle: currentStyle,
                 redactionMode: redactionMode,
                 textFontSize: effectiveTextFontSize,
+                textFillColor: textFillColor,
+                textOutlineColor: textOutlineColor,
+                textGlyphStrokeColor: textGlyphStrokeColor,
                 zoomScale: displayScale,
                 refreshTrigger: refreshTrigger,
                 textRegions: textRegions,
@@ -187,8 +205,11 @@ private struct InlineAnnotationEditorView: View {
                     document.clearSelection()
                     currentTool = .select
                 },
-                onTextEditingStarted: { fontSize in
+                onTextEditingStarted: { fontSize, hasFill, hasOutline, hasStroke in
                     isEditingText = true
+                    textFillEnabled = hasFill
+                    textOutlineEnabled = hasOutline
+                    textStrokeEnabled = hasStroke
                     if lineWidth != fontSize {
                         lineWidth = fontSize
                     }
@@ -213,6 +234,9 @@ private struct InlineAnnotationEditorView: View {
                 lineWidth: $lineWidth,
                 strokePattern: $strokePattern,
                 filled: $filled,
+                textFillEnabled: $textFillEnabled,
+                textOutlineEnabled: $textOutlineEnabled,
+                textStrokeEnabled: $textStrokeEnabled,
                 redactionMode: $redactionMode,
                 isEditingText: isEditingText,
                 canUndo: document.canUndo,
@@ -263,6 +287,9 @@ private struct InlineAnnotationEditorView: View {
             updateSelectedStyle()
         }
         .onChange(of: filled) { _, _ in updateSelectedStyle() }
+        .onChange(of: textFillEnabled) { _, _ in updateSelectedStyle() }
+        .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }
+        .onChange(of: textStrokeEnabled) { _, _ in updateSelectedStyle() }
         .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
     }
 
@@ -299,6 +326,11 @@ private struct InlineAnnotationEditorView: View {
                     lineWidth: lineWidth,
                     filled: filled
                 )
+            } else if let text = obj as? TextObject {
+                text.fillColor = textFillColor
+                text.outlineColor = textOutlineColor
+                text.glyphStrokeColor = textGlyphStrokeColor
+                text.style = currentStyle
             } else {
                 obj.style = currentStyle
             }
@@ -355,6 +387,9 @@ private struct InlineAnnotationToolbar: View {
     @Binding var lineWidth: CGFloat
     @Binding var strokePattern: StrokePattern
     @Binding var filled: Bool
+    @Binding var textFillEnabled: Bool
+    @Binding var textOutlineEnabled: Bool
+    @Binding var textStrokeEnabled: Bool
     @Binding var redactionMode: RedactionMode
 
     let isEditingText: Bool
@@ -372,108 +407,44 @@ private struct InlineAnnotationToolbar: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 4) {
-                toolButton(.select)
-                toolButton(.arrow)
-                toolButton(.line)
-                toolButton(.rectangle)
-                toolButton(.ellipse)
-                toolButton(.text)
-                toolButton(.freehand)
-                toolButton(.pixelate)
-                toolButton(.counter)
-                toolButton(.highlighter)
-            }
-
-            divider
-
-            AnnotationColorControls(
-                currentColor: $currentColor,
-                swatchSize: 17,
-                selectedRingColor: .white
-            )
-
-            divider
-
-            HStack(spacing: 7) {
-                if !(currentTool == .pixelate && redactionMode == .solid) {
-                    Slider(value: $lineWidth, in: sliderRange, step: sliderStep)
-                        .frame(width: 82)
-                        .help(sliderHelp)
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                HStack(spacing: 4) {
+                    toolButton(.select)
+                    toolButton(.arrow)
+                    toolButton(.line)
+                    toolButton(.rectangle)
+                    toolButton(.ellipse)
+                    toolButton(.text)
+                    toolButton(.freehand)
+                    toolButton(.pixelate)
+                    toolButton(.counter)
+                    toolButton(.highlighter)
                 }
 
-                if currentTool == .pixelate {
-                    Picker("", selection: $redactionMode) {
-                        ForEach(RedactionMode.allCases, id: \.self) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 168)
-                    .help("Redaction Mode")
-                }
+                divider
 
-                if currentTool == .arrow || currentTool == .line {
-                    Picker("", selection: $strokePattern) {
-                        ForEach(StrokePattern.allCases, id: \.self) { pattern in
-                            StrokePatternGlyph(pattern: pattern)
-                                .tag(pattern)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 104)
-                    .help("Stroke Pattern")
-                }
-
-                if currentTool != .counter
-                    && currentTool != .arrow
-                    && currentTool != .line
-                    && currentTool != .highlighter
-                    && currentTool != .pixelate
-                    && !isFontSizeMode {
-                    iconButton(
-                        systemName: filled ? "square.fill" : "square",
-                        help: "Fill Shape",
-                        isActive: filled,
-                        action: { filled.toggle() }
-                    )
-                }
-            }
-
-            divider
-
-            HStack(spacing: 4) {
-                iconButton(
-                    systemName: "arrow.uturn.backward",
-                    help: "Undo",
-                    isEnabled: canUndo,
-                    action: onUndo
+                AnnotationColorControls(
+                    currentColor: $currentColor,
+                    swatchSize: 17,
+                    selectedRingColor: .white
                 )
-                .keyboardShortcut("z", modifiers: .command)
 
-                iconButton(
-                    systemName: "arrow.uturn.forward",
-                    help: "Redo",
-                    isEnabled: canRedo,
-                    action: onRedo
-                )
-                .keyboardShortcut("z", modifiers: [.command, .shift])
+                divider
+
+                primaryControls
+
+                divider
+
+                undoRedoControls
+
+                Spacer(minLength: 4)
+
+                actionControls
             }
 
-            Spacer(minLength: 4)
-
-            HStack(spacing: 4) {
-                iconButton(systemName: "xmark", help: "Close", action: onCancel)
-                    .keyboardShortcut(.escape, modifiers: [])
-                iconButton(systemName: "doc.on.doc", help: "Copy", action: onCopy)
-                    .keyboardShortcut("c", modifiers: .command)
-                iconButton(systemName: "pin", help: "Pin to Screen", action: onPin)
-                    .keyboardShortcut("p", modifiers: .command)
-                iconButton(systemName: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
-                    .keyboardShortcut("s", modifiers: .command)
+            if isFontSizeMode {
+                textEffectsGroup
             }
         }
         .padding(.horizontal, 14)
@@ -486,6 +457,114 @@ private struct InlineAnnotationToolbar: View {
         )
         .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
         .environment(\.colorScheme, .dark)
+    }
+
+    private var primaryControls: some View {
+        HStack(spacing: 7) {
+            if !(currentTool == .pixelate && redactionMode == .solid) {
+                Slider(value: $lineWidth, in: sliderRange, step: sliderStep)
+                    .frame(width: 82)
+                    .help(sliderHelp)
+            }
+
+            if currentTool == .pixelate {
+                Picker("", selection: $redactionMode) {
+                    ForEach(RedactionMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 168)
+                .help("Redaction Mode")
+            }
+
+            if currentTool == .arrow || currentTool == .line {
+                Picker("", selection: $strokePattern) {
+                    ForEach(StrokePattern.allCases, id: \.self) { pattern in
+                        StrokePatternGlyph(pattern: pattern)
+                            .tag(pattern)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 104)
+                .help("Stroke Pattern")
+            }
+
+            if currentTool != .counter
+                && currentTool != .arrow
+                && currentTool != .line
+                && currentTool != .highlighter
+                && currentTool != .pixelate
+                && !isFontSizeMode {
+                iconButton(
+                    systemName: filled ? "square.fill" : "square",
+                    help: "Fill Shape",
+                    isActive: filled,
+                    action: { filled.toggle() }
+                )
+            }
+        }
+    }
+
+    private var undoRedoControls: some View {
+        HStack(spacing: 4) {
+            iconButton(
+                systemName: "arrow.uturn.backward",
+                help: "Undo",
+                isEnabled: canUndo,
+                action: onUndo
+            )
+            .keyboardShortcut("z", modifiers: .command)
+
+            iconButton(
+                systemName: "arrow.uturn.forward",
+                help: "Redo",
+                isEnabled: canRedo,
+                action: onRedo
+            )
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+        }
+    }
+
+    private var actionControls: some View {
+        HStack(spacing: 4) {
+            iconButton(systemName: "xmark", help: "Close", action: onCancel)
+                .keyboardShortcut(.escape, modifiers: [])
+            iconButton(systemName: "doc.on.doc", help: "Copy", action: onCopy)
+                .keyboardShortcut("c", modifiers: .command)
+            iconButton(systemName: "pin", help: "Pin to Screen", action: onPin)
+                .keyboardShortcut("p", modifiers: .command)
+            iconButton(systemName: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
+                .keyboardShortcut("s", modifiers: .command)
+        }
+    }
+
+    private var textEffectsGroup: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                textEffectToggle("Fill", isOn: $textFillEnabled, help: "Text Fill")
+                textEffectToggle("Outline", isOn: $textOutlineEnabled, help: "Text Box Outline")
+                textEffectToggle("Trace", isOn: $textStrokeEnabled, help: "Text Trace")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func textEffectToggle(
+        _ title: LocalizedStringKey,
+        isOn: Binding<Bool>,
+        help: LocalizedStringKey
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(minWidth: 46, minHeight: 20)
+        }
+        .toggleStyle(.button)
+        .controlSize(.small)
+        .help(help)
     }
 
     private var divider: some View {

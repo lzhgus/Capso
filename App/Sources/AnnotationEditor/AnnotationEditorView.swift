@@ -47,6 +47,9 @@ struct AnnotationEditorView: View {
     @AppStorage("annotationHighlighterWidth") private var savedHighlighterWidth: Double = 20
     @AppStorage("annotationRedactionMode") private var redactionMode: RedactionMode = .pixelate
     @AppStorage("annotationStrokePattern") private var savedStrokePattern: StrokePattern = .solid
+    @AppStorage("annotationTextFillEnabled") private var textFillEnabled: Bool = false
+    @AppStorage("annotationTextOutlineEnabled") private var textOutlineEnabled: Bool = false
+    @AppStorage("annotationTextStrokeEnabled") private var textStrokeEnabled: Bool = true
     /// Preserved font size for the Text tool. Swapped in/out of `lineWidth`
     /// as the user toggles tools — same pattern as savedBlockSize etc.
     @AppStorage("annotationTextFontSize") private var savedTextFontSize: Double = 48
@@ -125,6 +128,18 @@ struct AnnotationEditorView: View {
     /// fall back to the preserved value from the last text session.
     private var effectiveTextFontSize: CGFloat {
         (currentTool == .text || isEditingText) ? lineWidth : CGFloat(savedTextFontSize)
+    }
+
+    private var textFillColor: AnnotationColor? {
+        textFillEnabled ? .black : nil
+    }
+
+    private var textOutlineColor: AnnotationColor? {
+        textOutlineEnabled ? .white : nil
+    }
+
+    private var textGlyphStrokeColor: AnnotationColor? {
+        textStrokeEnabled ? .white : nil
     }
 
     /// Preserved width for the given tool. Bridges between the `Double`
@@ -206,6 +221,9 @@ struct AnnotationEditorView: View {
                     lineWidth: $lineWidth,
                     strokePattern: $strokePattern,
                     filled: $filled,
+                    textFillEnabled: $textFillEnabled,
+                    textOutlineEnabled: $textOutlineEnabled,
+                    textStrokeEnabled: $textStrokeEnabled,
                     redactionMode: $redactionMode,
                     showBeautifyPanel: $showBeautifyPanel,
                     isEditingText: isEditingText,
@@ -242,6 +260,9 @@ struct AnnotationEditorView: View {
                                 currentStyle: currentStyle,
                                 redactionMode: redactionMode,
                                 textFontSize: effectiveTextFontSize,
+                                textFillColor: textFillColor,
+                                textOutlineColor: textOutlineColor,
+                                textGlyphStrokeColor: textGlyphStrokeColor,
                                 zoomScale: zoomScale,
                                 refreshTrigger: refreshTrigger,
                                 textRegions: textRegions,
@@ -250,8 +271,11 @@ struct AnnotationEditorView: View {
                                     document.clearSelection()
                                     currentTool = .select
                                 },
-                                onTextEditingStarted: { fontSize in
+                                onTextEditingStarted: { fontSize, hasFill, hasOutline, hasStroke in
                                     isEditingText = true
+                                    textFillEnabled = hasFill
+                                    textOutlineEnabled = hasOutline
+                                    textStrokeEnabled = hasStroke
                                     // Sync slider to the object's fontSize when
                                     // re-editing. Harmless for fresh edits: the
                                     // value matches what we just pushed in.
@@ -327,6 +351,9 @@ struct AnnotationEditorView: View {
                         updateSelectedStyle()
                     }
                     .onChange(of: filled) { _, _ in updateSelectedStyle() }
+                    .onChange(of: textFillEnabled) { _, _ in updateSelectedStyle() }
+                    .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }
+                    .onChange(of: textStrokeEnabled) { _, _ in updateSelectedStyle() }
                     .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
                     .onChange(of: geo.size) { _, newSize in
                         // Re-fit if window is resized and we're at fit scale
@@ -406,6 +433,11 @@ struct AnnotationEditorView: View {
             } else if let counter = obj as? CounterObject {
                 counter.radius = lineWidth
                 counter.style = AnnotationKit.StrokeStyle(color: currentColor, lineWidth: lineWidth, filled: filled)
+            } else if let text = obj as? TextObject {
+                text.fillColor = textFillColor
+                text.outlineColor = textOutlineColor
+                text.glyphStrokeColor = textGlyphStrokeColor
+                text.style = currentStyle
             } else {
                 obj.style = currentStyle
             }
