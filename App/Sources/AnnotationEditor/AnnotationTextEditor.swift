@@ -1,43 +1,32 @@
 // App/Sources/AnnotationEditor/AnnotationTextEditor.swift
-//
-// Inline, in-canvas text editor that replaces the modal NSAlert popup the
-// annotation text tool used before. Appears at the click point, grows with
-// content, commits on **Esc or outside-click** (no Return-commit — Return and
-// Shift+Return both insert newlines, matching CleanShot X). IME composition
-// is respected so Chinese / Japanese / Korean users can confirm candidates
-// with Return without committing the whole edit.
-//
-// Visual language: refined native macOS — a hairline accent-tinted rounded
-// outline and a soft dark backdrop. Intentionally quieter than CleanShot X,
-// so it never fights the content being annotated.
-
 import AppKit
 
 @MainActor
 protocol AnnotationTextEditorDelegate: AnyObject {
-    /// Called when the user commits the edit (Return / Esc / outside-click).
-    /// `text` may be empty — the canvas decides whether to discard or delete.
     func textEditor(_ editor: AnnotationTextEditor, didCommitText text: String)
 }
 
 @MainActor
-final class AnnotationTextEditor: NSView {
-    weak var delegate: AnnotationTextEditorDelegate?
+final class AnnotationTextEditor: NSScrollView {
+    private static let liveGlyphTraceStrokeWidth: CGFloat = 2.0
 
-    /// Origin in **image coordinates**. The owning canvas multiplies by
-    /// `zoomScale` to position us in its view space.
-    var imageOrigin: CGPoint = .zero
+    weak var editorDelegate: AnnotationTextEditorDelegate?
 
-    /// Zoom of the owning canvas. Controls the effective on-screen font size
-    /// so typed glyphs line up 1:1 with what `TextObject.render` will draw.
+    var imageOrigin: CGPoint = .zero {
+        didSet { updateFrameFromImageGeometry() }
+    }
+    var boxSize: CGSize = .zero {
+        didSet { updateFrameFromImageGeometry() }
+    }
+
     var zoomScale: CGFloat = 1.0 {
         didSet {
             guard zoomScale != oldValue else { return }
             applyAttributes()
+            updateFrameFromImageGeometry()
         }
     }
 
-    /// Font size in **image coordinates** (what gets stored on TextObject).
     var fontSize: CGFloat = 48 {
         didSet {
             guard fontSize != oldValue else { return }
@@ -45,7 +34,6 @@ final class AnnotationTextEditor: NSView {
         }
     }
 
-    /// Font name matches what TextObject uses when rendering.
     var fontName: String = ".AppleSystemUIFont" {
         didSet {
             guard fontName != oldValue else { return }
@@ -53,7 +41,6 @@ final class AnnotationTextEditor: NSView {
         }
     }
 
-    /// Text color with style.opacity already applied.
     var textColor: NSColor = .red {
         didSet {
             guard textColor != oldValue else { return }
@@ -61,33 +48,58 @@ final class AnnotationTextEditor: NSView {
         }
     }
 
-    /// String currently in the editor.
+    var fillColor: NSColor?
+    var boxOutlineColor: NSColor?
+    var glyphStrokeColor: NSColor? {
+        didSet {
+            applyAttributes()
+            invalidateCanvasTrace()
+        }
+    }
+
     var text: String { textView.string }
+    var viewBoxFrame: CGRect { frame }
 
     private let textView: InlineTextView
-    private let innerPadding: CGFloat = 4
+    private let textInset: CGFloat = 4
+    private var manuallySizedWidth = false
+    private var hasBegunEditing = false
 
     override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override init(frame frameRect: NSRect) {
         self.textView = InlineTextView(frame: .zero)
         super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.masksToBounds = false
 
+        configureScrollView()
         configureTextView()
-        addSubview(textView)
+        documentView = textView
 
         textView.commitHandler = { [weak self] in
             guard let self else { return }
-            self.delegate?.textEditor(self, didCommitText: self.textView.string)
+            self.editorDelegate?.textEditor(self, didCommitText: self.textView.string)
         }
         textView.sizeChangeHandler = { [weak self] in
             self?.resizeToFit()
+            self?.invalidateCanvasTrace()
         }
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+
+    private func configureScrollView() {
+        hasVerticalScroller = false
+        hasHorizontalScroller = false
+        autohidesScrollers = true
+        drawsBackground = false
+        borderType = .noBorder
+        contentView.drawsBackground = false
+        wantsLayer = true
+        layer?.masksToBounds = true
+        contentView.wantsLayer = true
+        contentView.layer?.masksToBounds = true
+    }
 
     private func configureTextView() {
         textView.isEditable = true
@@ -107,60 +119,72 @@ final class AnnotationTextEditor: NSView {
         textView.isAutomaticTextReplacementEnabled = false
         textView.smartInsertDeleteEnabled = false
 
-        // Unbounded container so multi-line grows horizontally with longest line.
-        textView.textContainerInset = .zero
+        textView.textContainerInset = NSSize(width: textInset, height: textInset)
         textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
-        textView.textContainer?.containerSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        textView.isHorizontallyResizable = true
+        textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.minSize = .zero
-        textView.maxSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
-
-        // Make the caret visible on typical dark backgrounds.
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.insertionPointColor = .white
     }
 
-    // MARK: - Lifecycle
-
-    /// Seed the editor with `initialText`, apply current style, and select-all
-    /// (so that typing replaces a double-click-restored string).
     func beginEditing(initialText: String) {
+        hasBegunEditing = true
         textView.string = initialText
-        applyAttributes()
-        // Place caret at end (new text) or select all (existing text).
-        let len = (textView.string as NSString).length
-        if initialText.isEmpty {
-            textView.setSelectedRange(NSRange(location: 0, length: 0))
-        } else {
-            textView.setSelectedRange(NSRange(location: 0, length: len))
+        if boxSize == .zero {
+            boxSize = defaultBoxSize()
         }
+        applyAttributes()
+        let len = (textView.string as NSString).length
+        textView.setSelectedRange(initialText.isEmpty ? NSRange(location: 0, length: 0) : NSRange(location: 0, length: len))
         resizeToFit()
     }
 
-    /// Ask the window to make our text view first responder. Call after the
-    /// view is installed in the window hierarchy.
     func focusTextView() {
         window?.makeFirstResponder(textView)
     }
 
-    // MARK: - Attributes / layout
+    func containsCanvasPoint(_ pointInCanvas: CGPoint) -> Bool {
+        frame.contains(pointInCanvas)
+    }
+
+    func resizeBox(to rect: CGRect) {
+        manuallySizedWidth = true
+        imageOrigin = rect.origin
+        boxSize = rect.size
+        layoutTextView()
+        invalidateCanvasTrace()
+    }
 
     private var attributes: [NSAttributedString.Key: Any] {
         let effective = max(1, fontSize * zoomScale)
         let font = NSFont(name: fontName, size: effective)
             ?? NSFont.systemFont(ofSize: effective, weight: .medium)
-        return [
+        let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: textColor,
         ]
+        return attrs
+    }
+
+    func drawGlyphTraceBehindText() {
+        guard let glyphStrokeColor, !text.isEmpty else { return }
+        let effective = max(1, fontSize * zoomScale)
+        let font = NSFont(name: fontName, size: effective)
+            ?? NSFont.systemFont(ofSize: effective, weight: .medium)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.clear,
+            .strokeColor: glyphStrokeColor,
+            .strokeWidth: Self.liveGlyphTraceStrokeWidth,
+        ]
+        (text as NSString).draw(
+            with: frame.insetBy(dx: textInset, dy: textInset),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attrs
+        )
     }
 
     private func applyAttributes() {
@@ -168,92 +192,103 @@ final class AnnotationTextEditor: NSView {
         if let storage = textView.textStorage, storage.length > 0 {
             storage.setAttributes(attributes, range: NSRange(location: 0, length: storage.length))
         }
-        resizeToFit()
+        if hasBegunEditing {
+            resizeToFit()
+        }
+    }
+
+    private func defaultBoxSize() -> CGSize {
+        CGSize(width: min(220, maxAutoWidth()), height: max(28, fontSize + 12))
+    }
+
+    private func minBoxSize() -> CGSize {
+        CGSize(width: 60, height: max(28, fontSize + 12))
+    }
+
+    private func maxAutoWidth() -> CGFloat {
+        guard let superview else { return 420 }
+        let remaining = (superview.bounds.width - imageOrigin.x * zoomScale - 12) / max(zoomScale, 0.1)
+        return max(minBoxSize().width, remaining)
     }
 
     private func resizeToFit() {
-        guard let layoutManager = textView.layoutManager,
-              let container = textView.textContainer else { return }
-        layoutManager.ensureLayout(for: container)
-        let used = layoutManager.usedRect(for: container)
+        guard hasBegunEditing, let storage = textView.textStorage else { return }
 
-        // Reserve width for the caret so it doesn't clip on empty / trailing.
-        let caretRoom = max(2, (fontSize * zoomScale) * 0.05)
-        let minWidth = max(12, fontSize * zoomScale * 0.6)
-        let contentW = max(minWidth, ceil(used.width) + caretRoom)
-        let contentH = max(ceil(fontSize * zoomScale), ceil(used.height))
-
-        let outerW = contentW + innerPadding * 2
-        let outerH = contentH + innerPadding * 2
-
-        if frame.size.width != outerW || frame.size.height != outerH {
-            setFrameSize(NSSize(width: outerW, height: outerH))
+        let minSize = minBoxSize()
+        let naturalWidth = naturalTextWidth(storage: storage)
+        let targetWidth: CGFloat
+        if manuallySizedWidth {
+            targetWidth = max(minSize.width, boxSize.width)
+        } else {
+            targetWidth = min(maxAutoWidth(), max(minSize.width, naturalWidth))
         }
-        textView.frame = NSRect(
-            x: innerPadding, y: innerPadding,
-            width: contentW, height: contentH
+
+        let measuredHeight = measuredTextHeight(storage: storage, width: targetWidth)
+        boxSize = CGSize(width: targetWidth, height: max(minSize.height, measuredHeight))
+        layoutTextView()
+    }
+
+    private func naturalTextWidth(storage: NSTextStorage) -> CGFloat {
+        guard storage.length > 0 else { return boxSize == .zero ? defaultBoxSize().width : boxSize.width }
+        let scale = max(zoomScale, 0.1)
+        let rect = storage.boundingRect(
+            with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
         )
-        needsDisplay = true
+        return ceil(rect.width / scale) + (textInset * 2 + 2) / scale
     }
 
-    // MARK: - Drawing: thin solid outline + soft backdrop
-
-    override func draw(_ dirtyRect: NSRect) {
-        let outline = bounds.insetBy(dx: 0.5, dy: 0.5)
-        let path = NSBezierPath(roundedRect: outline, xRadius: 3, yRadius: 3)
-
-        // Soft, nearly-invisible backdrop — just enough to keep light text legible
-        // over messy backgrounds without visually competing with the capture.
-        NSColor.black.withAlphaComponent(0.08).setFill()
-        path.fill()
-
-        // Thin accent outline, intentionally understated.
-        NSColor.controlAccentColor.withAlphaComponent(0.55).setStroke()
-        path.lineWidth = 1
-        path.stroke()
+    private func measuredTextHeight(storage: NSTextStorage, width: CGFloat) -> CGFloat {
+        let scale = max(zoomScale, 0.1)
+        guard storage.length > 0 else { return fontSize + textInset * 2 / scale }
+        let contentWidth = max(1, width * scale - textInset * 2)
+        let rect = storage.boundingRect(
+            with: NSSize(width: contentWidth, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        )
+        return ceil(rect.height / scale) + (textInset * 2) / scale
     }
 
-    // MARK: - Hit testing
+    private func updateFrameFromImageGeometry() {
+        guard boxSize.width > 0, boxSize.height > 0 else { return }
+        let scale = max(zoomScale, 0.1)
+        frame = CGRect(
+            x: imageOrigin.x * scale,
+            y: imageOrigin.y * scale,
+            width: boxSize.width * scale,
+            height: boxSize.height * scale
+        )
+        layoutTextView()
+        invalidateCanvasTrace()
+    }
 
-    /// True if `pointInSelfSuperview` (the canvas's coordinate space) lands
-    /// inside our frame. Used by the canvas to decide whether a click commits
-    /// (outside) or falls through to the text view (inside).
-    func containsCanvasPoint(_ pointInSelfSuperview: CGPoint) -> Bool {
-        frame.contains(pointInSelfSuperview)
+    private func layoutTextView() {
+        textView.frame = CGRect(origin: .zero, size: bounds.size)
+        textView.textContainer?.containerSize = NSSize(
+            width: max(1, bounds.width - textInset * 2),
+            height: CGFloat.greatestFiniteMagnitude
+        )
+    }
+
+    private func invalidateCanvasTrace() {
+        superview?.needsDisplay = true
     }
 }
 
-// MARK: - Inline text view with commit-on-Return semantics
-
-/// NSTextView subclass that commits on Esc and lets every other keystroke
-/// (including Return and Shift+Return) fall through to the default multi-line
-/// NSTextView behavior — which is to insert a newline. This mirrors the
-/// behavior the user confirmed in CleanShot X: no keystroke commits; only
-/// losing focus (Esc, or clicking outside the editor) finalizes the edit.
-///
-/// IME composition (`hasMarkedText()`) always bypasses interception so that
-/// Return confirms a Chinese / Japanese / Korean candidate instead of acting
-/// on the editor itself.
 @MainActor
 private final class InlineTextView: NSTextView {
     var commitHandler: (() -> Void)?
     var sizeChangeHandler: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
-        // While IME has marked text, let the input manager handle everything.
         if hasMarkedText() {
             super.keyDown(with: event)
             return
         }
-
-        // Escape (keyCode 53) commits. Everything else — including Return and
-        // Shift+Return — falls through and gets the default newline-insertion
-        // behavior for a multi-line NSTextView.
         if event.keyCode == 53 {
             commitHandler?()
             return
         }
-
         super.keyDown(with: event)
     }
 

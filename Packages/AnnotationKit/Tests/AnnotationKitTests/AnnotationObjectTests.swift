@@ -2,6 +2,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import AppKit
 @testable import AnnotationKit
 
 @Suite("AnnotationObject")
@@ -56,6 +57,150 @@ struct AnnotationObjectTests {
         let id1 = ObjectID()
         let id2 = ObjectID()
         #expect(id1 != id2)
+    }
+}
+
+@Suite("TextObject")
+struct TextObjectTests {
+    @Test("Text copy preserves text effect colors")
+    func copyPreservesTextEffectColors() {
+        let text = TextObject(
+            text: "Hello",
+            origin: CGPoint(x: 10, y: 20),
+            boxSize: CGSize(width: 120, height: 40),
+            fillColor: .black,
+            outlineColor: .white,
+            glyphStrokeColor: .white
+        )
+
+        let copy = text.copy() as? TextObject
+
+        #expect(copy?.text == text.text)
+        #expect(copy?.origin == text.origin)
+        #expect(copy?.boxSize == CGSize(width: 120, height: 40))
+        #expect(copy?.fillColor == .black)
+        #expect(copy?.outlineColor == .white)
+        #expect(copy?.glyphStrokeColor == .white)
+    }
+
+    @Test("Text trace expands bounds enough for large glyph stroke")
+    func traceExpandsBoundsEnoughForLargeGlyphStroke() {
+        let text = TextObject(
+            text: "Trace",
+            origin: CGPoint(x: 20, y: 30),
+            boxSize: CGSize(width: 100, height: 40),
+            fontSize: 200,
+            glyphStrokeColor: .white
+        )
+
+        #expect(text.bounds == CGRect(x: 14, y: 24, width: 112, height: 52))
+    }
+
+    @Test("Text trace preserves the foreground color")
+    func tracePreservesForegroundColor() {
+        let text = TextObject(
+            text: "傅师大发生的",
+            origin: CGPoint(x: 20, y: 20),
+            boxSize: CGSize(width: 380, height: 96),
+            fontSize: 72,
+            glyphStrokeColor: .white,
+            style: StrokeStyle(color: .yellow)
+        )
+
+        let counts = renderColorCounts(text)
+
+        #expect(counts.yellow > counts.white)
+    }
+
+    @Test("Resize geometry scales text from bottom right while anchoring top left")
+    func resizeGeometryScalesFromBottomRight() {
+        let originalBounds = CGRect(x: 10, y: 20, width: 100, height: 50)
+
+        let fontSize = TextResizeGeometry.fontSize(
+            originalBounds: originalBounds,
+            originalFontSize: 20,
+            handle: .bottomRight,
+            dragDelta: CGSize(width: 50, height: 10)
+        )
+        let origin = TextResizeGeometry.origin(
+            originalBounds: originalBounds,
+            resizedSize: CGSize(width: 150, height: 75),
+            handle: .bottomRight
+        )
+
+        #expect(fontSize == 30)
+        #expect(origin == CGPoint(x: 10, y: 20))
+    }
+
+    @Test("Resize geometry keeps the opposite corner anchored")
+    func resizeGeometryKeepsOppositeCornerAnchored() {
+        let originalBounds = CGRect(x: 10, y: 20, width: 100, height: 50)
+
+        let origin = TextResizeGeometry.origin(
+            originalBounds: originalBounds,
+            resizedSize: CGSize(width: 150, height: 75),
+            handle: .topLeft
+        )
+
+        #expect(origin == CGPoint(x: -40, y: -5))
+    }
+
+    @Test("Resize geometry changes text box while preserving opposite edge")
+    func resizeGeometryChangesTextBox() {
+        let originalBounds = CGRect(x: 10, y: 20, width: 100, height: 50)
+
+        let rect = TextResizeGeometry.rect(
+            originalBounds: originalBounds,
+            handle: .topLeft,
+            dragDelta: CGSize(width: 20, height: 10),
+            minSize: CGSize(width: 60, height: 30)
+        )
+
+        #expect(rect == CGRect(x: 30, y: 30, width: 80, height: 40))
+    }
+
+    private func renderColorCounts(_ text: TextObject) -> (yellow: Int, white: Int) {
+        let width = 420
+        let height = 140
+        let bytesPerPixel = 4
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * bytesPerPixel,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else {
+            Issue.record("Could not create bitmap context")
+            return (0, 0)
+        }
+
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        text.render(in: context)
+
+        var yellow = 0
+        var white = 0
+        for index in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
+            let r = pixels[index]
+            let g = pixels[index + 1]
+            let b = pixels[index + 2]
+            let a = pixels[index + 3]
+            guard a > 0 else { continue }
+
+            if r > 180, g > 140, b < 80 {
+                yellow += 1
+            } else if r > 180, g > 180, b > 180 {
+                white += 1
+            }
+        }
+
+        return (yellow, white)
     }
 }
 

@@ -8,6 +8,9 @@ struct AnnotationToolbar: View {
     @Binding var lineWidth: CGFloat
     @Binding var strokePattern: StrokePattern
     @Binding var filled: Bool
+    @Binding var textFillEnabled: Bool
+    @Binding var textOutlineEnabled: Bool
+    @Binding var textStrokeEnabled: Bool
     @Binding var redactionMode: RedactionMode
     @Binding var showBeautifyPanel: Bool
     /// True when an inline text edit is active (either via the text tool or
@@ -32,20 +35,27 @@ struct AnnotationToolbar: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            toolGroup
-            toolbarDivider
-            colorGroup
-            toolbarDivider
-            strokeGroup
-            toolbarDivider
-            cropGroup
-            toolbarDivider
-            beautifyGroup
-            toolbarDivider
-            undoGroup
-            Spacer()
-            actionGroup
+        VStack(spacing: 6) {
+            HStack(spacing: 12) {
+                toolGroup
+                toolbarDivider
+                colorGroup
+                toolbarDivider
+                strokeGroup
+                toolbarDivider
+                cropGroup
+                toolbarDivider
+                beautifyGroup
+                toolbarDivider
+                undoGroup
+                Spacer()
+                actionGroup
+            }
+
+            if isFontSizeMode {
+                textEffectsGroup
+                    .transition(.opacity)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -168,6 +178,32 @@ struct AnnotationToolbar: View {
                 .help("Fill Shape")
             }
         }
+    }
+
+    private var textEffectsGroup: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                textEffectToggle("Fill", isOn: $textFillEnabled, help: "Text Fill")
+                textEffectToggle("Outline", isOn: $textOutlineEnabled, help: "Text Box Outline")
+                textEffectToggle("Trace", isOn: $textStrokeEnabled, help: "Text Trace")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func textEffectToggle(
+        _ title: LocalizedStringKey,
+        isOn: Binding<Bool>,
+        help: LocalizedStringKey
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(minWidth: 46, minHeight: 20)
+        }
+        .toggleStyle(.button)
+        .controlSize(.small)
+        .help(help)
     }
 
     private var cropGroup: some View {

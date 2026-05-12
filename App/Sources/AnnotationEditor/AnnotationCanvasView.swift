@@ -12,6 +12,9 @@ struct AnnotationCanvasView: NSViewRepresentable {
     /// Font size for the text tool / active inline edit. Bound to the
     /// font-size slider in SwiftUI.
     let textFontSize: CGFloat
+    let textFillColor: AnnotationColor?
+    let textOutlineColor: AnnotationColor?
+    let textGlyphStrokeColor: AnnotationColor?
     let zoomScale: CGFloat
     let refreshTrigger: Int
     var textRegions: [CGRect] = []
@@ -22,7 +25,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
     /// fontSize (existing object's size when re-editing, current slider
     /// value for a new edit). SwiftUI flips `isEditingText` and — for
     /// re-edits — syncs the size slider.
-    var onTextEditingStarted: ((CGFloat) -> Void)?
+    var onTextEditingStarted: ((CGFloat, Bool, Bool, Bool) -> Void)?
     /// Called when the inline text editor commits / dismisses.
     var onTextEditingEnded: (() -> Void)?
 
@@ -44,6 +47,9 @@ struct AnnotationCanvasView: NSViewRepresentable {
         view.currentStyle = currentStyle
         view.redactionMode = redactionMode
         view.currentTextFontSize = textFontSize
+        view.currentTextFillColor = textFillColor
+        view.currentTextOutlineColor = textOutlineColor
+        view.currentTextGlyphStrokeColor = textGlyphStrokeColor
         view.zoomScale = zoomScale
         view.textRegions = textRegions
         view.onDocumentChanged = { onDocumentChanged?() }
@@ -52,7 +58,9 @@ struct AnnotationCanvasView: NSViewRepresentable {
                 onSwitchToSelect?()
             }
         }
-        view.onTextEditingStarted = { fontSize in onTextEditingStarted?(fontSize) }
+        view.onTextEditingStarted = { fontSize, hasFill, hasOutline, hasStroke in
+            onTextEditingStarted?(fontSize, hasFill, hasOutline, hasStroke)
+        }
         view.onTextEditingEnded = { onTextEditingEnded?() }
         return view
     }
@@ -68,6 +76,9 @@ struct AnnotationCanvasView: NSViewRepresentable {
         nsView.currentStyle = currentStyle
         nsView.redactionMode = redactionMode
         nsView.currentTextFontSize = textFontSize
+        nsView.currentTextFillColor = textFillColor
+        nsView.currentTextOutlineColor = textOutlineColor
+        nsView.currentTextGlyphStrokeColor = textGlyphStrokeColor
         nsView.zoomScale = zoomScale
         nsView.textRegions = textRegions
         nsView.onDocumentChanged = { onDocumentChanged?() }
@@ -76,7 +87,9 @@ struct AnnotationCanvasView: NSViewRepresentable {
                 onSwitchToSelect?()
             }
         }
-        nsView.onTextEditingStarted = { fontSize in onTextEditingStarted?(fontSize) }
+        nsView.onTextEditingStarted = { fontSize, hasFill, hasOutline, hasStroke in
+            onTextEditingStarted?(fontSize, hasFill, hasOutline, hasStroke)
+        }
         nsView.onTextEditingEnded = { onTextEditingEnded?() }
         if context.coordinator.lastCommitEditingTrigger != commitEditingTrigger {
             context.coordinator.lastCommitEditingTrigger = commitEditingTrigger

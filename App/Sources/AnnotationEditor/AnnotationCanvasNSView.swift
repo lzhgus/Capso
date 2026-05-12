@@ -7,6 +7,21 @@ import AnnotationKit
 private enum ResizeHandle {
     case topLeft, topRight, bottomLeft, bottomRight
     case pathStart, pathEnd, pathControl
+
+    var textResizeHandle: TextResizeHandle? {
+        switch self {
+        case .topLeft:
+            .topLeft
+        case .topRight:
+            .topRight
+        case .bottomLeft:
+            .bottomLeft
+        case .bottomRight:
+            .bottomRight
+        case .pathStart, .pathEnd, .pathControl:
+            nil
+        }
+    }
 }
 
 private protocol PathEditableAnnotation: AnnotationObject {
@@ -32,13 +47,30 @@ final class AnnotationCanvasNSView: NSView {
     var currentTextFontSize: CGFloat = 48 {
         didSet { textEditor?.fontSize = currentTextFontSize }
     }
+    /// Optional text effects for newly created text and active inline edits.
+    var currentTextFillColor: AnnotationColor? {
+        didSet {
+            textEditor?.fillColor = currentTextFillColor?.nsColor.withAlphaComponent(0.5)
+            needsDisplay = true
+        }
+    }
+    var currentTextOutlineColor: AnnotationColor? {
+        didSet {
+            textEditor?.boxOutlineColor = currentTextOutlineColor?.nsColor
+            needsDisplay = true
+        }
+    }
+    var currentTextGlyphStrokeColor: AnnotationColor? {
+        didSet {
+            textEditor?.glyphStrokeColor = currentTextGlyphStrokeColor?.nsColor
+            needsDisplay = true
+        }
+    }
     var onDocumentChanged: (() -> Void)?
     var onObjectCreated: (() -> Void)?
     /// Fired when an inline text edit begins. Passes the effective fontSize
-    /// (matches the existing object when re-editing, or `currentTextFontSize`
-    /// for a fresh edit). SwiftUI uses it to flip `isEditingText` and — for
-    /// double-click re-edits — to sync the font-size slider to the object.
-    var onTextEditingStarted: ((CGFloat) -> Void)?
+    /// and text effect states, so SwiftUI can sync toolbar state.
+    var onTextEditingStarted: ((CGFloat, Bool, Bool, Bool) -> Void)?
     /// Fired on commit / cancel.
     var onTextEditingEnded: (() -> Void)?
 
@@ -81,6 +113,10 @@ final class AnnotationCanvasNSView: NSView {
     /// When re-editing an existing TextObject (double-click), holds it so we
     /// can mutate it on commit rather than creating a new object.
     private var editingOriginalObject: TextObject?
+    private var isResizingTextEditor = false
+    private var textEditorResizeHandle: ResizeHandle?
+    private var textEditorResizeStart: CGPoint?
+    private var textEditorOriginalBounds: CGRect?
 
     private let handleRadius: CGFloat = 5  // in image coords (adjusted by zoom in drawing)
 
@@ -137,6 +173,13 @@ final class AnnotationCanvasNSView: NSView {
 
     // MARK: - Cursor Management
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if liveTextHandleHitTest(pointInView: point) != nil {
+            return self
+        }
+        return super.hitTest(point)
+    }
+
     override func resetCursorRects() {
         discardCursorRects()
         let cursor: NSCursor = currentTool == .select ? .arrow : .crosshair
@@ -144,7 +187,13 @@ final class AnnotationCanvasNSView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        let point = toImagePoint(convert(event.locationInWindow, from: nil))
+        let pointInView = convert(event.locationInWindow, from: nil)
+        if let handle = liveTextHandleHitTest(pointInView: pointInView) {
+            cursorForHandle(handle).set()
+            return
+        }
+
+        let point = toImagePoint(pointInView)
         guard let doc = document else { return }
 
         if let selected = doc.selectedObject {
@@ -233,7 +282,9 @@ final class AnnotationCanvasNSView: NSView {
             }
 
             if let selected = doc.selectedObject {
-                if let pathObject = selected as? any PathEditableAnnotation {
+                if let text = selected as? TextObject, text === editingOriginalObject {
+                    // The live inline editor draws matching selection chrome below.
+                } else if let pathObject = selected as? any PathEditableAnnotation {
                     drawPathSelectionHandles(ctx: ctx, object: pathObject)
                 } else {
                     drawSelectionHandles(ctx: ctx, bounds: selected.bounds)
@@ -248,6 +299,54 @@ final class AnnotationCanvasNSView: NSView {
         }
 
         ctx.restoreGState()
+
+        drawLiveTextEditorChrome()
+    }
+
+    private func drawLiveTextEditorChrome() {
+        guard let editor = textEditor else { return }
+        let boxFrame = editor.viewBoxFrame
+        guard !boxFrame.isEmpty else { return }
+
+        let pillRect = boxFrame.insetBy(dx: -4, dy: -4)
+        let path = NSBezierPath(roundedRect: pillRect, xRadius: 4, yRadius: 4)
+        if let fillColor = editor.fillColor {
+            fillColor.setFill()
+            path.fill()
+        } else {
+            NSColor.black.withAlphaComponent(0.08).setFill()
+            path.fill()
+        }
+
+        if let outlineColor = editor.boxOutlineColor {
+            outlineColor.setStroke()
+            path.lineWidth = 2
+            path.stroke()
+        }
+
+        editor.drawGlyphTraceBehindText()
+
+        NSColor.controlAccentColor.withAlphaComponent(0.82).setStroke()
+        let selection = NSBezierPath(rect: boxFrame)
+        selection.lineWidth = 1
+        selection.setLineDash([4, 3], count: 2, phase: 0)
+        selection.stroke()
+
+        let handleSize: CGFloat = 8
+        for (_, center) in liveTextHandleCenters(boxFrame: boxFrame) {
+            let rect = CGRect(
+                x: center.x - handleSize / 2,
+                y: center.y - handleSize / 2,
+                width: handleSize,
+                height: handleSize
+            )
+            NSColor.windowBackgroundColor.setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            NSColor.controlAccentColor.setStroke()
+            let border = NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5))
+            border.lineWidth = 1.5
+            border.stroke()
+        }
     }
 
     private func drawPathSelectionHandles(ctx: CGContext, object: any PathEditableAnnotation) {
@@ -357,6 +456,26 @@ final class AnnotationCanvasNSView: NSView {
         ]
     }
 
+    private func liveTextHandleCenters(boxFrame: CGRect) -> [(ResizeHandle, CGPoint)] {
+        [
+            (.topLeft, CGPoint(x: boxFrame.minX, y: boxFrame.minY)),
+            (.topRight, CGPoint(x: boxFrame.maxX, y: boxFrame.minY)),
+            (.bottomLeft, CGPoint(x: boxFrame.minX, y: boxFrame.maxY)),
+            (.bottomRight, CGPoint(x: boxFrame.maxX, y: boxFrame.maxY)),
+        ]
+    }
+
+    private func liveTextHandleHitTest(pointInView: CGPoint) -> ResizeHandle? {
+        guard let editor = textEditor else { return nil }
+        let hitRadius: CGFloat = 12
+        for (handle, center) in liveTextHandleCenters(boxFrame: editor.viewBoxFrame) {
+            if hypot(pointInView.x - center.x, pointInView.y - center.y) <= hitRadius {
+                return handle
+            }
+        }
+        return nil
+    }
+
     private func drawPreview(ctx: CGContext, from start: CGPoint, to end: CGPoint) {
         ctx.saveGState()
         ctx.setStrokeColor(currentStyle.color.cgColor)
@@ -383,9 +502,17 @@ final class AnnotationCanvasNSView: NSView {
         // editor commits the edit; clicks inside are forwarded to the editor.
         if let editor = textEditor {
             let pointInSelf = convert(event.locationInWindow, from: nil)
+            if let handle = liveTextHandleHitTest(pointInView: pointInSelf) {
+                isResizingTextEditor = true
+                textEditorResizeHandle = handle
+                textEditorResizeStart = toImagePoint(pointInSelf)
+                textEditorOriginalBounds = CGRect(origin: editor.imageOrigin, size: editor.boxSize)
+                cursorForHandle(handle).set()
+                needsDisplay = true
+                return
+            }
             if editor.containsCanvasPoint(pointInSelf) {
-                // Let the NSTextView handle the click (focus / caret placement).
-                super.mouseDown(with: event)
+                editor.focusTextView()
                 return
             } else {
                 commitTextEditing()
@@ -480,6 +607,23 @@ final class AnnotationCanvasNSView: NSView {
         let point = toImagePoint(convert(event.locationInWindow, from: nil))
         dragCurrent = point
 
+        if isResizingTextEditor,
+           let editor = textEditor,
+           let handle = textEditorResizeHandle?.textResizeHandle,
+           let start = textEditorResizeStart,
+           let originalBounds = textEditorOriginalBounds {
+            let delta = CGSize(width: point.x - start.x, height: point.y - start.y)
+            let rect = TextResizeGeometry.rect(
+                originalBounds: originalBounds,
+                handle: handle,
+                dragDelta: delta,
+                minSize: CGSize(width: 60, height: max(28, editor.fontSize + 12))
+            )
+            editor.resizeBox(to: rect)
+            needsDisplay = true
+            return
+        }
+
         if let handle = activeResizeHandle, let objID = dragObjectID,
            let origBounds = resizeOriginalBounds, let start = dragStart {
             // Resize handles remain active even while a drawing tool is selected.
@@ -561,45 +705,36 @@ final class AnnotationCanvasNSView: NSView {
         else if let ellipse = obj as? EllipseObject { ellipse.rect = newRect }
         else if let pixelate = obj as? PixelateObject { pixelate.rect = newRect }
         else if let text = obj as? TextObject {
+            if text.boxSize != nil, let textHandle = handle.textResizeHandle {
+                let rect = TextResizeGeometry.rect(
+                    originalBounds: originalBounds,
+                    handle: textHandle,
+                    dragDelta: CGSize(width: dx, height: dy),
+                    minSize: CGSize(width: 60, height: max(28, text.fontSize + 12))
+                )
+                text.origin = rect.origin
+                text.boxSize = rect.size
+                return
+            }
+
             // Text has intrinsic bounds derived from fontSize, so we scale fontSize
             // uniformly and then reposition origin so the corner opposite the dragged
             // handle stays fixed.
             guard let origFontSize = resizeOriginalTextFontSize,
-                  originalBounds.width > 0, originalBounds.height > 0 else { return }
-            let scaleX = newRect.width / originalBounds.width
-            let scaleY = newRect.height / originalBounds.height
-            // Use the larger scale so the text grows to fill the dragged rect.
-            let scale = max(scaleX, scaleY)
-            let minFontSize: CGFloat = 6
-            text.fontSize = max(minFontSize, origFontSize * scale)
+                  let textHandle = handle.textResizeHandle else { return }
+            text.fontSize = TextResizeGeometry.fontSize(
+                originalBounds: originalBounds,
+                originalFontSize: origFontSize,
+                handle: textHandle,
+                dragDelta: CGSize(width: dx, height: dy)
+            )
 
             // Intrinsic size after fontSize change.
-            let newSize = text.bounds.size
-            switch handle {
-            case .topLeft:
-                // Anchor: bottomRight of original bounds
-                text.origin = CGPoint(
-                    x: originalBounds.maxX - newSize.width,
-                    y: originalBounds.maxY - newSize.height
-                )
-            case .topRight:
-                // Anchor: bottomLeft of original bounds
-                text.origin = CGPoint(
-                    x: originalBounds.minX,
-                    y: originalBounds.maxY - newSize.height
-                )
-            case .bottomLeft:
-                // Anchor: topRight of original bounds
-                text.origin = CGPoint(
-                    x: originalBounds.maxX - newSize.width,
-                    y: originalBounds.minY
-                )
-            case .bottomRight:
-                // Anchor: topLeft of original bounds
-                text.origin = originalBounds.origin
-            case .pathStart, .pathEnd, .pathControl:
-                break
-            }
+            text.origin = TextResizeGeometry.origin(
+                originalBounds: originalBounds,
+                resizedSize: text.bounds.size,
+                handle: textHandle
+            )
         }
         else if let arrow = obj as? ArrowObject {
             guard let endpoints = resizeOriginalEndpoints else { return }
@@ -632,6 +767,16 @@ final class AnnotationCanvasNSView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if isResizingTextEditor {
+            isResizingTextEditor = false
+            textEditorResizeHandle = nil
+            textEditorResizeStart = nil
+            textEditorOriginalBounds = nil
+            textEditor?.focusTextView()
+            needsDisplay = true
+            return
+        }
+
         guard let doc = document, let start = dragStart else {
             isDragging = false; return
         }
@@ -753,34 +898,46 @@ final class AnnotationCanvasNSView: NSView {
         if textEditor != nil { commitTextEditing() }
 
         let editor = AnnotationTextEditor(frame: .zero)
-        editor.delegate = self
+        editor.editorDelegate = self
         editor.zoomScale = zoomScale
         editor.imageOrigin = imagePoint
+        addSubview(editor)
+        textEditor = editor
 
         if let existing {
             editor.fontSize = existing.fontSize
             editor.fontName = existing.fontName
             editor.textColor = existing.style.color.nsColor
                 .withAlphaComponent(existing.style.opacity)
+            editor.boxSize = existing.boxSize ?? existing.bounds.size
+            editor.fillColor = existing.fillColor?.nsColor.withAlphaComponent(0.5)
+            editor.boxOutlineColor = existing.outlineColor?.nsColor
+            editor.glyphStrokeColor = existing.glyphStrokeColor?.nsColor
             editor.beginEditing(initialText: existing.text)
             editingOriginalObject = existing
         } else {
             editor.fontSize = currentTextFontSize
             editor.textColor = currentStyle.color.nsColor
                 .withAlphaComponent(currentStyle.opacity)
+            editor.fillColor = currentTextFillColor?.nsColor.withAlphaComponent(0.5)
+            editor.boxOutlineColor = currentTextOutlineColor?.nsColor
+            editor.glyphStrokeColor = currentTextGlyphStrokeColor?.nsColor
             editor.beginEditing(initialText: "")
             editingOriginalObject = nil
         }
 
-        addSubview(editor)
-        textEditor = editor
         repositionEditor()
         editor.focusTextView()
         needsDisplay = true
 
         // Notify SwiftUI so the toolbar can flip into font-size mode and
         // — for re-edits — sync the slider to the object's fontSize.
-        onTextEditingStarted?(editor.fontSize)
+        onTextEditingStarted?(
+            editor.fontSize,
+            editor.fillColor != nil,
+            editor.boxOutlineColor != nil,
+            editor.glyphStrokeColor != nil
+        )
     }
 
     /// Position the editor's frame based on its `imageOrigin` and the current
@@ -802,16 +959,29 @@ final class AnnotationCanvasNSView: NSView {
 
         let finalText = editor.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let origin = editor.imageOrigin
+        let boxSize = editor.boxSize
+        let editorFillColor = editor.fillColor.map(AnnotationColor.init(nsColor:))
+        let editorOutlineColor = editor.boxOutlineColor.map(AnnotationColor.init(nsColor:))
+        let editorGlyphStrokeColor = editor.glyphStrokeColor.map(AnnotationColor.init(nsColor:))
 
         if let existing = editingOriginalObject {
             if finalText.isEmpty {
                 // Edited to empty → delete the original.
                 doc.removeObject(id: existing.id)
-            } else if finalText != existing.text || editor.fontSize != existing.fontSize {
+            } else if finalText != existing.text
+                || editor.fontSize != existing.fontSize
+                || boxSize != existing.boxSize
+                || editorFillColor != existing.fillColor
+                || editorOutlineColor != existing.outlineColor
+                || editorGlyphStrokeColor != existing.glyphStrokeColor {
                 // Mutated text or fontSize — push one undo step, then update.
                 doc.beginDrag()
                 existing.text = finalText
+                existing.boxSize = boxSize
                 existing.fontSize = editor.fontSize
+                existing.fillColor = editorFillColor
+                existing.outlineColor = editorOutlineColor
+                existing.glyphStrokeColor = editorGlyphStrokeColor
             }
         } else if !finalText.isEmpty {
             // Fresh edit with content → create a new TextObject using the
@@ -819,7 +989,11 @@ final class AnnotationCanvasNSView: NSView {
             let newObj = TextObject(
                 text: finalText,
                 origin: origin,
+                boxSize: boxSize,
                 fontSize: editor.fontSize,
+                fillColor: editorFillColor,
+                outlineColor: editorOutlineColor,
+                glyphStrokeColor: editorGlyphStrokeColor,
                 style: currentStyle
             )
             doc.addObject(newObj)
