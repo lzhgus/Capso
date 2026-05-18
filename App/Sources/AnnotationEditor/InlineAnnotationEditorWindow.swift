@@ -532,12 +532,22 @@ private struct InlineAnnotationToolbar: View {
         HStack(spacing: 4) {
             iconButton(systemName: "xmark", help: "Close", action: onCancel)
                 .keyboardShortcut(.escape, modifiers: [])
-            iconButton(systemName: "doc.on.doc", help: "Copy", action: onCopy)
-                .keyboardShortcut("c", modifiers: .command)
+            copyActionButton
             iconButton(systemName: "pin", help: "Pin to Screen", action: onPin)
                 .keyboardShortcut("p", modifiers: .command)
             iconButton(systemName: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
                 .keyboardShortcut("s", modifiers: .command)
+        }
+    }
+
+    @ViewBuilder
+    private var copyActionButton: some View {
+        let button = iconButton(systemName: "doc.on.doc", help: "Copy", action: onCopy)
+            .keyboardShortcut("c", modifiers: .command)
+        if isEditingText {
+            button
+        } else {
+            button.keyboardShortcut(.return, modifiers: [])
         }
     }
 

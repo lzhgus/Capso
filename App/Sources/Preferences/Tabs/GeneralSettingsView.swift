@@ -3,6 +3,7 @@ import SwiftUI
 import LaunchAtLogin
 import AppKit
 import KeyboardShortcuts
+import SharedKit
 
 struct GeneralSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
@@ -89,6 +90,26 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            SettingGroup(title: "Diagnostics") {
+                SettingCard {
+                    SettingRow(label: "Diagnostic Logging", sublabel: "Write local troubleshooting logs when enabled") {
+                        Toggle("", isOn: $viewModel.diagnosticLoggingEnabled)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    SettingRow(label: "Diagnostic Logs", sublabel: "Open Capso's local log folder", showDivider: true) {
+                        ExternalLinkButton(title: "Open", icon: "folder") {
+                            openDiagnosticLogs()
+                        }
+                    }
+                    SettingRow(label: "Crash Reports", sublabel: "Open macOS DiagnosticReports", showDivider: true) {
+                        ExternalLinkButton(title: "Open", icon: "doc.text.magnifyingglass") {
+                            openCrashReports()
+                        }
+                    }
+                }
+            }
+
             SettingGroup(title: "About") {
                 SettingCard {
                     SettingRow(label: "Version") {
@@ -148,6 +169,16 @@ struct GeneralSettingsView: View {
     private func openURL(_ string: String) {
         guard let url = URL(string: string) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private func openDiagnosticLogs() {
+        let logFileURL = DiagnosticLogger.prepareLogFile()
+        NSWorkspace.shared.activateFileViewerSelecting([logFileURL])
+    }
+
+    private func openCrashReports() {
+        let directory = DiagnosticLogger.diagnosticReportDirectories.first!
+        NSWorkspace.shared.open(directory)
     }
 }
 

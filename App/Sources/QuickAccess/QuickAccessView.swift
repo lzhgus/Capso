@@ -21,6 +21,7 @@ struct QuickAccessView: View {
     let onOCR: () -> Void
     let onTranslate: () -> Void
     let onPin: () -> Void
+    let onPreview: () -> Void
     let onClose: () -> Void
 
     @State private var isHovering = false
@@ -109,6 +110,11 @@ struct QuickAccessView: View {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
                 )
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .onTapGesture(count: 2, perform: onPreview)
+                .help("Double-click to preview")
+                .accessibilityLabel(Text("Screenshot preview"))
+                .accessibilityHint(Text("Double-click to enlarge preview"))
 
             if isRevealed {
                 Button(action: onClose) {
