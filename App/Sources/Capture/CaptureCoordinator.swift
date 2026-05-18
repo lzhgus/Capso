@@ -50,20 +50,21 @@ final class CaptureCoordinator {
         case annotate     // Open the full annotation editor directly
         case inlineAnnotate // Open the All-in-One inline annotation editor
         case ocr          // Open visual OCR directly
+        case pin          // Pin selected capture to screen
         case share        // Upload to cloud, skip Quick Access, save to history
 
         var playsShutterSound: Bool {
             switch self {
             case .annotate, .inlineAnnotate:
                 false
-            case .default, .clipboard, .ocr, .share:
+            case .default, .clipboard, .ocr, .pin, .share:
                 true
             }
         }
 
         var savesOriginalCaptureToHistory: Bool {
             switch self {
-            case .annotate, .inlineAnnotate:
+            case .annotate, .inlineAnnotate, .pin:
                 false
             case .default, .clipboard, .ocr, .share:
                 true
@@ -122,12 +123,7 @@ final class CaptureCoordinator {
     func captureAllInOne() {
         pendingAction = .default
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            guard let self else { return }
-            if self.settings.screenshotShowsCursor {
-                self.showOverlay(mode: .area, isAllInOne: true)
-            } else {
-                self.showFrozenAllInOneOverlay()
-            }
+            self?.showFrozenAllInOneOverlay()
         }
     }
 
@@ -437,6 +433,28 @@ final class CaptureCoordinator {
             self.dismissAllInOneToolbar()
             self.dismissFreezeWindows()
             self.copyRenderedImage(image)
+        }
+        toolbar.onPin = { [weak self] rect in
+            guard let self else { return }
+            if self.handleFrozenAllInOneAction(
+                rect: rect,
+                screen: screen,
+                frozenImage: frozenImage,
+                action: .pin
+            ) {
+                return
+            }
+            self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.pendingAction = .pin
+            self.performAreaCapture(rect: rect, screen: screen)
+        }
+        toolbar.onPinRendered = { [weak self] image, rect in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
+            self.pinRenderedImage(image, anchor: self.globalRect(fromScreenLocalRect: rect, screen: screen))
         }
         toolbar.onCancel = { [weak self] in
             self?.dismissAllInOneToolbar()
@@ -928,6 +946,8 @@ final class CaptureCoordinator {
             openInlineAnnotationEditor(result, anchorScreen: screenFor(result: result))
         case .ocr:
             ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: screenFor(result: result))
+        case .pin:
+            pinToScreen(result, anchor: anchorRect(for: result))
         case .share:
             // Skip Quick Access, save to history, then upload in background.
             logDiagnostic("Cloud Share capture completed mode=\(result.mode) displayID=\(result.displayID)")
@@ -1168,6 +1188,26 @@ final class CaptureCoordinator {
     /// unplugged the monitor between capture and action).
     private func screenFor(result: CaptureResult) -> NSScreen? {
         NSScreen.screens.first { $0.displayID == result.displayID }
+    }
+
+    private func anchorRect(for result: CaptureResult) -> CGRect {
+        guard let screen = screenFor(result: result) else {
+            return result.captureRect
+        }
+        let screenLocalRect = CaptureDisplayGeometry.screenLocalRect(
+            fromTopLeftCaptureRect: result.captureRect,
+            screenHeight: screen.frame.height
+        )
+        return globalRect(fromScreenLocalRect: screenLocalRect, screen: screen)
+    }
+
+    private func globalRect(fromScreenLocalRect rect: CGRect, screen: NSScreen) -> CGRect {
+        CGRect(
+            x: rect.origin.x + screen.frame.origin.x,
+            y: rect.origin.y + screen.frame.origin.y,
+            width: rect.width,
+            height: rect.height
+        )
     }
 
     /// If the currently-focused Quick Access panel can handle the Translate

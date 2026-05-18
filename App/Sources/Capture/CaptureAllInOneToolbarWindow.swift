@@ -37,6 +37,8 @@ final class CaptureAllInOneToolbarWindow {
     var onAnnotate: ((CGRect) -> Void)?
     var onCopy: ((CGRect) -> Void)?
     var onCopyRendered: ((CGImage, CGRect) -> Void)?
+    var onPin: ((CGRect) -> Void)?
+    var onPinRendered: ((CGImage, CGRect) -> Void)?
     var onOCRRendered: ((CGImage, CGRect) -> Void)?
     var onCancel: (() -> Void)?
 
@@ -214,6 +216,21 @@ final class CaptureAllInOneToolbarWindow {
                     })
                 } else {
                     self.onCopy?(self.screenLocalSelectionRect)
+                }
+            },
+            onPin: { [weak self] in
+                guard let self else { return }
+                if let annotationOverlay = self.annotationOverlay {
+                    annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
+                        guard let self else { return }
+                        if let rendered {
+                            self.onPinRendered?(rendered, self.screenLocalSelectionRect)
+                        } else {
+                            self.onPin?(self.screenLocalSelectionRect)
+                        }
+                    })
+                } else {
+                    self.onPin?(self.screenLocalSelectionRect)
                 }
             },
             onPresetSelected: { [weak self] preset in
@@ -542,14 +559,14 @@ private final class CaptureAllInOneToolbarState {
 
         let itemHeights: [CGFloat]
         if isCompact && !showsOverflow {
-            itemHeights = [dimensionHeight, rowHeight, rowHeight, dividerHeight, rowHeight]
+            itemHeights = [dimensionHeight, rowHeight, rowHeight, rowHeight, dividerHeight, rowHeight]
         } else {
             itemHeights = [
                 rowHeight, rowHeight, rowHeight, rowHeight, rowHeight, rowHeight, rowHeight,
                 dividerHeight,
                 dimensionHeight,
                 presetHeight,
-                rowHeight,
+                rowHeight, rowHeight,
                 rowHeight
             ]
         }
@@ -573,7 +590,7 @@ private struct CaptureAllInOneToolbarView: View {
     }
 
     private enum UtilityAction: Hashable {
-        case annotate, copy, cancel, overflow
+        case annotate, copy, pin, cancel, overflow
     }
 
     let state: CaptureAllInOneToolbarState
@@ -588,6 +605,7 @@ private struct CaptureAllInOneToolbarView: View {
     let onRecording: () -> Void
     let onAnnotate: () -> Void
     let onCopy: () -> Void
+    let onPin: () -> Void
     let onPresetSelected: (CapturePreset) -> Void
     let onCancel: () -> Void
 
@@ -620,6 +638,7 @@ private struct CaptureAllInOneToolbarView: View {
                 dimensionPill
                 presetMenu
                 iconButton("doc.on.doc", kind: .copy, help: "Copy selected area", action: onCopy)
+                iconButton("pin", kind: .pin, help: "Pin selected area", action: onPin)
                 iconButton("xmark", kind: .cancel, help: "Cancel", action: onCancel)
             }
         }
@@ -661,6 +680,7 @@ private struct CaptureAllInOneToolbarView: View {
             }
 
             railIconButton("doc.on.doc", kind: .copy, help: "Copy selected area", label: String(localized: "Copy"), action: onCopy)
+            railIconButton("pin", kind: .pin, help: "Pin selected area", label: String(localized: "Pin"), action: onPin)
             railIconButton("xmark", kind: .cancel, help: "Cancel", label: String(localized: "Close"), action: onCancel)
 
             if state.isCompact {
