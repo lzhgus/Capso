@@ -119,6 +119,11 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "showMenuBarIcon") }
     }
 
+    public var diagnosticLoggingEnabled: Bool {
+        get { defaults.object(forKey: "diagnosticLoggingEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "diagnosticLoggingEnabled") }
+    }
+
     // MARK: Export
     public var screenshotFormat: ScreenshotFormat {
         get {
@@ -268,6 +273,11 @@ public final class AppSettings: @unchecked Sendable {
     public var screenshotAutoSave: Bool {
         get { defaults.object(forKey: "screenshotAutoSave") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "screenshotAutoSave") }
+    }
+
+    public var screenshotShowsCursor: Bool {
+        get { defaults.object(forKey: "screenshotShowsCursor") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "screenshotShowsCursor") }
     }
 
     public var captureWindowShadow: Bool {

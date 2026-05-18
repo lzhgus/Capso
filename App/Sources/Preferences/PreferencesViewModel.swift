@@ -36,6 +36,17 @@ final class PreferencesViewModel {
             NotificationCenter.default.post(name: .menuBarVisibilityChanged, object: nil)
         }
     }
+    var diagnosticLoggingEnabled: Bool {
+        get {
+            access(keyPath: \.diagnosticLoggingEnabled)
+            return settings.diagnosticLoggingEnabled
+        }
+        set {
+            withMutation(keyPath: \.diagnosticLoggingEnabled) {
+                settings.diagnosticLoggingEnabled = newValue
+            }
+        }
+    }
 
     // MARK: Screenshots
     var screenshotShowPreview: Bool {
@@ -79,6 +90,17 @@ final class PreferencesViewModel {
         set {
             withMutation(keyPath: \.screenshotFormat) {
                 settings.screenshotFormat = newValue
+            }
+        }
+    }
+    var screenshotShowsCursor: Bool {
+        get {
+            access(keyPath: \.screenshotShowsCursor)
+            return settings.screenshotShowsCursor
+        }
+        set {
+            withMutation(keyPath: \.screenshotShowsCursor) {
+                settings.screenshotShowsCursor = newValue
             }
         }
     }

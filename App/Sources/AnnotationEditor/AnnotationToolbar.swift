@@ -259,14 +259,24 @@ struct AnnotationToolbar: View {
             actionButton(icon: "xmark", help: "Close", isDestructive: true, action: onCancel)
                 .keyboardShortcut(.escape, modifiers: [])
 
-            actionButton(icon: "doc.on.doc", help: "Copy", action: onCopy)
-                .keyboardShortcut("c", modifiers: .command)
+            copyActionButton
 
             actionButton(icon: "pin", help: "Pin", action: onPin)
                 .keyboardShortcut("p", modifiers: .command)
 
             actionButton(icon: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
                 .keyboardShortcut("s", modifiers: .command)
+        }
+    }
+
+    @ViewBuilder
+    private var copyActionButton: some View {
+        let button = actionButton(icon: "doc.on.doc", help: "Copy", action: onCopy)
+            .keyboardShortcut("c", modifiers: .command)
+        if isEditingText {
+            button
+        } else {
+            button.keyboardShortcut(.return, modifiers: [])
         }
     }
 

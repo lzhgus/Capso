@@ -17,6 +17,26 @@ struct AppSettingsTests {
         #expect(settings.screenshotFormat == .png)
     }
 
+    @Test("Screenshot cursor capture is disabled by default")
+    func defaultScreenshotShowsCursor() {
+        let suite = "test.screenshotShowsCursor.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.screenshotShowsCursor == false)
+    }
+
+    @Test("Screenshot cursor capture persists across instances")
+    func screenshotShowsCursorPersists() {
+        let suite = "test.screenshotShowsCursor.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.screenshotShowsCursor = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.screenshotShowsCursor == true)
+    }
+
     @Test("Default Quick Access position is bottomLeft")
     func defaultQuickAccessPosition() {
         let settings = AppSettings()
@@ -27,6 +47,26 @@ struct AppSettingsTests {
     func defaultShutterSound() {
         let settings = AppSettings()
         #expect(settings.playShutterSound == true)
+    }
+
+    @Test("Diagnostic logging is disabled by default")
+    func defaultDiagnosticLoggingEnabled() {
+        let suite = "test.diagnosticLogging.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.diagnosticLoggingEnabled == false)
+    }
+
+    @Test("Diagnostic logging preference persists across instances")
+    func diagnosticLoggingPersists() {
+        let suite = "test.diagnosticLogging.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.diagnosticLoggingEnabled = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.diagnosticLoggingEnabled == true)
     }
 
     @Test("Menu bar icon is shown by default")

@@ -7,7 +7,10 @@ public enum ScreenCaptureManager {
 
     // MARK: - Fullscreen Capture
 
-    public static func captureFullscreen(displayID: CGDirectDisplayID = CGMainDisplayID()) async throws -> CaptureResult {
+    public static func captureFullscreen(
+        displayID: CGDirectDisplayID = CGMainDisplayID(),
+        showsCursor: Bool = false
+    ) async throws -> CaptureResult {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == displayID })
             ?? content.displays.first(where: { $0.displayID == CGMainDisplayID() })
@@ -25,7 +28,7 @@ public enum ScreenCaptureManager {
         config.width = Int(CGFloat(display.width) * scaleFactor)
         config.height = Int(CGFloat(display.height) * scaleFactor)
         config.captureResolution = .best
-        config.showsCursor = false
+        config.showsCursor = showsCursor
 
         let image = try await SCScreenshotManager.captureImage(
             contentFilter: filter,
@@ -42,7 +45,11 @@ public enum ScreenCaptureManager {
 
     // MARK: - Window Capture
 
-    public static func captureWindow(windowID: CGWindowID, includeShadow: Bool = true) async throws -> CaptureResult {
+    public static func captureWindow(
+        windowID: CGWindowID,
+        includeShadow: Bool = true,
+        showsCursor: Bool = false
+    ) async throws -> CaptureResult {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
 
         guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
@@ -60,7 +67,7 @@ public enum ScreenCaptureManager {
         let filter: SCContentFilter
         let config = SCStreamConfiguration()
         config.captureResolution = .best
-        config.showsCursor = false
+        config.showsCursor = showsCursor
 
         if includeShadow {
             // Desktop-independent window filter: ScreenCaptureKit renders the
@@ -164,7 +171,11 @@ public enum ScreenCaptureManager {
 
     // MARK: - Area Capture
 
-    public static func captureArea(rect: CGRect, displayID: CGDirectDisplayID = CGMainDisplayID()) async throws -> CaptureResult {
+    public static func captureArea(
+        rect: CGRect,
+        displayID: CGDirectDisplayID = CGMainDisplayID(),
+        showsCursor: Bool = false
+    ) async throws -> CaptureResult {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
             throw CaptureError.noDisplayFound
@@ -173,7 +184,7 @@ public enum ScreenCaptureManager {
         let filter = SCContentFilter(display: display, excludingWindows: [])
         let config = SCStreamConfiguration()
         config.captureResolution = .best
-        config.showsCursor = false
+        config.showsCursor = showsCursor
         config.sourceRect = rect
         config.width = Int(rect.width) * 2
         config.height = Int(rect.height) * 2

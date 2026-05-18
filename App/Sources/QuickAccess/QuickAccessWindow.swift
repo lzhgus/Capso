@@ -17,6 +17,7 @@ final class QuickAccessWindow: NSPanel {
     var onOCR: (() -> Void)?
     var onTranslate: (() -> Void)?
     var onPin: (() -> Void)?
+    var onPreview: (() -> Void)?
     var onClose: (() -> Void)?
     /// Called with the public URL string when a cloud upload succeeds.
     var onUploadSucceeded: ((String) -> Void)?
@@ -79,6 +80,7 @@ final class QuickAccessWindow: NSPanel {
             onOCR:       { [weak self] in self?.onOCR?() },
             onTranslate: { [weak self] in self?.onTranslate?() },
             onPin:       { [weak self] in self?.onPin?() },
+            onPreview:   { [weak self] in self?.onPreview?() },
             onClose:     { [weak self] in self?.onClose?() }
         )
 

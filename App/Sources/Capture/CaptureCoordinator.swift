@@ -23,6 +23,7 @@ final class CaptureCoordinator {
     private var quickAccessWindows: [QuickAccessWindow] = []
     /// Maximum previews kept on-screen. Oldest is evicted when exceeded.
     private let maxQuickAccessStackSize = 5
+    private var quickAccessPreviewWindow: QuickAccessPreviewWindow?
     private var annotationWindow: AnnotationEditorWindow?
     private var inlineAnnotationWindow: InlineAnnotationEditorWindow?
     private var allInOneToolbarWindow: CaptureAllInOneToolbarWindow?
@@ -90,10 +91,12 @@ final class CaptureCoordinator {
     }
 
     func captureAreaAndShare() {
+        logDiagnostic("Capture and Share shortcut invoked")
         // Gate: Cloud Share not configured → ask AppDelegate (via notification) to
         // open Preferences → Cloud Share tab. We avoid `NSApp.delegate as? AppDelegate`
         // because the cast fails under SwiftUI's @NSApplicationDelegateAdaptor proxying.
         guard let coord = shareCoordinator else {
+            logDiagnostic("Cloud Share shortcut blocked: coordinator not configured")
             NotificationCenter.default.post(
                 name: .openScreenshotSettings,
                 object: PreferencesTab.cloudShare
@@ -103,6 +106,7 @@ final class CaptureCoordinator {
 
         // Gate: upload already in flight → notify and bail
         if case .uploading = coord.state {
+            logDiagnostic("Cloud Share shortcut blocked: upload already in progress")
             Self.postNotification(
                 title: String(localized: "Cloud Share busy"),
                 body: String(localized: "Previous upload still in progress — try again in a moment.")
@@ -118,12 +122,17 @@ final class CaptureCoordinator {
     func captureAllInOne() {
         pendingAction = .default
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.showFrozenAllInOneOverlay()
+            guard let self else { return }
+            if self.settings.screenshotShowsCursor {
+                self.showOverlay(mode: .area, isAllInOne: true)
+            } else {
+                self.showFrozenAllInOneOverlay()
+            }
         }
     }
 
     private func startAreaCapture() {
-        if settings.freezeScreen {
+        if settings.freezeScreen && !settings.screenshotShowsCursor {
             showFrozenOverlay()
         } else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
@@ -146,7 +155,10 @@ final class CaptureCoordinator {
         settings.lastCaptureSelection = .fullscreen(screenID: displayID)
         Task {
             do {
-                let result = try await ScreenCaptureManager.captureFullscreen(displayID: displayID)
+                let result = try await ScreenCaptureManager.captureFullscreen(
+                    displayID: displayID,
+                    showsCursor: settings.screenshotShowsCursor
+                )
                 handleCaptureResult(result)
             } catch {
                 print("Fullscreen capture failed: \(error)")
@@ -215,7 +227,10 @@ final class CaptureCoordinator {
             pendingAction = .default
             Task {
                 do {
-                    let result = try await ScreenCaptureManager.captureFullscreen(displayID: screenID)
+                    let result = try await ScreenCaptureManager.captureFullscreen(
+                        displayID: screenID,
+                        showsCursor: settings.screenshotShowsCursor
+                    )
                     handleCaptureResult(result)
                 } catch {
                     print("Fullscreen replay failed: \(error)")
@@ -536,7 +551,8 @@ final class CaptureCoordinator {
                 // uniform padding + frosted glass backdrop when the setting is on.
                 let result = try await ScreenCaptureManager.captureWindow(
                     windowID: windowID,
-                    includeShadow: false
+                    includeShadow: false,
+                    showsCursor: settings.screenshotShowsCursor
                 )
                 if settings.captureWindowShadow {
                     // Capture the real desktop behind the window (excluding the
@@ -829,7 +845,8 @@ final class CaptureCoordinator {
                 let displayID = screen.displayID
                 let result = try await ScreenCaptureManager.captureArea(
                     rect: screenRect,
-                    displayID: displayID
+                    displayID: displayID,
+                    showsCursor: settings.screenshotShowsCursor
                 )
                 handleCaptureResult(result)
             } catch {
@@ -913,10 +930,12 @@ final class CaptureCoordinator {
             ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: screenFor(result: result))
         case .share:
             // Skip Quick Access, save to history, then upload in background.
+            logDiagnostic("Cloud Share capture completed mode=\(result.mode) displayID=\(result.displayID)")
             historyCoordinator?.saveCapture(result: result, entryID: entryID)
             if let coord = shareCoordinator {
                 Task { await self.performShareAfterCapture(result: result, entryID: entryID, coord: coord) }
             } else {
+                logDiagnostic("Cloud Share capture completed but coordinator is nil")
                 Self.postNotification(
                     title: String(localized: "Cloud share failed"),
                     body: String(localized: "Cloud Share is not configured.")
@@ -989,6 +1008,10 @@ final class CaptureCoordinator {
             self.dismissQuickAccessWindow(window)
             self.openAnnotationEditor(result, anchorScreen: anchor)
         }
+        window.onPreview = { [weak self, weak window] in
+            guard let self, let window else { return }
+            self.openQuickAccessPreview(result, anchorScreen: window.targetScreen)
+        }
         window.onPin = { [weak self, weak window] in
             guard let self, let window else { return }
             let anchor = window.frame
@@ -1015,6 +1038,17 @@ final class CaptureCoordinator {
         quickAccessWindows.append(window)
         restackQuickAccessWindows(excluding: window)
         window.show()
+    }
+
+    private func openQuickAccessPreview(_ result: CaptureResult, anchorScreen: NSScreen?) {
+        quickAccessPreviewWindow?.close()
+        let previewWindow = QuickAccessPreviewWindow(image: result.image, anchorScreen: anchorScreen)
+        previewWindow.onClose = { [weak self, weak previewWindow] in
+            guard let self, self.quickAccessPreviewWindow === previewWindow else { return }
+            self.quickAccessPreviewWindow = nil
+        }
+        quickAccessPreviewWindow = previewWindow
+        previewWindow.show()
     }
 
     /// Remove a specific preview from the stack and close it, then slide the
@@ -1219,6 +1253,7 @@ final class CaptureCoordinator {
         let image = result.image
 
         // Encode + write off the main actor so large PNGs don't block the UI.
+        logDiagnostic("Cloud Share encode starting size=\(image.width)x\(image.height)")
         let tempURL: URL? = await Task.detached(priority: .userInitiated) { () -> URL? in
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
@@ -1233,6 +1268,7 @@ final class CaptureCoordinator {
         }.value
 
         guard let tempURL else {
+            logDiagnostic("Cloud Share encode failed")
             Self.postNotification(
                 title: String(localized: "Cloud share failed"),
                 body: String(localized: "Couldn't encode capture for upload.")
@@ -1242,24 +1278,34 @@ final class CaptureCoordinator {
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
         do {
+            logDiagnostic("Cloud Share upload starting")
             let url = try await coord.upload(file: tempURL, contentType: "image/png")
             // ShareCoordinator already copied the URL to clipboard on success.
+            logDiagnostic("Cloud Share upload succeeded host=\(url.host ?? "unknown")")
             historyCoordinator?.setCloudURL(id: entryID, url: url.absoluteString)
+            logDiagnostic("Cloud Share history URL persisted")
             Self.postNotification(
                 title: String(localized: "Cloud share ready"),
                 body: String(localized: "Link copied to clipboard.")
             )
         } catch let err as ShareError {
+            logDiagnostic("Cloud Share upload failed shareError=\(Self.humanizeShareError(err))")
             Self.postNotification(
                 title: String(localized: "Cloud share failed"),
                 body: Self.humanizeShareError(err)
             )
         } catch {
+            logDiagnostic("Cloud Share upload failed error=\(error.localizedDescription)")
             Self.postNotification(
                 title: String(localized: "Cloud share failed"),
                 body: error.localizedDescription
             )
         }
+    }
+
+    private func logDiagnostic(_ message: String) {
+        guard settings.diagnosticLoggingEnabled else { return }
+        DiagnosticLogger.append(message, category: "Capture")
     }
 
     private static func humanizeShareError(_ err: ShareError) -> String {

@@ -38,7 +38,12 @@ struct ScreenshotSettingsView: View {
 
             SettingGroup(title: "Capture") {
                 SettingCard {
-                    SettingRow(label: "Capture Window Shadow", sublabel: "Include shadow in window captures") {
+                    SettingRow(label: "Show Cursor", sublabel: "Include the mouse pointer in screenshots") {
+                        Toggle("", isOn: $viewModel.screenshotShowsCursor)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    SettingRow(label: "Capture Window Shadow", sublabel: "Include shadow in window captures", showDivider: true) {
                         Toggle("", isOn: $viewModel.captureWindowShadow)
                             .toggleStyle(.switch)
                             .controlSize(.small)
