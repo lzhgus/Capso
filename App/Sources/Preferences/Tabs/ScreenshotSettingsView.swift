@@ -188,18 +188,6 @@ struct ScreenshotSettingsView: View {
                 } // if capturePresetsEnabled
             }
 
-            SettingGroup(title: "Format") {
-                SettingCard {
-                    SettingRow(label: "Screenshot Format") {
-                        Picker("", selection: $viewModel.screenshotFormat) {
-                            Text("PNG").tag(ScreenshotFormat.png)
-                            Text("JPEG").tag(ScreenshotFormat.jpeg)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 140)
-                    }
-                }
-            }
         }
         .sheet(isPresented: $showingAddPreset) {
             addPresetSheet

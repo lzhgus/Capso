@@ -17,6 +17,48 @@ struct AppSettingsTests {
         #expect(settings.screenshotFormat == .png)
     }
 
+    @Test("Default screenshot output preset is lossless PNG")
+    func defaultScreenshotOutputPreset() {
+        let suite = "test.screenshotOutputPreset.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.screenshotOutputPreset == .losslessPNG)
+        #expect(settings.screenshotOutputPreset.fileFormat == .png)
+        #expect(settings.screenshotOutputPreset.jpegQuality == nil)
+    }
+
+    @Test("Screenshot output presets expose JPEG quality")
+    func screenshotOutputPresetJPEGQuality() {
+        #expect(ScreenshotOutputPreset.standardJPEG.fileFormat == .jpeg)
+        #expect(ScreenshotOutputPreset.standardJPEG.jpegQuality == 0.85)
+        #expect(ScreenshotOutputPreset.compactJPEG.fileFormat == .jpeg)
+        #expect(ScreenshotOutputPreset.compactJPEG.jpegQuality == 0.70)
+    }
+
+    @Test("Screenshot output preset falls back to legacy JPEG format")
+    func screenshotOutputPresetLegacyFormatFallback() {
+        let suite = "test.screenshotOutputPreset.legacy"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        settings.screenshotFormat = .jpeg
+
+        #expect(settings.screenshotOutputPreset == .standardJPEG)
+    }
+
+    @Test("Monthly screenshot folders are disabled by default")
+    func defaultScreenshotMonthlyFolders() {
+        let suite = "test.screenshotMonthlyFolders.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.screenshotMonthlyFolders == false)
+    }
+
     @Test("Screenshot cursor capture is disabled by default")
     func defaultScreenshotShowsCursor() {
         let suite = "test.screenshotShowsCursor.default"

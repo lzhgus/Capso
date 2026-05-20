@@ -25,6 +25,24 @@ extension KeyboardShortcuts.Name {
 }
 
 struct ShortcutSettingsView: View {
+    private struct ContextualShortcut: Identifiable {
+        let id: String
+        let scope: LocalizedStringKey
+        let action: LocalizedStringKey
+        let shortcut: String
+    }
+
+    private let contextualShortcuts: [ContextualShortcut] = [
+        ContextualShortcut(id: "all-in-one-copy", scope: "All-in-One", action: "Copy selected area", shortcut: "⌘C"),
+        ContextualShortcut(id: "all-in-one-save", scope: "All-in-One", action: "Save selected area", shortcut: "⌘S"),
+        ContextualShortcut(id: "all-in-one-pin", scope: "All-in-One", action: "Pin selected area", shortcut: "⌘P"),
+        ContextualShortcut(id: "all-in-one-cancel", scope: "All-in-One", action: "Cancel", shortcut: "Esc"),
+        ContextualShortcut(id: "quick-access-copy", scope: "Quick Access", action: "Copy", shortcut: "⌘C"),
+        ContextualShortcut(id: "quick-access-save", scope: "Quick Access", action: "Save", shortcut: "⌘S"),
+        ContextualShortcut(id: "quick-access-annotate", scope: "Quick Access", action: "Annotate", shortcut: "⌘E"),
+        ContextualShortcut(id: "quick-access-pin", scope: "Quick Access", action: "Pin", shortcut: "⌘P")
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Shortcuts")
@@ -34,7 +52,7 @@ struct ShortcutSettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
                     .foregroundStyle(.blue)
-                Text("Click a shortcut to record a new combination. Press **Esc** to cancel or **Delete** to remove.")
+                Text("Click a customizable shortcut to record a new combination. Press Esc to cancel or Delete to remove. Contextual shortcuts are fixed and work only while that panel is active.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -47,7 +65,7 @@ struct ShortcutSettingsView: View {
                     .stroke(Color.blue.opacity(0.2), lineWidth: 0.5)
             )
 
-            SettingGroup(title: "Capture") {
+            SettingGroup(title: "Customizable Shortcuts") {
                 SettingCard {
                     shortcutRow("All-in-One", name: .captureAllInOne)
                     shortcutRow("Capture Area", name: .captureArea, showDivider: true)
@@ -61,18 +79,16 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Capture Area & Annotate", name: .captureAreaAndAnnotate, showDivider: true)
                     shortcutRow("Capture & Translate", name: .captureAndTranslate, showDivider: true)
                     shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
-                }
-            }
-
-            SettingGroup(title: "Recording") {
-                SettingCard {
-                    shortcutRow("Start / Stop Recording", name: .recordScreen)
-                }
-            }
-
-            SettingGroup(title: "Other") {
-                SettingCard {
+                    shortcutRow("Start / Stop Recording", name: .recordScreen, showDivider: true)
                     shortcutRow("Screenshot History", name: .screenshotHistory)
+                }
+            }
+
+            SettingGroup(title: "Contextual Shortcuts") {
+                SettingCard {
+                    ForEach(Array(contextualShortcuts.enumerated()), id: \.element.id) { index, item in
+                        contextualShortcutRow(item, showDivider: index > 0)
+                    }
                 }
             }
         }
@@ -85,5 +101,26 @@ struct ShortcutSettingsView: View {
         }
     }
 
+    private func contextualShortcutRow(_ item: ContextualShortcut, showDivider: Bool = false) -> some View {
+        SettingRow(label: item.action, sublabel: item.scope, showDivider: showDivider) {
+            ShortcutKeycap(text: item.shortcut)
+        }
+    }
+}
 
+private struct ShortcutKeycap: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+            )
+    }
 }

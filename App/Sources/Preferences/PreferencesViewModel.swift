@@ -82,14 +82,25 @@ final class PreferencesViewModel {
             }
         }
     }
-    var screenshotFormat: ScreenshotFormat {
+    var screenshotOutputPreset: ScreenshotOutputPreset {
         get {
-            access(keyPath: \.screenshotFormat)
-            return settings.screenshotFormat
+            access(keyPath: \.screenshotOutputPreset)
+            return settings.screenshotOutputPreset
         }
         set {
-            withMutation(keyPath: \.screenshotFormat) {
-                settings.screenshotFormat = newValue
+            withMutation(keyPath: \.screenshotOutputPreset) {
+                settings.screenshotOutputPreset = newValue
+            }
+        }
+    }
+    var screenshotMonthlyFolders: Bool {
+        get {
+            access(keyPath: \.screenshotMonthlyFolders)
+            return settings.screenshotMonthlyFolders
+        }
+        set {
+            withMutation(keyPath: \.screenshotMonthlyFolders) {
+                settings.screenshotMonthlyFolders = newValue
             }
         }
     }

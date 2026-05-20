@@ -41,4 +41,15 @@ struct FileNamingTests {
         let ext = FileNaming.fileExtension(for: .gif)
         #expect(ext == "gif")
     }
+
+    @Test("Monthly directory uses year and month")
+    func monthlyDirectoryUsesYearAndMonth() {
+        let base = URL(fileURLWithPath: "/tmp/capso-test", isDirectory: true)
+        let date = Date(timeIntervalSince1970: 1_705_348_800)
+
+        let directory = FileNaming.monthlyDirectory(in: base, date: date)
+
+        #expect(directory.lastPathComponent == "2024-01")
+        #expect(directory.deletingLastPathComponent() == base)
+    }
 }

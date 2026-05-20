@@ -64,7 +64,7 @@ final class UpdateManager: NSObject, ObservableObject {
         clearStatusTask?.cancel()
         manualCheckState = .probing
         probeFoundValidUpdate = false
-        status = Status(message: "Checking…", kind: .checking)
+        status = Status(message: String(localized: "Checking…"), kind: .checking)
         updater.checkForUpdateInformation()
     }
 

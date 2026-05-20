@@ -37,6 +37,8 @@ final class CaptureAllInOneToolbarWindow {
     var onAnnotate: ((CGRect) -> Void)?
     var onCopy: ((CGRect) -> Void)?
     var onCopyRendered: ((CGImage, CGRect) -> Void)?
+    var onSave: ((CGRect) -> Void)?
+    var onSaveRendered: ((CGImage, CGRect) -> Void)?
     var onPin: ((CGRect) -> Void)?
     var onPinRendered: ((CGImage, CGRect) -> Void)?
     var onOCRRendered: ((CGImage, CGRect) -> Void)?
@@ -73,11 +75,11 @@ final class CaptureAllInOneToolbarWindow {
         showSelectionOverlay()
         showToolbar()
         showAnnotationOverlayIfPossible()
-        installEscMonitor()
+        installKeyboardMonitor()
     }
 
     func close() {
-        removeEscMonitor()
+        removeKeyboardMonitor()
         annotationOverlay?.close()
         annotationOverlay = nil
         removeSelectionMouseMonitor()
@@ -203,36 +205,9 @@ final class CaptureAllInOneToolbarWindow {
                 guard let self else { return }
                 self.onAnnotate?(self.screenLocalSelectionRect)
             },
-            onCopy: { [weak self] in
-                guard let self else { return }
-                if let annotationOverlay = self.annotationOverlay {
-                    annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
-                        guard let self else { return }
-                        if let rendered {
-                            self.onCopyRendered?(rendered, self.screenLocalSelectionRect)
-                        } else {
-                            self.onCopy?(self.screenLocalSelectionRect)
-                        }
-                    })
-                } else {
-                    self.onCopy?(self.screenLocalSelectionRect)
-                }
-            },
-            onPin: { [weak self] in
-                guard let self else { return }
-                if let annotationOverlay = self.annotationOverlay {
-                    annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
-                        guard let self else { return }
-                        if let rendered {
-                            self.onPinRendered?(rendered, self.screenLocalSelectionRect)
-                        } else {
-                            self.onPin?(self.screenLocalSelectionRect)
-                        }
-                    })
-                } else {
-                    self.onPin?(self.screenLocalSelectionRect)
-                }
-            },
+            onCopy: { [weak self] in self?.performCopyAction() },
+            onSave: { [weak self] in self?.performSaveAction() },
+            onPin: { [weak self] in self?.performPinAction() },
             onPresetSelected: { [weak self] preset in
                 self?.applyPreset(preset)
             },
@@ -442,19 +417,62 @@ final class CaptureAllInOneToolbarWindow {
         )
     }
 
-    private func installEscMonitor() {
+    private func performCopyAction() {
+        if let annotationOverlay {
+            annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
+                guard let self else { return }
+                if let rendered {
+                    self.onCopyRendered?(rendered, self.screenLocalSelectionRect)
+                } else {
+                    self.onCopy?(self.screenLocalSelectionRect)
+                }
+            })
+        } else {
+            onCopy?(screenLocalSelectionRect)
+        }
+    }
+
+    private func performSaveAction() {
+        if let annotationOverlay {
+            annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
+                guard let self else { return }
+                if let rendered {
+                    self.onSaveRendered?(rendered, self.screenLocalSelectionRect)
+                } else {
+                    self.onSave?(self.screenLocalSelectionRect)
+                }
+            })
+        } else {
+            onSave?(screenLocalSelectionRect)
+        }
+    }
+
+    private func performPinAction() {
+        if let annotationOverlay {
+            annotationOverlay.renderImage(afterCommit: { [weak self] rendered in
+                guard let self else { return }
+                if let rendered {
+                    self.onPinRendered?(rendered, self.screenLocalSelectionRect)
+                } else {
+                    self.onPin?(self.screenLocalSelectionRect)
+                }
+            })
+        } else {
+            onPin?(screenLocalSelectionRect)
+        }
+    }
+
+    private func installKeyboardMonitor() {
         globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
             Task { @MainActor in self?.onCancel?() }
         }
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53 else { return event }
-            self?.onCancel?()
-            return nil
+            self?.handleKeyboardEvent(event)
         }
     }
 
-    private func removeEscMonitor() {
+    private func removeKeyboardMonitor() {
         if let globalEscMonitor {
             NSEvent.removeMonitor(globalEscMonitor)
             self.globalEscMonitor = nil
@@ -462,6 +480,30 @@ final class CaptureAllInOneToolbarWindow {
         if let localEscMonitor {
             NSEvent.removeMonitor(localEscMonitor)
             self.localEscMonitor = nil
+        }
+    }
+
+    private func handleKeyboardEvent(_ event: NSEvent) -> NSEvent? {
+        if event.keyCode == 53 {
+            onCancel?()
+            return nil
+        }
+
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        guard modifiers == .command else { return event }
+
+        switch event.charactersIgnoringModifiers?.lowercased() {
+        case "c":
+            performCopyAction()
+            return nil
+        case "s":
+            performSaveAction()
+            return nil
+        case "p":
+            performPinAction()
+            return nil
+        default:
+            return event
         }
     }
 
@@ -590,7 +632,7 @@ private struct CaptureAllInOneToolbarView: View {
     }
 
     private enum UtilityAction: Hashable {
-        case annotate, copy, pin, cancel, overflow
+        case annotate, copy, save, pin, cancel, overflow
     }
 
     let state: CaptureAllInOneToolbarState
@@ -605,6 +647,7 @@ private struct CaptureAllInOneToolbarView: View {
     let onRecording: () -> Void
     let onAnnotate: () -> Void
     let onCopy: () -> Void
+    let onSave: () -> Void
     let onPin: () -> Void
     let onPresetSelected: (CapturePreset) -> Void
     let onCancel: () -> Void
@@ -638,6 +681,7 @@ private struct CaptureAllInOneToolbarView: View {
                 dimensionPill
                 presetMenu
                 iconButton("doc.on.doc", kind: .copy, help: "Copy selected area", action: onCopy)
+                iconButton("square.and.arrow.down", kind: .save, help: "Save selected area", action: onSave)
                 iconButton("pin", kind: .pin, help: "Pin selected area", action: onPin)
                 iconButton("xmark", kind: .cancel, help: "Cancel", action: onCancel)
             }
@@ -680,6 +724,7 @@ private struct CaptureAllInOneToolbarView: View {
             }
 
             railIconButton("doc.on.doc", kind: .copy, help: "Copy selected area", label: String(localized: "Copy"), action: onCopy)
+            railIconButton("square.and.arrow.down", kind: .save, help: "Save selected area", label: String(localized: "Save"), action: onSave)
             railIconButton("pin", kind: .pin, help: "Pin selected area", label: String(localized: "Pin"), action: onPin)
             railIconButton("xmark", kind: .cancel, help: "Cancel", label: String(localized: "Close"), action: onCancel)
 
@@ -994,10 +1039,17 @@ private struct CaptureAllInOneToolbarView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
                 )
+                .overlay(alignment: .topTrailing) {
+                    if hoveredUtility == kind, let shortcut = utilityShortcut(for: kind) {
+                        UtilityShortcutBadge(text: shortcut)
+                            .offset(x: 5, y: -5)
+                            .transition(.opacity)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .onHover { hoveredUtility = $0 ? kind : nil }
-        .help(help)
+        .help(utilityHelp(for: kind, fallback: help))
     }
 
     private func railIconButton(
@@ -1028,20 +1080,77 @@ private struct CaptureAllInOneToolbarView: View {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
             )
+            .overlay(alignment: .topTrailing) {
+                if hoveredUtility == kind, let shortcut = utilityShortcut(for: kind) {
+                    UtilityShortcutBadge(text: shortcut)
+                        .offset(x: 5, y: -5)
+                        .transition(.opacity)
+                }
+            }
         }
         .buttonStyle(.plain)
         .onHover { hoveredUtility = $0 ? kind : nil }
-        .help(help)
+        .help(utilityHelp(for: kind, fallback: help))
     }
 
     private func utilityBackground(_ kind: UtilityAction) -> Color {
         hoveredUtility == kind ? Color.white.opacity(0.18) : Color.white.opacity(0.11)
     }
 
+    private func utilityShortcut(for kind: UtilityAction) -> String? {
+        switch kind {
+        case .copy:
+            return "⌘C"
+        case .save:
+            return "⌘S"
+        case .pin:
+            return "⌘P"
+        case .cancel:
+            return "Esc"
+        case .annotate, .overflow:
+            return nil
+        }
+    }
+
+    private func utilityHelp(for kind: UtilityAction, fallback: LocalizedStringKey) -> Text {
+        guard let shortcut = utilityShortcut(for: kind) else {
+            return Text(fallback)
+        }
+
+        switch kind {
+        case .copy:
+            return Text(String(localized: "Copy selected area (\(shortcut))"))
+        case .save:
+            return Text(String(localized: "Save selected area (\(shortcut))"))
+        case .pin:
+            return Text(String(localized: "Pin selected area (\(shortcut))"))
+        case .cancel:
+            return Text(String(localized: "Cancel (\(shortcut))"))
+        case .annotate, .overflow:
+            return Text(fallback)
+        }
+    }
+
     private func toggleOverflow() {
         guard state.isCompact else { return }
         state.showsOverflow.toggle()
         onChromeStateChanged()
+    }
+}
+
+private struct UtilityShortcutBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 4)
+            .frame(height: 14)
+            .background(Color.black.opacity(0.62), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.22), lineWidth: 0.5))
+            .allowsHitTesting(false)
     }
 }
 

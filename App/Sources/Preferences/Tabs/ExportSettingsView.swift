@@ -25,6 +25,15 @@ struct ExportSettingsView: View {
                         .pickerStyle(.segmented)
                         .frame(width: 220)
                     }
+                    SettingRow(label: "Screenshot Quality", sublabel: "Applies to screenshot files", showDivider: true) {
+                        Picker("", selection: $viewModel.screenshotOutputPreset) {
+                            Text("PNG").tag(ScreenshotOutputPreset.losslessPNG)
+                            Text("JPEG 85%").tag(ScreenshotOutputPreset.standardJPEG)
+                            Text("JPEG 70%").tag(ScreenshotOutputPreset.compactJPEG)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 240)
+                    }
                 }
             }
 
@@ -43,6 +52,11 @@ struct ExportSettingsView: View {
                             }
                             .controlSize(.small)
                         }
+                    }
+                    SettingRow(label: "Monthly Screenshot Folders", sublabel: "Save screenshots into yyyy-MM subfolders", showDivider: true) {
+                        Toggle("", isOn: $viewModel.screenshotMonthlyFolders)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
                     }
                 }
             }

@@ -51,13 +51,14 @@ final class CaptureCoordinator {
         case inlineAnnotate // Open the All-in-One inline annotation editor
         case ocr          // Open visual OCR directly
         case pin          // Pin selected capture to screen
+        case save         // Save to file only, no preview
         case share        // Upload to cloud, skip Quick Access, save to history
 
         var playsShutterSound: Bool {
             switch self {
             case .annotate, .inlineAnnotate:
                 false
-            case .default, .clipboard, .ocr, .pin, .share:
+            case .default, .clipboard, .ocr, .pin, .save, .share:
                 true
             }
         }
@@ -66,7 +67,7 @@ final class CaptureCoordinator {
             switch self {
             case .annotate, .inlineAnnotate, .pin:
                 false
-            case .default, .clipboard, .ocr, .share:
+            case .default, .clipboard, .ocr, .save, .share:
                 true
             }
         }
@@ -433,6 +434,28 @@ final class CaptureCoordinator {
             self.dismissAllInOneToolbar()
             self.dismissFreezeWindows()
             self.copyRenderedImage(image)
+        }
+        toolbar.onSave = { [weak self] rect in
+            guard let self else { return }
+            if self.handleFrozenAllInOneAction(
+                rect: rect,
+                screen: screen,
+                frozenImage: frozenImage,
+                action: .save
+            ) {
+                return
+            }
+            self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            self.pendingAction = .save
+            self.performAreaCapture(rect: rect, screen: screen)
+        }
+        toolbar.onSaveRendered = { [weak self] image, _ in
+            guard let self else { return }
+            self.dismissAllInOneToolbar()
+            self.dismissFreezeWindows()
+            self.saveRenderedImage(image)
         }
         toolbar.onPin = { [weak self] rect in
             guard let self else { return }
@@ -948,6 +971,8 @@ final class CaptureCoordinator {
             ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: screenFor(result: result))
         case .pin:
             pinToScreen(result, anchor: anchorRect(for: result))
+        case .save:
+            saveImageToFile(result.image)
         case .share:
             // Skip Quick Access, save to history, then upload in background.
             logDiagnostic("Cloud Share capture completed mode=\(result.mode) displayID=\(result.displayID)")
@@ -1261,18 +1286,31 @@ final class CaptureCoordinator {
     }
 
     private func saveImageToFile(_ image: CGImage) {
-        let format = settings.screenshotFormat
-        let fileFormat: FileFormat = format == .png ? .png : .jpeg
+        guard let encoded = screenshotData(from: image) else { return }
+        let directory = settings.screenshotMonthlyFolders
+            ? FileNaming.monthlyDirectory(in: settings.exportLocation)
+            : settings.exportLocation
         let url = FileNaming.generateFileURL(
-            in: settings.exportLocation,
+            in: directory,
             type: .screenshot,
-            format: fileFormat
+            format: encoded.format
         )
-        let data: Data? = switch format {
-        case .png: ImageUtilities.pngData(from: image)
-        case .jpeg: ImageUtilities.jpegData(from: image)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? encoded.data.write(to: url)
+    }
+
+    private func screenshotData(from image: CGImage) -> (data: Data, format: FileFormat)? {
+        let preset = settings.screenshotOutputPreset
+        let data: Data? = switch preset.fileFormat {
+        case .png:
+            ImageUtilities.pngData(from: image)
+        case .jpeg:
+            ImageUtilities.jpegData(from: image, quality: preset.jpegQuality ?? 0.85)
+        case .mp4, .gif, .mov:
+            nil
         }
-        if let data { try? data.write(to: url) }
+        guard let data else { return nil }
+        return (data, preset.fileFormat)
     }
 
     private func saveRenderedImage(_ image: CGImage) {

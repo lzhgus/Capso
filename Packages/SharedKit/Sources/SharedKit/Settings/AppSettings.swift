@@ -8,6 +8,32 @@ public enum ScreenshotFormat: String, CaseIterable, Sendable {
     case jpeg
 }
 
+public enum ScreenshotOutputPreset: String, CaseIterable, Sendable {
+    case losslessPNG
+    case standardJPEG
+    case compactJPEG
+
+    public var fileFormat: FileFormat {
+        switch self {
+        case .losslessPNG:
+            return .png
+        case .standardJPEG, .compactJPEG:
+            return .jpeg
+        }
+    }
+
+    public var jpegQuality: Double? {
+        switch self {
+        case .losslessPNG:
+            return nil
+        case .standardJPEG:
+            return 0.85
+        case .compactJPEG:
+            return 0.70
+        }
+    }
+}
+
 public enum QuickAccessPosition: String, CaseIterable, Sendable {
     case bottomLeft
     case bottomRight
@@ -132,6 +158,20 @@ public final class AppSettings: @unchecked Sendable {
             return value
         }
         set { defaults.set(newValue.rawValue, forKey: "screenshotFormat") }
+    }
+
+    public var screenshotOutputPreset: ScreenshotOutputPreset {
+        get {
+            if let raw = defaults.string(forKey: "screenshotOutputPreset"),
+               let value = ScreenshotOutputPreset(rawValue: raw) {
+                return value
+            }
+            return screenshotFormat == .jpeg ? .standardJPEG : .losslessPNG
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: "screenshotOutputPreset")
+            screenshotFormat = newValue.fileFormat == .png ? .png : .jpeg
+        }
     }
 
     public var recordingFormat: RecordingFormat {
@@ -273,6 +313,11 @@ public final class AppSettings: @unchecked Sendable {
     public var screenshotAutoSave: Bool {
         get { defaults.object(forKey: "screenshotAutoSave") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "screenshotAutoSave") }
+    }
+
+    public var screenshotMonthlyFolders: Bool {
+        get { defaults.object(forKey: "screenshotMonthlyFolders") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "screenshotMonthlyFolders") }
     }
 
     public var screenshotShowsCursor: Bool {

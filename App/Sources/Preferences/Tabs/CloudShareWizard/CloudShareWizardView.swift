@@ -512,13 +512,13 @@ private struct GetKeysStep: View {
 
     private let steps: [(title: String, detail: AttributedString)] = [
         (String(localized: "Create a bucket"),
-         attributed("In `R2 → Overview`, click `Create bucket`. Name it something memorable like `capso-shares`.")),
+         attributed(String(localized: "In `R2 → Overview`, click `Create bucket`. Name it something memorable like `capso-shares`."))),
         (String(localized: "Enable public access"),
-         attributed("In the bucket's `Settings` tab: click `Enable` next to **Public Development URL** for a free `pub-…r2.dev` link, OR click `+ Add` next to **Custom Domains** to use your own domain.")),
+         attributed(String(localized: "In the bucket's `Settings` tab: click `Enable` next to **Public Development URL** for a free `pub-…r2.dev` link, OR click `+ Add` next to **Custom Domains** to use your own domain."))),
         (String(localized: "Create an API token"),
-         attributed("`R2 → Manage API Tokens` → `Create API Token`. Choose **Object Read & Write**, scoped to this bucket.")),
+         attributed(String(localized: "`R2 → Manage API Tokens` → `Create API Token`. Choose **Object Read & Write**, scoped to this bucket."))),
         (String(localized: "Copy the four values"),
-         attributed("You'll get `Account ID`, `Access Key ID`, and `Secret Access Key`. Note your bucket name too. The secret won't be shown again."))
+         attributed(String(localized: "You'll get `Account ID`, `Access Key ID`, and `Secret Access Key`. Note your bucket name too. The secret won't be shown again.")))
     ]
 
     var body: some View {

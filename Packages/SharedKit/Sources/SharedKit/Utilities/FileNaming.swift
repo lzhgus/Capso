@@ -60,6 +60,12 @@ public enum FileNaming {
         return f
     }()
 
+    private static let monthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
     public static func generateName(for type: CaptureType, date: Date = Date()) -> String {
         let prefix = switch type {
         case .screenshot: "Capso Screenshot"
@@ -80,5 +86,9 @@ public enum FileNaming {
 
     public static func generateFileURL(in directory: URL, type: CaptureType, format: FileFormat, date: Date = Date()) -> URL {
         directory.appendingPathComponent(generateFileName(for: type, format: format, date: date))
+    }
+
+    public static func monthlyDirectory(in baseDirectory: URL, date: Date = Date()) -> URL {
+        baseDirectory.appendingPathComponent(monthFormatter.string(from: date), isDirectory: true)
     }
 }
