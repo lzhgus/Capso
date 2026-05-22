@@ -202,118 +202,155 @@ private struct InlineAnnotationEditorView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            DimmingCutout(cutout: canvasRect.insetBy(dx: -1, dy: -1))
-                .fill(Color.black.opacity(0.34), style: FillStyle(eoFill: true))
-
-            AnnotationCanvasView(
-                document: document,
-                sourceImage: sourceImage,
-                currentTool: currentTool,
-                currentStyle: currentStyle,
-                redactionMode: redactionMode,
-                textFontSize: effectiveTextFontSize,
-                textFillColor: textFillColor,
-                textOutlineColor: textOutlineColor,
-                textGlyphStrokeColor: textGlyphStrokeColor,
-                zoomScale: displayScale,
-                refreshTrigger: refreshTrigger,
-                textRegions: textRegions,
-                commitEditingTrigger: commitEditingTrigger,
-                onInteractionChanged: { isInteracting in
-                    interactionState.setCanvasInteraction(isInteracting)
-                },
-                onSwitchToSelect: {
-                    document.clearSelection()
-                    currentTool = .select
-                },
-                onTextEditingStarted: { fontSize, hasFill, hasOutline, hasStroke in
-                    isEditingText = true
-                    interactionState.isEditingText = true
-                    textFillEnabled = hasFill
-                    textOutlineEnabled = hasOutline
-                    textStrokeEnabled = hasStroke
-                    if lineWidth != fontSize {
-                        lineWidth = fontSize
-                    }
-                },
-                onTextEditingEnded: {
-                    isEditingText = false
-                    interactionState.isEditingText = false
-                    savedTextFontSize = Double(lineWidth)
-                }
-            )
-            .frame(width: canvasRect.width, height: canvasRect.height)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.white.opacity(0.92), lineWidth: 1.5)
-                    .shadow(color: .black.opacity(0.55), radius: 8)
-            )
-            .position(x: canvasRect.midX, y: canvasRect.midY)
-
-            InlineAnnotationToolbar(
-                currentTool: $currentTool,
-                currentColor: $currentColor,
-                lineWidth: $lineWidth,
-                strokePattern: $strokePattern,
-                filled: $filled,
-                textFillEnabled: $textFillEnabled,
-                textOutlineEnabled: $textOutlineEnabled,
-                textStrokeEnabled: $textStrokeEnabled,
-                redactionMode: $redactionMode,
-                isEditingText: isEditingText,
-                canUndo: document.canUndo,
-                canRedo: document.canRedo,
-                onUndo: {
-                    document.undo()
-                    refreshTrigger += 1
-                },
-                onRedo: {
-                    document.redo()
-                    refreshTrigger += 1
-                },
-                onCancel: onCancel,
-                onCopy: copy,
-                onPin: pin,
-                onSave: save
-            )
-            .frame(width: toolbarRect.width, height: toolbarRect.height)
-            .position(x: toolbarRect.midX, y: toolbarRect.midY)
+            dimmingOverlay
+            canvas
+            toolbar
         }
         .frame(width: screenSize.width, height: screenSize.height)
         .background(Color.clear)
-        .onAppear {
-            lineWidth = savedWidth(for: currentTool)
-            strokePattern = savedStrokePattern
-            Task {
-                if let regions = try? await TextRecognizer.recognize(
-                    image: sourceImage,
-                    level: .fast,
-                    detectURLs: false
-                ) {
-                    textRegions = regions.map(\.boundingBox)
-                }
-            }
-        }
-        .onChange(of: currentTool) { oldTool, newTool in
-            document.clearSelection()
-            persistWidth(lineWidth, for: oldTool)
-            lineWidth = savedWidth(for: newTool)
-        }
+        .onAppear(perform: handleAppear)
+        .onChange(of: currentTool, handleToolChange)
         .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
-        .onChange(of: lineWidth) { _, newValue in
-            updateSelectedStyle()
-            persistWidth(newValue, for: currentTool)
-        }
-        .onChange(of: strokePattern) { _, newValue in
-            savedStrokePattern = newValue
-            updateSelectedStyle()
-        }
+        .onChange(of: lineWidth, handleLineWidthChange)
+        .onChange(of: strokePattern, handleStrokePatternChange)
         .onChange(of: filled) { _, _ in updateSelectedStyle() }
         .onChange(of: textFillEnabled) { _, _ in updateSelectedStyle() }
         .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }
         .onChange(of: textStrokeEnabled) { _, _ in updateSelectedStyle() }
         .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
+    }
+
+    private var dimmingOverlay: some View {
+        DimmingCutout(cutout: canvasRect.insetBy(dx: -1, dy: -1))
+            .fill(Color.black.opacity(0.34), style: FillStyle(eoFill: true))
+    }
+
+    private var canvas: some View {
+        AnnotationCanvasView(
+            document: document,
+            sourceImage: sourceImage,
+            currentTool: currentTool,
+            currentStyle: currentStyle,
+            redactionMode: redactionMode,
+            textFontSize: effectiveTextFontSize,
+            textFillColor: textFillColor,
+            textOutlineColor: textOutlineColor,
+            textGlyphStrokeColor: textGlyphStrokeColor,
+            zoomScale: displayScale,
+            refreshTrigger: refreshTrigger,
+            textRegions: textRegions,
+            commitEditingTrigger: commitEditingTrigger,
+            onSwitchToSelect: switchToSelectTool,
+            onInteractionChanged: handleCanvasInteractionChanged,
+            onTextEditingStarted: handleTextEditingStarted,
+            onTextEditingEnded: handleTextEditingEnded
+        )
+        .frame(width: canvasRect.width, height: canvasRect.height)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(canvasBorder)
+        .position(x: canvasRect.midX, y: canvasRect.midY)
+    }
+
+    private var canvasBorder: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .stroke(Color.white.opacity(0.92), lineWidth: 1.5)
+            .shadow(color: .black.opacity(0.55), radius: 8)
+    }
+
+    private var toolbar: some View {
+        InlineAnnotationToolbar(
+            currentTool: $currentTool,
+            currentColor: $currentColor,
+            lineWidth: $lineWidth,
+            strokePattern: $strokePattern,
+            filled: $filled,
+            textFillEnabled: $textFillEnabled,
+            textOutlineEnabled: $textOutlineEnabled,
+            textStrokeEnabled: $textStrokeEnabled,
+            redactionMode: $redactionMode,
+            isEditingText: isEditingText,
+            canUndo: document.canUndo,
+            canRedo: document.canRedo,
+            onUndo: undo,
+            onRedo: redo,
+            onCancel: onCancel,
+            onCopy: copy,
+            onPin: pin,
+            onSave: save
+        )
+        .frame(width: toolbarRect.width, height: toolbarRect.height)
+        .position(x: toolbarRect.midX, y: toolbarRect.midY)
+    }
+
+    private func handleAppear() {
+        lineWidth = savedWidth(for: currentTool)
+        strokePattern = savedStrokePattern
+        Task {
+            if let regions = try? await TextRecognizer.recognize(
+                image: sourceImage,
+                level: .fast,
+                detectURLs: false
+            ) {
+                textRegions = regions.map(\.boundingBox)
+            }
+        }
+    }
+
+    private func handleToolChange(oldTool: AnnotationTool, newTool: AnnotationTool) {
+        document.clearSelection()
+        persistWidth(lineWidth, for: oldTool)
+        lineWidth = savedWidth(for: newTool)
+    }
+
+    private func handleLineWidthChange(oldValue: CGFloat, newValue: CGFloat) {
+        updateSelectedStyle()
+        persistWidth(newValue, for: currentTool)
+    }
+
+    private func handleStrokePatternChange(oldValue: StrokePattern, newValue: StrokePattern) {
+        savedStrokePattern = newValue
+        updateSelectedStyle()
+    }
+
+    private func handleCanvasInteractionChanged(_ isInteracting: Bool) {
+        interactionState.setCanvasInteraction(isInteracting)
+    }
+
+    private func switchToSelectTool() {
+        document.clearSelection()
+        currentTool = .select
+    }
+
+    private func handleTextEditingStarted(
+        fontSize: CGFloat,
+        hasFill: Bool,
+        hasOutline: Bool,
+        hasStroke: Bool
+    ) {
+        isEditingText = true
+        interactionState.isEditingText = true
+        textFillEnabled = hasFill
+        textOutlineEnabled = hasOutline
+        textStrokeEnabled = hasStroke
+        if lineWidth != fontSize {
+            lineWidth = fontSize
+        }
+    }
+
+    private func handleTextEditingEnded() {
+        isEditingText = false
+        interactionState.isEditingText = false
+        savedTextFontSize = Double(lineWidth)
+    }
+
+    private func undo() {
+        document.undo()
+        refreshTrigger += 1
+    }
+
+    private func redo() {
+        document.redo()
+        refreshTrigger += 1
     }
 
     private func savedWidth(for tool: AnnotationTool) -> CGFloat {
