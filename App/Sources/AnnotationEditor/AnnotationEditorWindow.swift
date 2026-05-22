@@ -6,6 +6,7 @@ import AnnotationKit
 @MainActor
 final class AnnotationEditorWindow: NSPanel {
     private let document: AnnotationDocument
+    private let interactionState = AnnotationEditorInteractionState()
 
     init(
         image: CGImage,
@@ -67,6 +68,7 @@ final class AnnotationEditorWindow: NSPanel {
         let view = AnnotationEditorView(
             sourceImage: image,
             document: document,
+            interactionState: interactionState,
             onSave: { [weak self] rendered in
                 onSave(rendered)
                 self?.close()
@@ -91,5 +93,20 @@ final class AnnotationEditorWindow: NSPanel {
     func show() {
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if interactionState.shouldSuppressCopyShortcut(for: event) {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown,
+           interactionState.shouldSuppressCopyShortcut(for: event) {
+            return
+        }
+        super.sendEvent(event)
     }
 }

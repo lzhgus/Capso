@@ -6,6 +6,7 @@ import OCRKit
 struct AnnotationEditorView: View {
     let initialSourceImage: CGImage
     let document: AnnotationDocument
+    let interactionState: AnnotationEditorInteractionState
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
     let onPin: (CGImage) -> Void
@@ -19,6 +20,7 @@ struct AnnotationEditorView: View {
     init(
         sourceImage: CGImage,
         document: AnnotationDocument,
+        interactionState: AnnotationEditorInteractionState,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage) -> Void,
@@ -26,6 +28,7 @@ struct AnnotationEditorView: View {
     ) {
         self.initialSourceImage = sourceImage
         self.document = document
+        self.interactionState = interactionState
         self.onSave = onSave
         self.onCopy = onCopy
         self.onPin = onPin
@@ -267,12 +270,16 @@ struct AnnotationEditorView: View {
                                 refreshTrigger: refreshTrigger,
                                 textRegions: textRegions,
                                 commitEditingTrigger: commitEditingTrigger,
+                                onInteractionChanged: { isInteracting in
+                                    interactionState.setCanvasInteraction(isInteracting)
+                                },
                                 onSwitchToSelect: {
                                     document.clearSelection()
                                     currentTool = .select
                                 },
                                 onTextEditingStarted: { fontSize, hasFill, hasOutline, hasStroke in
                                     isEditingText = true
+                                    interactionState.isEditingText = true
                                     textFillEnabled = hasFill
                                     textOutlineEnabled = hasOutline
                                     textStrokeEnabled = hasStroke
@@ -285,6 +292,7 @@ struct AnnotationEditorView: View {
                                 },
                                 onTextEditingEnded: {
                                     isEditingText = false
+                                    interactionState.isEditingText = false
                                     // Preserve the last-used font size for the
                                     // next text edit / tool switch.
                                     savedTextFontSize = Double(lineWidth)
@@ -466,6 +474,9 @@ struct AnnotationEditorView: View {
     }
 
     private func copy() {
+        guard !interactionState.shouldSuppressCopyAction else {
+            return
+        }
         commitEditingTrigger += 1
         DispatchQueue.main.async {
             if let rendered = renderedOutputImage() {

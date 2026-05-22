@@ -7,6 +7,7 @@ import OCRKit
 @MainActor
 final class InlineAnnotationEditorWindow: NSPanel {
     private let document: AnnotationDocument
+    private let interactionState = AnnotationEditorInteractionState()
 
     init(
         image: CGImage,
@@ -50,6 +51,7 @@ final class InlineAnnotationEditorWindow: NSPanel {
         let view = InlineAnnotationEditorView(
             sourceImage: image,
             document: document,
+            interactionState: interactionState,
             screenSize: screen.frame.size,
             screenLocalRect: screenLocalRect,
             onSave: { [weak self] rendered in
@@ -80,11 +82,27 @@ final class InlineAnnotationEditorWindow: NSPanel {
         orderFrontRegardless()
         makeKey()
     }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if interactionState.shouldSuppressCopyShortcut(for: event) {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown,
+           interactionState.shouldSuppressCopyShortcut(for: event) {
+            return
+        }
+        super.sendEvent(event)
+    }
 }
 
 private struct InlineAnnotationEditorView: View {
     let sourceImage: CGImage
     let document: AnnotationDocument
+    let interactionState: AnnotationEditorInteractionState
     let screenSize: CGSize
     let screenLocalRect: CGRect
     let onSave: (CGImage) -> Void
@@ -201,12 +219,16 @@ private struct InlineAnnotationEditorView: View {
                 refreshTrigger: refreshTrigger,
                 textRegions: textRegions,
                 commitEditingTrigger: commitEditingTrigger,
+                onInteractionChanged: { isInteracting in
+                    interactionState.setCanvasInteraction(isInteracting)
+                },
                 onSwitchToSelect: {
                     document.clearSelection()
                     currentTool = .select
                 },
                 onTextEditingStarted: { fontSize, hasFill, hasOutline, hasStroke in
                     isEditingText = true
+                    interactionState.isEditingText = true
                     textFillEnabled = hasFill
                     textOutlineEnabled = hasOutline
                     textStrokeEnabled = hasStroke
@@ -216,6 +238,7 @@ private struct InlineAnnotationEditorView: View {
                 },
                 onTextEditingEnded: {
                     isEditingText = false
+                    interactionState.isEditingText = false
                     savedTextFontSize = Double(lineWidth)
                 }
             )
@@ -352,6 +375,9 @@ private struct InlineAnnotationEditorView: View {
     }
 
     private func copy() {
+        guard !interactionState.shouldSuppressCopyAction else {
+            return
+        }
         commitEditingTrigger += 1
         DispatchQueue.main.async {
             if let rendered = renderedOutputImage() {
