@@ -434,9 +434,23 @@ final class CaptureOverlayView: NSView {
         let labelWidth = size.width + padding * 2
         let labelHeight = size.height + padding
 
-        // Position label centered above the window
-        let labelX = rect.midX - labelWidth / 2
-        let labelY = rect.maxY + 8
+        let visibleRect = visibleScreenRectInViewCoordinates()
+        let minLabelX = visibleRect.minX + 8
+        let maxLabelX = max(minLabelX, visibleRect.maxX - labelWidth - 8)
+        let labelX = min(max(rect.midX - labelWidth / 2, minLabelX), maxLabelX)
+
+        let minLabelY = visibleRect.minY + 8
+        let maxLabelY = max(minLabelY, visibleRect.maxY - labelHeight - 8)
+        let preferredAboveY = rect.maxY + 8
+        let preferredBelowY = rect.minY - labelHeight - 8
+        let labelY: CGFloat
+        if preferredAboveY <= maxLabelY {
+            labelY = preferredAboveY
+        } else if preferredBelowY >= minLabelY {
+            labelY = preferredBelowY
+        } else {
+            labelY = min(max(preferredAboveY, minLabelY), maxLabelY)
+        }
 
         let bgRect = CGRect(x: labelX, y: labelY, width: labelWidth, height: labelHeight)
         context.setFillColor(dimensionBgColor.cgColor)
@@ -448,14 +462,27 @@ final class CaptureOverlayView: NSView {
         (name as NSString).draw(at: textPoint, withAttributes: attributes)
     }
 
-    /// Convert screen coordinates (origin top-left) to view coordinates (origin bottom-left).
+    private func visibleScreenRectInViewCoordinates() -> CGRect {
+        guard let screen = window?.screen else { return bounds }
+        let screenFrame = screen.frame
+        let visibleFrame = screen.visibleFrame
+        return CGRect(
+            x: visibleFrame.minX - screenFrame.minX,
+            y: visibleFrame.minY - screenFrame.minY,
+            width: visibleFrame.width,
+            height: visibleFrame.height
+        )
+    }
+
+    /// Convert ScreenCaptureKit global top-left coordinates to view-local
+    /// bottom-left coordinates for the overlay's display.
     private func screenRectToViewRect(_ screenRect: CGRect) -> CGRect {
         guard let screen = window?.screen else { return screenRect }
-        let screenFrame = screen.frame
-        // Screen coords: origin top-left. NSView coords: origin bottom-left.
-        let viewY = screenFrame.height - screenRect.origin.y - screenRect.height
+        let displayBounds = CGDisplayBounds(screen.displayID)
+        let localTopLeftY = screenRect.origin.y - displayBounds.origin.y
+        let viewY = displayBounds.height - localTopLeftY - screenRect.height
         return CGRect(
-            x: screenRect.origin.x - screenFrame.origin.x,
+            x: screenRect.origin.x - displayBounds.origin.x,
             y: viewY,
             width: screenRect.width,
             height: screenRect.height
@@ -611,12 +638,13 @@ final class CaptureOverlayView: NSView {
         return nil
     }
 
-    /// Convert view point to screen coordinates (top-left origin).
+    /// Convert view-local bottom-left coordinates to ScreenCaptureKit global
+    /// top-left coordinates.
     private func viewPointToScreenPoint(_ viewPoint: NSPoint) -> CGPoint {
         guard let screen = window?.screen else { return viewPoint }
-        let screenFrame = screen.frame
-        let screenX = viewPoint.x + screenFrame.origin.x
-        let screenY = screenFrame.height - viewPoint.y // flip Y
+        let displayBounds = CGDisplayBounds(screen.displayID)
+        let screenX = viewPoint.x + displayBounds.origin.x
+        let screenY = displayBounds.origin.y + displayBounds.height - viewPoint.y
         return CGPoint(x: screenX, y: screenY)
     }
 
