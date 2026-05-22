@@ -228,17 +228,30 @@ final class RecordingCoordinator {
                 )
             },
             onCameraToggled: { [weak self] enabled, deviceID in
+                guard let self else { return false }
                 if enabled {
                     if let deviceID {
-                        self?.cameraManager.selectedDeviceID = deviceID
+                        self.cameraManager.selectedDeviceID = deviceID
                     }
-                    self?.cameraManager.stop()
-                    try? self?.cameraManager.start()
-                    self?.showCameraPiP()
+                    self.cameraManager.stop()
+                    do {
+                        try await self.cameraManager.requestAccessAndStart()
+                        self.showCameraPiP()
+                        return true
+                    } catch {
+                        self.cameraPiPWindow?.close()
+                        self.cameraPiPWindow = nil
+                        self.cameraManager.stop()
+                        if error is CameraError {
+                            self.showCameraPermissionDeniedAlert()
+                        }
+                        return false
+                    }
                 } else {
-                    self?.cameraPiPWindow?.close()
-                    self?.cameraPiPWindow = nil
-                    self?.cameraManager.stop()
+                    self.cameraPiPWindow?.close()
+                    self.cameraPiPWindow = nil
+                    self.cameraManager.stop()
+                    return true
                 }
             },
             onChangeArea: { [weak self] in
@@ -856,6 +869,29 @@ final class RecordingCoordinator {
         }
         cameraPiPWindow = CameraPiPWindow(cameraManager: cameraManager, settings: settings, recordingFrame: recordingFrame)
         cameraPiPWindow?.show()
+    }
+
+    private func showCameraPermissionDeniedAlert() {
+        let shouldRestoreToolbar = toolbarWindow?.isVisible == true
+        toolbarWindow?.orderOut(nil)
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Camera Access Needed")
+        alert.informativeText = String(localized: "Camera access is turned off. Enable Capso in System Settings > Privacy & Security > Camera, then try again.")
+        alert.addButton(withTitle: String(localized: "Open Camera Settings"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.window.level = .screenSaver + 2
+
+        let response = alert.runModal()
+        if shouldRestoreToolbar {
+            toolbarWindow?.show()
+        }
+        guard response == .alertFirstButtonReturn,
+              let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     private func hideRecordingUI() {

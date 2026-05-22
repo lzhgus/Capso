@@ -73,6 +73,7 @@ final class AnnotationCanvasNSView: NSView {
     var onTextEditingStarted: ((CGFloat, Bool, Bool, Bool) -> Void)?
     /// Fired on commit / cancel.
     var onTextEditingEnded: (() -> Void)?
+    var onInteractionChanged: ((Bool) -> Void)?
 
     func commitTextEditingIfNeeded() {
         commitTextEditing()
@@ -88,7 +89,12 @@ final class AnnotationCanvasNSView: NSView {
 
     private var dragStart: CGPoint?
     private var dragCurrent: CGPoint?
-    private var isDragging = false
+    private var isDragging = false {
+        didSet {
+            guard isDragging != oldValue else { return }
+            onInteractionChanged?(isDragging)
+        }
+    }
     private var dragObjectID: ObjectID?
     private var activeResizeHandle: ResizeHandle?
     private var resizeOriginalBounds: CGRect?
@@ -504,6 +510,7 @@ final class AnnotationCanvasNSView: NSView {
             let pointInSelf = convert(event.locationInWindow, from: nil)
             if let handle = liveTextHandleHitTest(pointInView: pointInSelf) {
                 isResizingTextEditor = true
+                isDragging = true
                 textEditorResizeHandle = handle
                 textEditorResizeStart = toImagePoint(pointInSelf)
                 textEditorOriginalBounds = CGRect(origin: editor.imageOrigin, size: editor.boxSize)
@@ -769,6 +776,7 @@ final class AnnotationCanvasNSView: NSView {
     override func mouseUp(with event: NSEvent) {
         if isResizingTextEditor {
             isResizingTextEditor = false
+            isDragging = false
             textEditorResizeHandle = nil
             textEditorResizeStart = nil
             textEditorOriginalBounds = nil

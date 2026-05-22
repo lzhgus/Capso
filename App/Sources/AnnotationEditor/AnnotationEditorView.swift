@@ -6,6 +6,7 @@ import OCRKit
 struct AnnotationEditorView: View {
     let initialSourceImage: CGImage
     let document: AnnotationDocument
+    let interactionState: AnnotationEditorInteractionState
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
     let onPin: (CGImage) -> Void
@@ -19,6 +20,7 @@ struct AnnotationEditorView: View {
     init(
         sourceImage: CGImage,
         document: AnnotationDocument,
+        interactionState: AnnotationEditorInteractionState,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage) -> Void,
@@ -26,6 +28,7 @@ struct AnnotationEditorView: View {
     ) {
         self.initialSourceImage = sourceImage
         self.document = document
+        self.interactionState = interactionState
         self.onSave = onSave
         self.onCopy = onCopy
         self.onPin = onPin
@@ -192,214 +195,259 @@ struct AnnotationEditorView: View {
 
     var body: some View {
         if isCropMode {
-            CropEditorView(
-                sourceImage: sourceImage,
-                initialCropRect: document.cropRect,
-                canTransformImage: document.objects.isEmpty,
-                onCancel: { isCropMode = false },
-                onCommit: { newImage, newRect in
-                    if let newImage {
-                        // Rotate/flip happened: swap the working image and
-                        // realign the document's imageSize so any future
-                        // annotations use the correct coordinate space.
-                        sourceImage = newImage
-                        document.replaceImage(size: CGSize(width: newImage.width, height: newImage.height))
-                        // cropRect lives in the new image's coords.
-                        document.setCropRect(newRect)
-                    } else {
-                        document.setCropRect(newRect)
-                    }
-                    isCropMode = false
-                }
-            )
+            cropEditor
         } else {
-            VStack(spacing: 0) {
-                // Toolbar pinned at top
-                AnnotationToolbar(
-                    currentTool: $currentTool,
-                    currentColor: $currentColor,
-                    lineWidth: $lineWidth,
-                    strokePattern: $strokePattern,
-                    filled: $filled,
-                    textFillEnabled: $textFillEnabled,
-                    textOutlineEnabled: $textOutlineEnabled,
-                    textStrokeEnabled: $textStrokeEnabled,
-                    redactionMode: $redactionMode,
-                    showBeautifyPanel: $showBeautifyPanel,
-                    isEditingText: isEditingText,
-                    canUndo: document.canUndo,
-                    canRedo: document.canRedo,
-                    onUndo: { document.undo(); refreshTrigger += 1 },
-                    onRedo: { document.redo(); refreshTrigger += 1 },
-                    onSave: { save() },
-                    onCopy: { copy() },
-                    onPin: { pin() },
-                    onCancel: onCancel,
-                    onCrop: { isCropMode = true }
-                )
+            editorContent
+        }
+    }
+
+    private var cropEditor: some View {
+        CropEditorView(
+            sourceImage: sourceImage,
+            initialCropRect: document.cropRect,
+            canTransformImage: document.objects.isEmpty,
+            onCancel: { isCropMode = false },
+            onCommit: commitCrop
+        )
+    }
+
+    private var editorContent: some View {
+        VStack(spacing: 0) {
+            toolbar
+            Divider()
+
+            if showBeautifyPanel {
+                BeautifyPanel(settings: $beautifySettings)
                 Divider()
-
-                if showBeautifyPanel {
-                    BeautifyPanel(settings: $beautifySettings)
-                    Divider()
-                }
-
-                // Canvas area with fit-to-window zoom
-                GeometryReader { geo in
-                    ScrollView([.horizontal, .vertical]) {
-                        ZStack {
-                            if beautifySettings.isEnabled {
-                                beautifyBackground
-                                    .frame(width: previewWidth, height: previewHeight)
-                            }
-
-                            AnnotationCanvasView(
-                                document: document,
-                                sourceImage: sourceImage,
-                                currentTool: currentTool,
-                                currentStyle: currentStyle,
-                                redactionMode: redactionMode,
-                                textFontSize: effectiveTextFontSize,
-                                textFillColor: textFillColor,
-                                textOutlineColor: textOutlineColor,
-                                textGlyphStrokeColor: textGlyphStrokeColor,
-                                zoomScale: zoomScale,
-                                refreshTrigger: refreshTrigger,
-                                textRegions: textRegions,
-                                commitEditingTrigger: commitEditingTrigger,
-                                onSwitchToSelect: {
-                                    document.clearSelection()
-                                    currentTool = .select
-                                },
-                                onTextEditingStarted: { fontSize, hasFill, hasOutline, hasStroke in
-                                    isEditingText = true
-                                    textFillEnabled = hasFill
-                                    textOutlineEnabled = hasOutline
-                                    textStrokeEnabled = hasStroke
-                                    // Sync slider to the object's fontSize when
-                                    // re-editing. Harmless for fresh edits: the
-                                    // value matches what we just pushed in.
-                                    if lineWidth != fontSize {
-                                        lineWidth = fontSize
-                                    }
-                                },
-                                onTextEditingEnded: {
-                                    isEditingText = false
-                                    // Preserve the last-used font size for the
-                                    // next text edit / tool switch.
-                                    savedTextFontSize = Double(lineWidth)
-                                }
-                            )
-                            .frame(
-                                width: imageWidth * zoomScale,
-                                height: imageHeight * zoomScale
-                            )
-                            .offset(x: cropOffsetX, y: cropOffsetY)
-                            .frame(
-                                width: effectiveImageWidth * zoomScale,
-                                height: effectiveImageHeight * zoomScale,
-                                alignment: .topLeading
-                            )
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: beautifySettings.isEnabled ? beautifySettings.clampedCornerRadius * zoomScale : 0))
-                            .shadow(
-                                color: .black.opacity(beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 0.25 : 0),
-                                radius: beautifySettings.clampedShadowRadius * zoomScale,
-                                y: beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 6 * zoomScale : 0
-                            )
-                            .padding(previewOuterInset)
-                        }
-                        .frame(
-                            width: beautifySettings.isEnabled ? previewWidth : effectiveImageWidth * zoomScale,
-                            height: beautifySettings.isEnabled ? previewHeight : effectiveImageHeight * zoomScale
-                        )
-                    }
-                    .background(Color(white: 0.12))
-                    .onAppear {
-                        fitToWindow(availableSize: geo.size)
-                        // Sync the session-local slider to the persisted width
-                        // for whichever tool was last used (issue #75).
-                        lineWidth = savedWidth(for: currentTool)
-                        strokePattern = savedStrokePattern
-                        // Pre-cache text regions for smart highlighter snapping
-                        Task {
-                            if let regions = try? await TextRecognizer.recognize(
-                                image: sourceImage, level: .fast, detectURLs: false
-                            ) {
-                                textRegions = regions.map(\.boundingBox)
-                            }
-                        }
-                    }
-                    .onChange(of: currentTool) { oldTool, newTool in
-                        // Clear selection so restoring lineWidth below doesn't
-                        // overwrite the previously drawn object's style.
-                        document.clearSelection()
-
-                        // Save outgoing tool's value then restore incoming.
-                        persistWidth(lineWidth, for: oldTool)
-                        lineWidth = savedWidth(for: newTool)
-                    }
-                    .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
-                    .onChange(of: lineWidth) { _, newValue in
-                        updateSelectedStyle()
-                        // Persist slider drags live so closing the editor
-                        // without switching tools still saves the change.
-                        persistWidth(newValue, for: currentTool)
-                    }
-                    .onChange(of: strokePattern) { _, newValue in
-                        savedStrokePattern = newValue
-                        updateSelectedStyle()
-                    }
-                    .onChange(of: filled) { _, _ in updateSelectedStyle() }
-                    .onChange(of: textFillEnabled) { _, _ in updateSelectedStyle() }
-                    .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }
-                    .onChange(of: textStrokeEnabled) { _, _ in updateSelectedStyle() }
-                    .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
-                    .onChange(of: geo.size) { _, newSize in
-                        // Re-fit if window is resized and we're at fit scale
-                        if zoomScale == fitScale(for: newSize) { return }
-                    }
-                }
-
-                // Bottom bar: zoom controls
-                HStack(spacing: 8) {
-                    Button(action: zoomOut) {
-                        Image(systemName: "minus.magnifyingglass")
-                    }
-                    .buttonStyle(.borderless)
-                    .keyboardShortcut("-", modifiers: .command)
-
-                    Text("\(Int(zoomScale * 100))%")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 44)
-
-                    Button(action: zoomIn) {
-                        Image(systemName: "plus.magnifyingglass")
-                    }
-                    .buttonStyle(.borderless)
-                    .keyboardShortcut("=", modifiers: .command)
-
-                    Button("Fit") {
-                        // Re-calculate fit scale
-                        if let window = NSApp.keyWindow {
-                            let toolbarH: CGFloat = 90 // toolbar + zoom bar
-                            let available = CGSize(
-                                width: window.contentView?.bounds.width ?? 800,
-                                height: (window.contentView?.bounds.height ?? 600) - toolbarH
-                            )
-                            fitToWindow(availableSize: available)
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .keyboardShortcut("0", modifiers: .command)
-
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(.bar)
             }
+
+            canvasArea
+            zoomBar
+        }
+    }
+
+    private var toolbar: some View {
+        AnnotationToolbar(
+            currentTool: $currentTool,
+            currentColor: $currentColor,
+            lineWidth: $lineWidth,
+            strokePattern: $strokePattern,
+            filled: $filled,
+            textFillEnabled: $textFillEnabled,
+            textOutlineEnabled: $textOutlineEnabled,
+            textStrokeEnabled: $textStrokeEnabled,
+            redactionMode: $redactionMode,
+            showBeautifyPanel: $showBeautifyPanel,
+            isEditingText: isEditingText,
+            canUndo: document.canUndo,
+            canRedo: document.canRedo,
+            onUndo: { document.undo(); refreshTrigger += 1 },
+            onRedo: { document.redo(); refreshTrigger += 1 },
+            onSave: { save() },
+            onCopy: { copy() },
+            onPin: { pin() },
+            onCancel: onCancel,
+            onCrop: { isCropMode = true }
+        )
+    }
+
+    private var canvasArea: some View {
+        GeometryReader { geo in
+            ScrollView([.horizontal, .vertical]) {
+                previewCanvas
+            }
+            .background(Color(white: 0.12))
+            .onAppear { handleCanvasAppear(size: geo.size) }
+            .onChange(of: currentTool, handleToolChange)
+            .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
+            .onChange(of: lineWidth, handleLineWidthChange)
+            .onChange(of: strokePattern, handleStrokePatternChange)
+            .onChange(of: filled) { _, _ in updateSelectedStyle() }
+            .onChange(of: textFillEnabled) { _, _ in updateSelectedStyle() }
+            .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }
+            .onChange(of: textStrokeEnabled) { _, _ in updateSelectedStyle() }
+            .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
+            .onChange(of: geo.size, handleCanvasSizeChange)
+        }
+    }
+
+    private var previewCanvas: some View {
+        ZStack {
+            if beautifySettings.isEnabled {
+                beautifyBackground
+                    .frame(width: previewWidth, height: previewHeight)
+            }
+
+            annotationCanvas
+        }
+        .frame(
+            width: beautifySettings.isEnabled ? previewWidth : effectiveImageWidth * zoomScale,
+            height: beautifySettings.isEnabled ? previewHeight : effectiveImageHeight * zoomScale
+        )
+    }
+
+    private var annotationCanvas: some View {
+        AnnotationCanvasView(
+            document: document,
+            sourceImage: sourceImage,
+            currentTool: currentTool,
+            currentStyle: currentStyle,
+            redactionMode: redactionMode,
+            textFontSize: effectiveTextFontSize,
+            textFillColor: textFillColor,
+            textOutlineColor: textOutlineColor,
+            textGlyphStrokeColor: textGlyphStrokeColor,
+            zoomScale: zoomScale,
+            refreshTrigger: refreshTrigger,
+            textRegions: textRegions,
+            commitEditingTrigger: commitEditingTrigger,
+            onSwitchToSelect: switchToSelectTool,
+            onInteractionChanged: handleCanvasInteractionChanged,
+            onTextEditingStarted: handleTextEditingStarted,
+            onTextEditingEnded: handleTextEditingEnded
+        )
+        .frame(width: imageWidth * zoomScale, height: imageHeight * zoomScale)
+        .offset(x: cropOffsetX, y: cropOffsetY)
+        .frame(
+            width: effectiveImageWidth * zoomScale,
+            height: effectiveImageHeight * zoomScale,
+            alignment: .topLeading
+        )
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: canvasCornerRadius))
+        .shadow(color: canvasShadowColor, radius: canvasShadowRadius, y: canvasShadowOffsetY)
+        .padding(previewOuterInset)
+    }
+
+    private var zoomBar: some View {
+        HStack(spacing: 8) {
+            Button(action: zoomOut) {
+                Image(systemName: "minus.magnifyingglass")
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("-", modifiers: .command)
+
+            Text("\(Int(zoomScale * 100))%")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 44)
+
+            Button(action: zoomIn) {
+                Image(systemName: "plus.magnifyingglass")
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("=", modifiers: .command)
+
+            Button("Fit", action: refitToCurrentWindow)
+                .buttonStyle(.borderless)
+                .keyboardShortcut("0", modifiers: .command)
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(.bar)
+    }
+
+    private var canvasCornerRadius: CGFloat {
+        beautifySettings.isEnabled ? beautifySettings.clampedCornerRadius * zoomScale : 0
+    }
+
+    private var canvasShadowColor: Color {
+        .black.opacity(beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 0.25 : 0)
+    }
+
+    private var canvasShadowRadius: CGFloat {
+        beautifySettings.clampedShadowRadius * zoomScale
+    }
+
+    private var canvasShadowOffsetY: CGFloat {
+        beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 6 * zoomScale : 0
+    }
+
+    private func commitCrop(newImage: CGImage?, newRect: CGRect?) {
+        if let newImage {
+            sourceImage = newImage
+            document.replaceImage(size: CGSize(width: newImage.width, height: newImage.height))
+            document.setCropRect(newRect)
+        } else {
+            document.setCropRect(newRect)
+        }
+        isCropMode = false
+    }
+
+    private func handleCanvasAppear(size: CGSize) {
+        fitToWindow(availableSize: size)
+        lineWidth = savedWidth(for: currentTool)
+        strokePattern = savedStrokePattern
+        Task {
+            if let regions = try? await TextRecognizer.recognize(
+                image: sourceImage, level: .fast, detectURLs: false
+            ) {
+                textRegions = regions.map(\.boundingBox)
+            }
+        }
+    }
+
+    private func handleToolChange(oldTool: AnnotationTool, newTool: AnnotationTool) {
+        document.clearSelection()
+        persistWidth(lineWidth, for: oldTool)
+        lineWidth = savedWidth(for: newTool)
+    }
+
+    private func handleLineWidthChange(oldValue: CGFloat, newValue: CGFloat) {
+        updateSelectedStyle()
+        persistWidth(newValue, for: currentTool)
+    }
+
+    private func handleStrokePatternChange(oldValue: StrokePattern, newValue: StrokePattern) {
+        savedStrokePattern = newValue
+        updateSelectedStyle()
+    }
+
+    private func handleCanvasSizeChange(oldSize: CGSize, newSize: CGSize) {
+        if zoomScale == fitScale(for: newSize) { return }
+    }
+
+    private func handleCanvasInteractionChanged(_ isInteracting: Bool) {
+        interactionState.setCanvasInteraction(isInteracting)
+    }
+
+    private func switchToSelectTool() {
+        document.clearSelection()
+        currentTool = .select
+    }
+
+    private func handleTextEditingStarted(
+        fontSize: CGFloat,
+        hasFill: Bool,
+        hasOutline: Bool,
+        hasStroke: Bool
+    ) {
+        isEditingText = true
+        interactionState.isEditingText = true
+        textFillEnabled = hasFill
+        textOutlineEnabled = hasOutline
+        textStrokeEnabled = hasStroke
+        if lineWidth != fontSize {
+            lineWidth = fontSize
+        }
+    }
+
+    private func handleTextEditingEnded() {
+        isEditingText = false
+        interactionState.isEditingText = false
+        savedTextFontSize = Double(lineWidth)
+    }
+
+    private func refitToCurrentWindow() {
+        if let window = NSApp.keyWindow {
+            let toolbarH: CGFloat = 90
+            let available = CGSize(
+                width: window.contentView?.bounds.width ?? 800,
+                height: (window.contentView?.bounds.height ?? 600) - toolbarH
+            )
+            fitToWindow(availableSize: available)
         }
     }
 
@@ -466,6 +514,9 @@ struct AnnotationEditorView: View {
     }
 
     private func copy() {
+        guard !interactionState.shouldSuppressCopyAction else {
+            return
+        }
         commitEditingTrigger += 1
         DispatchQueue.main.async {
             if let rendered = renderedOutputImage() {

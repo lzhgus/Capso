@@ -14,7 +14,7 @@ final class RecordingToolbarWindow: NSPanel {
         screen: NSScreen,
         settings: AppSettings,
         onRecord: @escaping (RecordingFormatChoice, Bool, String?, Bool, Bool) -> Void,
-        onCameraToggled: @escaping (Bool, String?) -> Void,
+        onCameraToggled: @escaping (Bool, String?) async -> Bool,
         onChangeArea: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onCameraSettingsChanged: @escaping () -> Void
@@ -81,7 +81,7 @@ private struct RecordingToolbarWrapper: View {
     let height: Int
     let settings: AppSettings
     let onRecord: (RecordingFormatChoice, Bool, String?, Bool, Bool) -> Void
-    let onCameraToggled: (Bool, String?) -> Void
+    let onCameraToggled: (Bool, String?) async -> Bool
     let onChangeArea: () -> Void
     let onCancel: () -> Void
     let onCameraSettingsChanged: () -> Void
@@ -90,6 +90,7 @@ private struct RecordingToolbarWrapper: View {
     @State private var selectedCameraID: String?
     @State private var micEnabled = false
     @State private var systemAudioEnabled = true
+    @State private var cameraToggleTask: Task<Void, Never>?
 
     var body: some View {
         RecordingToolbarView(
@@ -111,11 +112,26 @@ private struct RecordingToolbarWrapper: View {
             onCameraSettingsChanged: onCameraSettingsChanged
         )
         .onChange(of: cameraEnabled) { _, newValue in
-            onCameraToggled(newValue, selectedCameraID)
+            updateCamera(enabled: newValue, deviceID: selectedCameraID)
         }
         .onChange(of: selectedCameraID) { _, newValue in
             if cameraEnabled {
-                onCameraToggled(true, newValue)
+                updateCamera(enabled: true, deviceID: newValue)
+            }
+        }
+        .onDisappear {
+            cameraToggleTask?.cancel()
+        }
+    }
+
+    private func updateCamera(enabled: Bool, deviceID: String?) {
+        cameraToggleTask?.cancel()
+        cameraToggleTask = Task { @MainActor in
+            let didApply = await onCameraToggled(enabled, deviceID)
+            guard !Task.isCancelled else { return }
+            if enabled && !didApply {
+                cameraEnabled = false
+                selectedCameraID = nil
             }
         }
     }
