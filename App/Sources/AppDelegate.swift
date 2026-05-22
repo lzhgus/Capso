@@ -87,11 +87,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Task {
             await permissionManager.checkScreenRecordingPermission()
-            // Request camera permission early so the system dialog
-            // appears at a normal window level — not behind a recording
-            // overlay (which is at .screenSaver level and would hide
-            // the dialog, making it impossible to grant).
-            await permissionManager.requestCameraPermission()
         }
     }
 
