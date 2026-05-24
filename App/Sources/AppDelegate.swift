@@ -93,9 +93,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One-time migration: clear stale KeyboardShortcuts UserDefaults so new defaults apply.
     private func migrateShortcutsIfNeeded() {
         let migrationKey = "shortcutsMigratedToOptionShift"
-        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
-        KeyboardShortcuts.reset(.captureArea, .captureFullscreen, .captureWindow, .captureText, .recordScreen)
-        UserDefaults.standard.set(true, forKey: migrationKey)
+        if !UserDefaults.standard.bool(forKey: migrationKey) {
+            KeyboardShortcuts.reset(.captureArea, .captureFullscreen, .captureWindow, .captureText, .recordScreen)
+            UserDefaults.standard.set(true, forKey: migrationKey)
+        }
+
+        let translationMigrationKey = "captureAndTranslateShortcutMigratedToOptionShift"
+        guard !UserDefaults.standard.bool(forKey: translationMigrationKey) else { return }
+        let oldDefault = KeyboardShortcuts.Shortcut(.t, modifiers: [.command, .shift])
+        if KeyboardShortcuts.getShortcut(for: .captureAndTranslate) == oldDefault {
+            KeyboardShortcuts.reset(.captureAndTranslate)
+        }
+        UserDefaults.standard.set(true, forKey: translationMigrationKey)
     }
 
     private func registerGlobalShortcuts() {
@@ -140,7 +149,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         KeyboardShortcuts.onKeyDown(for: .captureAndTranslate) { [weak self] in
             guard let self else { return }
-            // If the user pressed ⌘⇧T while a Quick Access panel has focus
+            // If the user pressed the global Translate shortcut while a Quick
+            // Access panel has focus
             // (hovered / clicked), translate THAT capture rather than
             // starting a brand-new capture flow. The global hotkey otherwise
             // always wins over the panel's local `.keyboardShortcut`.

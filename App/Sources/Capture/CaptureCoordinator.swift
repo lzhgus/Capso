@@ -1240,11 +1240,12 @@ final class CaptureCoordinator {
     /// (a global shortcut handler) can fall through to its default behavior.
     ///
     /// This exists because the `KeyboardShortcuts` package registers a
-    /// SYSTEM-wide hotkey for `⌘⇧T`, which always wins over a SwiftUI
-    /// `.keyboardShortcut` attached to the Translate button in the Quick
-    /// Access panel. Without this fall-through, pressing ⌘⇧T while hovering
-    /// a Quick Access preview would trigger a fresh capture-and-translate
-    /// flow instead of translating the capture the user was already looking at.
+    /// SYSTEM-wide hotkey for the Capture & Translate shortcut, which always
+    /// wins over a SwiftUI `.keyboardShortcut` attached to the Translate button
+    /// in the Quick Access panel. Without this fall-through, pressing the
+    /// global shortcut while hovering a Quick Access preview would trigger a
+    /// fresh capture-and-translate flow instead of translating the capture the
+    /// user was already looking at.
     @discardableResult
     func invokeQuickAccessTranslateIfKey() -> Bool {
         guard let key = NSApp.keyWindow as? QuickAccessWindow,
