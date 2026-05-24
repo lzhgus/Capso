@@ -19,7 +19,7 @@ struct TranslationOnboardingView: View {
                 stepCard(
                     number: "01",
                     title: "Capture & Translate",
-                    description: "Press ⌘⇧T, drag to select text",
+                    description: "Press ⌥⇧T, drag to select text",
                     symbol: "rectangle.dashed.and.paperclip",
                     symbolColor: .orange
                 )

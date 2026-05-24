@@ -14,7 +14,7 @@ extension KeyboardShortcuts.Name {
     static let captureAreaAndShare = Self("captureAreaAndShare", default: .init(.zero, modifiers: [.option, .shift]))
     static let captureAreaAndAnnotate = Self("captureAreaAndAnnotate", default: .init(.eight, modifiers: [.option, .shift]))
     static let screenshotHistory = Self("screenshotHistory", default: .init(.nine, modifiers: [.option, .shift]))
-    static let captureAndTranslate = Self("captureAndTranslate", default: .init(.t, modifiers: [.command, .shift]))
+    static let captureAndTranslate = Self("captureAndTranslate", default: .init(.t, modifiers: [.option, .shift]))
     /// No default binding — opt-in. Self-Timer is discoverable from the
     /// menu bar; shipping a default risks colliding with whatever the user
     /// has already bound in macOS or third-party apps.
