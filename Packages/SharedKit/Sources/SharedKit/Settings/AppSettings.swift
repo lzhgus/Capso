@@ -56,6 +56,64 @@ public enum TranslationAutoDismiss: String, CaseIterable, Sendable {
     case afterDelay
 }
 
+public enum TranslationProviderKind: String, CaseIterable, Sendable {
+    case apple
+    case openAICompatible
+    case deepL
+    case custom
+
+    public var displayName: String {
+        switch self {
+        case .apple: return "Apple Translation"
+        case .openAICompatible: return "OpenAI"
+        case .deepL: return "DeepL"
+        case .custom: return "Custom"
+        }
+    }
+
+    public var defaultEndpoint: String {
+        switch self {
+        case .apple:
+            return ""
+        case .openAICompatible:
+            return "https://api.openai.com/v1/chat/completions"
+        case .deepL:
+            return ""
+        case .custom:
+            return ""
+        }
+    }
+
+    public var defaultModel: String {
+        switch self {
+        case .apple, .deepL:
+            return ""
+        case .openAICompatible:
+            return "gpt-4o-mini"
+        case .custom:
+            return ""
+        }
+    }
+
+    public var requiresAPIKey: Bool {
+        self != .apple
+    }
+
+    public var supportsModel: Bool {
+        switch self {
+        case .apple, .deepL: return false
+        case .openAICompatible, .custom: return true
+        }
+    }
+
+    public var supportsEndpoint: Bool {
+        switch self {
+        case .apple: return false
+        case .openAICompatible, .deepL, .custom: return true
+        }
+    }
+}
+
 public enum ExportQuality: String, CaseIterable, Sendable {
     case maximum
     case social
@@ -504,6 +562,25 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "translationTargetLanguage") }
     }
 
+    public var translationProvider: TranslationProviderKind {
+        get {
+            guard let raw = defaults.string(forKey: "translationProvider"),
+                  let provider = TranslationProviderKind(rawValue: raw) else { return .apple }
+            return provider
+        }
+        set { defaults.set(newValue.rawValue, forKey: "translationProvider") }
+    }
+
+    public var translationProviderModel: String {
+        get { defaults.string(forKey: "translationProviderModel") ?? translationProvider.defaultModel }
+        set { defaults.set(newValue, forKey: "translationProviderModel") }
+    }
+
+    public var translationProviderEndpoint: String {
+        get { defaults.string(forKey: "translationProviderEndpoint") ?? translationProvider.defaultEndpoint }
+        set { defaults.set(newValue, forKey: "translationProviderEndpoint") }
+    }
+
     public var translationAutoCopy: Bool {
         get { defaults.object(forKey: "translationAutoCopy") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "translationAutoCopy") }
@@ -540,6 +617,22 @@ public final class AppSettings: @unchecked Sendable {
     public var translationOnboardingShown: Bool {
         get { defaults.object(forKey: "translationOnboardingShown") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "translationOnboardingShown") }
+    }
+
+    public func translationAPIKey() -> String? {
+        try? KeychainHelper(service: "com.awesomemacapps.capso.translation")
+            .get(account: translationProvider.rawValue)
+    }
+
+    public func setTranslationAPIKey(_ value: String?) throws {
+        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.translation")
+        let account = translationProvider.rawValue
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmed.isEmpty {
+            try keychain.delete(account: account)
+        } else {
+            try keychain.set(trimmed, account: account)
+        }
     }
 
     /// Chosen at first launch; falls back to English for unsupported locales.

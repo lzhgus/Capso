@@ -7,10 +7,12 @@ import SharedKit
 final class PreferencesWindow {
     private var window: NSWindow?
     private let settings: AppSettings
+    private let permissionManager: PermissionManager
     private let updateManager: UpdateManager?
 
-    init(settings: AppSettings, updateManager: UpdateManager? = nil) {
+    init(settings: AppSettings, permissionManager: PermissionManager, updateManager: UpdateManager? = nil) {
         self.settings = settings
+        self.permissionManager = permissionManager
         self.updateManager = updateManager
     }
 
@@ -46,7 +48,7 @@ final class PreferencesWindow {
         visualEffect.state = .active
         window.contentView = visualEffect
 
-        let viewModel = PreferencesViewModel(settings: settings)
+        let viewModel = PreferencesViewModel(settings: settings, permissionManager: permissionManager)
         let hostingView = NSHostingView(rootView: PreferencesView(viewModel: viewModel, updateManager: updateManager, initialTab: tab))
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         visualEffect.addSubview(hostingView)

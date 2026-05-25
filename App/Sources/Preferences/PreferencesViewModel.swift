@@ -2,14 +2,22 @@
 import Foundation
 import Observation
 import SharedKit
+import TranslationKit
 
 @MainActor
 @Observable
 final class PreferencesViewModel {
     private let settings: AppSettings
+    private let permissionManager: PermissionManager
 
-    init(settings: AppSettings) {
+    private(set) var screenRecordingGranted: Bool = false
+    private(set) var accessibilityGranted: Bool = false
+    private(set) var cameraGranted: Bool = false
+    private(set) var microphoneGranted: Bool = false
+
+    init(settings: AppSettings, permissionManager: PermissionManager) {
         self.settings = settings
+        self.permissionManager = permissionManager
     }
 
     // MARK: General
@@ -458,6 +466,62 @@ final class PreferencesViewModel {
             }
         }
     }
+    var translationProvider: TranslationProviderKind {
+        get {
+            access(keyPath: \.translationProvider)
+            return settings.translationProvider
+        }
+        set {
+            withMutation(keyPath: \.translationProvider) {
+                settings.translationProvider = newValue
+            }
+        }
+    }
+    var translationProviderModel: String {
+        get {
+            access(keyPath: \.translationProviderModel)
+            return settings.translationProviderModel
+        }
+        set {
+            withMutation(keyPath: \.translationProviderModel) {
+                settings.translationProviderModel = newValue
+            }
+        }
+    }
+    var translationProviderEndpoint: String {
+        get {
+            access(keyPath: \.translationProviderEndpoint)
+            return settings.translationProviderEndpoint
+        }
+        set {
+            withMutation(keyPath: \.translationProviderEndpoint) {
+                settings.translationProviderEndpoint = newValue
+            }
+        }
+    }
+    func translationAPIKey() -> String {
+        settings.translationAPIKey() ?? ""
+    }
+    func setTranslationAPIKey(_ value: String) throws {
+        try settings.setTranslationAPIKey(value)
+    }
+    func testTranslationProviderConnection() async throws {
+        let provider = settings.translationProvider
+        guard provider != .apple else { return }
+        let result = try await ProviderTranslationService.translate(
+            text: "hello",
+            target: settings.translationTargetLanguage,
+            provider: provider,
+            config: TranslationProviderConfiguration(
+                apiKey: settings.translationAPIKey() ?? "",
+                endpoint: settings.translationProviderEndpoint,
+                model: settings.translationProviderModel
+            )
+        )
+        if result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw ProviderTranslationError.badResponse
+        }
+    }
     var translationAutoCopy: Bool {
         get {
             access(keyPath: \.translationAutoCopy)
@@ -490,6 +554,38 @@ final class PreferencesViewModel {
                 settings.translationAutoDismiss = newValue
             }
         }
+    }
+
+    // MARK: Permissions
+    func refreshPermissions() async {
+        await permissionManager.refreshAll()
+        updatePermissionSnapshot()
+    }
+
+    func requestPermission(_ kind: PermissionKind) async {
+        switch kind {
+        case .screenRecording:
+            permissionManager.openSettings(for: kind)
+        case .accessibility:
+            permissionManager.requestAccessibilityPermission()
+            permissionManager.openSettings(for: kind)
+        case .camera:
+            await permissionManager.requestCameraPermission()
+        case .microphone:
+            await permissionManager.requestMicrophonePermission()
+        }
+        updatePermissionSnapshot()
+    }
+
+    func openPermissionSettings(_ kind: PermissionKind) {
+        permissionManager.openSettings(for: kind)
+    }
+
+    private func updatePermissionSnapshot() {
+        screenRecordingGranted = permissionManager.screenRecordingGranted
+        accessibilityGranted = permissionManager.accessibilityGranted
+        cameraGranted = permissionManager.cameraGranted
+        microphoneGranted = permissionManager.microphoneGranted
     }
 
     // MARK: Cloud Share

@@ -3,6 +3,26 @@ import AVFoundation
 import Observation
 @preconcurrency import ScreenCaptureKit
 
+public enum PermissionKind: String, CaseIterable, Sendable {
+    case screenRecording
+    case accessibility
+    case camera
+    case microphone
+
+    public var settingsURL: URL {
+        switch self {
+        case .screenRecording:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+        case .accessibility:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        case .camera:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
+        case .microphone:
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+        }
+    }
+}
+
 @Observable
 @MainActor
 public final class PermissionManager {
@@ -12,6 +32,13 @@ public final class PermissionManager {
     public private(set) var accessibilityGranted: Bool = false
 
     public init() {}
+
+    public func refreshAll() async {
+        await checkScreenRecordingPermission()
+        checkAccessibilityPermission()
+        checkCameraPermission()
+        checkMicrophonePermission()
+    }
 
     // MARK: - Screen Recording
 
@@ -26,6 +53,10 @@ public final class PermissionManager {
 
     // MARK: - Camera
 
+    public func checkCameraPermission() {
+        cameraGranted = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+    }
+
     public func requestCameraPermission() async {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
@@ -39,6 +70,10 @@ public final class PermissionManager {
     }
 
     // MARK: - Microphone
+
+    public func checkMicrophonePermission() {
+        microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    }
 
     public func requestMicrophonePermission() async {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -69,22 +104,22 @@ public final class PermissionManager {
     // MARK: - Open System Settings
 
     public func openScreenRecordingSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-        NSWorkspace.shared.open(url)
+        openSettings(for: .screenRecording)
     }
 
     public func openCameraSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
-        NSWorkspace.shared.open(url)
+        openSettings(for: .camera)
     }
 
     public func openMicrophoneSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
-        NSWorkspace.shared.open(url)
+        openSettings(for: .microphone)
     }
 
     public func openAccessibilitySettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
+        openSettings(for: .accessibility)
+    }
+
+    public func openSettings(for kind: PermissionKind) {
+        NSWorkspace.shared.open(kind.settingsURL)
     }
 }

@@ -15,6 +15,7 @@ extension KeyboardShortcuts.Name {
     static let captureAreaAndAnnotate = Self("captureAreaAndAnnotate", default: .init(.eight, modifiers: [.option, .shift]))
     static let screenshotHistory = Self("screenshotHistory", default: .init(.nine, modifiers: [.option, .shift]))
     static let captureAndTranslate = Self("captureAndTranslate", default: .init(.t, modifiers: [.option, .shift]))
+    static let translateSelectedText = Self("translateSelectedText", default: .init(.y, modifiers: [.option, .shift]))
     /// No default binding — opt-in. Self-Timer is discoverable from the
     /// menu bar; shipping a default risks colliding with whatever the user
     /// has already bound in macOS or third-party apps.
@@ -78,6 +79,7 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Capture and Share to Cloud", name: .captureAreaAndShare, showDivider: true)
                     shortcutRow("Capture Area & Annotate", name: .captureAreaAndAnnotate, showDivider: true)
                     shortcutRow("Capture & Translate", name: .captureAndTranslate, showDivider: true)
+                    shortcutRow("Translate Selected Text", name: .translateSelectedText, showDivider: true)
                     shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
                     shortcutRow("Start / Stop Recording", name: .recordScreen, showDivider: true)
                     shortcutRow("Screenshot History", name: .screenshotHistory)

@@ -35,6 +35,14 @@ final class TranslationCoordinator {
         }
     }
 
+    func translateSelectedText() {
+        if !settings.translationOnboardingShown {
+            showOnboarding { [weak self] in self?.beginSelectedTextFlow() }
+        } else {
+            beginSelectedTextFlow()
+        }
+    }
+
     /// - Parameter anchorScreen: The screen where the capture came from.
     ///   Used to place the result card on the correct display — without this,
     ///   translating a screenshot taken on a secondary screen would bounce the
@@ -126,6 +134,8 @@ final class TranslationCoordinator {
         let window = TranslationResultWindow(
             regions: regions,
             target: target,
+            provider: settings.translationProvider,
+            providerConfig: providerConfig(),
             settings: settings,
             anchor: anchor,
             anchorScreen: anchorScreen
@@ -139,6 +149,7 @@ final class TranslationCoordinator {
             // `.screenSaver` floats above everything — including other apps'
             // windows — making the translation card genuinely always-on-top
             // when pinned. Unpinning returns to regular floating level.
+            window.setPinned(isPinned)
             window.level = isPinned ? .screenSaver : .floating
         }
         window.onChangeLanguage = { [weak self] in
@@ -177,6 +188,48 @@ final class TranslationCoordinator {
         }
         resultWindow = window
         window.show()
+    }
+
+    private func beginSelectedTextFlow() {
+        Task {
+            guard AXIsProcessTrusted() else {
+                let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(options)
+                NotificationCenter.default.post(name: .openPreferencesTab, object: PreferencesTab.permissions)
+                NSWorkspace.shared.open(PermissionKind.accessibility.settingsURL)
+                showToast("Allow Accessibility to translate selected text", icon: "lock.fill", iconColor: .systemYellow)
+                return
+            }
+
+            guard let text = await SelectedTextReader.readSelectedText(),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                showToast("No selected text found", icon: "text.cursor", iconColor: .systemYellow)
+                return
+            }
+
+            let region = TextRegion(text: text, boundingBox: .zero, confidence: 1)
+            let (anchor, screen) = Self.mouseAnchor()
+            showLoadingResult(
+                regions: [region],
+                target: settings.translationTargetLanguage,
+                anchor: anchor,
+                anchorScreen: screen
+            )
+        }
+    }
+
+    private func providerConfig() -> TranslationProviderConfiguration {
+        TranslationProviderConfiguration(
+            apiKey: settings.translationAPIKey() ?? "",
+            endpoint: settings.translationProviderEndpoint,
+            model: settings.translationProviderModel
+        )
+    }
+
+    private static func mouseAnchor() -> (NSRect, NSScreen?) {
+        let point = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) }
+        return (NSRect(x: point.x, y: point.y, width: 1, height: 1), screen)
     }
 
     /// Fetches the authoritative list of target language BCP-47 codes from

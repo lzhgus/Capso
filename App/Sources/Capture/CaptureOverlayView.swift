@@ -6,6 +6,7 @@ import SharedKit
 // MARK: - Notification extensions
 
 extension Notification.Name {
+    static let openPreferencesTab = Notification.Name("openPreferencesTab")
     static let openScreenshotSettings = Notification.Name("openScreenshotSettings")
     static let capturePresetChanged = Notification.Name("capturePresetChanged")
     /// Posted by PreferencesWindow when the window is already open and the

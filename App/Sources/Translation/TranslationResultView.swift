@@ -4,12 +4,16 @@ import Translation
 import NaturalLanguage
 import AppKit
 import OCRKit
+import SharedKit
 import TranslationKit
 
 struct TranslationResultView: View {
     let regions: [TextRegion]
     let target: String
+    let provider: TranslationProviderKind
+    let providerConfig: TranslationProviderConfiguration
     let autoCopy: Bool
+    let showOriginal: Bool
     let onClose: () -> Void
     let onPinChanged: (Bool) -> Void
     let onChangeLanguage: () -> Void
@@ -129,7 +133,7 @@ struct TranslationResultView: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
         )
-        .onAppear { buildConfig() }
+        .onAppear { startTranslation() }
         .translationTask(runConfig) { session in
             await runTranslation(using: session)
         }
@@ -183,35 +187,37 @@ struct TranslationResultView: View {
 
                 Divider().padding(.horizontal, 12)
 
-                // ORIGINAL (collapsible)
-                Button(action: toggleOriginal) {
-                    HStack(spacing: 8) {
-                        Text("ORIGINAL")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                            .tracking(1.0)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                            .rotationEffect(.degrees(originalExpanded ? 90 : 0))
+                if showOriginal {
+                    // ORIGINAL (collapsible)
+                    Button(action: toggleOriginal) {
+                        HStack(spacing: 8) {
+                            Text("ORIGINAL")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                                .tracking(1.0)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                                .rotationEffect(.degrees(originalExpanded ? 90 : 0))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                    .buttonStyle(.plain)
 
-                if originalExpanded {
-                    renderedText(
-                        region.original.text,
-                        bodyFont: .system(size: 13),
-                        bodyColor: .secondary,
-                        markerColor: .tertiary
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 14)
-                    .transition(.opacity)
+                    if originalExpanded {
+                        renderedText(
+                            region.original.text,
+                            bodyFont: .system(size: 13),
+                            bodyColor: .secondary,
+                            markerColor: .tertiary
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 14)
+                        .transition(.opacity)
+                    }
                 }
             }
         }
@@ -307,7 +313,7 @@ struct TranslationResultView: View {
 
     private func footer(copiedMessage: String?) -> some View {
         HStack {
-            Text("Apple Translation")
+            Text(provider.displayName)
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
             if let copiedMessage {
@@ -409,6 +415,16 @@ struct TranslationResultView: View {
         )
     }
 
+    private func startTranslation() {
+        originalExpanded = showOriginal
+        guard provider == .apple else {
+            runConfig = nil
+            Task { await runProviderTranslation() }
+            return
+        }
+        buildConfig()
+    }
+
     /// Normalizes codes for comparison (e.g. NLLanguageRecognizer returns
     /// "zh-Hans" / "zh-Hant"; our target stores the same form). Makes matching
     /// robust to minor casing/encoding differences.
@@ -459,6 +475,50 @@ struct TranslationResultView: View {
                 original: merged,
                 translation: response.targetText,
                 detectedSource: Locale.Language(identifier: detectedSource.isEmpty ? "en" : detectedSource)
+            )
+            phase = .done([result])
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    private func runProviderTranslation() async {
+        let meaningful = regions.filter {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        guard !meaningful.isEmpty else {
+            phase = .failed("No text to translate")
+            return
+        }
+
+        let joinedOriginal = meaningful.map(\.text).joined(separator: "\n")
+        do {
+            let response = try await ProviderTranslationService.translate(
+                text: joinedOriginal,
+                target: target,
+                provider: provider,
+                config: providerConfig
+            )
+            guard !response.text.isEmpty else {
+                phase = .failed("Translation returned no results. Try changing the target language.")
+                return
+            }
+
+            if autoCopy {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(response.text, forType: .string)
+            }
+
+            let merged = TextRegion(
+                text: joinedOriginal,
+                boundingBox: meaningful.first?.boundingBox ?? .zero,
+                confidence: 1.0
+            )
+            let result = TranslatedRegion(
+                original: merged,
+                translation: response.text,
+                detectedSource: Locale.Language(identifier: response.detectedSource ?? "und")
             )
             phase = .done([result])
         } catch {

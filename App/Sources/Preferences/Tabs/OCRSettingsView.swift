@@ -6,6 +6,9 @@ import SharedKit
 struct TextAndTranslationSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
     @State private var supportedLanguages: [(code: String, name: String)] = []
+    @State private var providerAPIKey: String = ""
+    @State private var providerStatusMessage: String?
+    @State private var isTestingProvider = false
 
     private let translationLanguages: [(code: String, name: String)] = [
         ("en",      "English"),
@@ -58,6 +61,66 @@ struct TextAndTranslationSettingsView: View {
                         }
                         .frame(width: 180)
                     }
+                    SettingRow(label: "Provider", sublabel: "Engine used for screenshot and selected text translation", showDivider: true) {
+                        Picker("", selection: $viewModel.translationProvider) {
+                            ForEach(TranslationProviderKind.allCases, id: \.rawValue) { provider in
+                                Text(provider.displayName).tag(provider)
+                            }
+                        }
+                        .frame(width: 180)
+                        .onChange(of: viewModel.translationProvider) { _, provider in
+                            viewModel.translationProviderEndpoint = provider.defaultEndpoint
+                            viewModel.translationProviderModel = provider.defaultModel
+                            loadProviderAPIKey()
+                        }
+                    }
+                    if viewModel.translationProvider.requiresAPIKey {
+                        SettingRow(label: "API Key", sublabel: "Stored in Keychain", showDivider: true) {
+                            HStack(spacing: 8) {
+                                SecureField("API Key", text: $providerAPIKey)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 180)
+                                    .onSubmit(saveProviderAPIKey)
+                                Button(action: saveProviderAPIKey) {
+                                    Image(systemName: "checkmark")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Save API key")
+                            }
+                        }
+                        if viewModel.translationProvider.supportsEndpoint {
+                            SettingRow(label: "Endpoint", sublabel: "Leave empty to use the provider default", showDivider: true) {
+                                TextField("", text: $viewModel.translationProviderEndpoint)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 260)
+                            }
+                        }
+                        if viewModel.translationProvider.supportsModel {
+                            SettingRow(label: "Model", sublabel: "Leave empty to use the provider default", showDivider: true) {
+                                TextField("", text: $viewModel.translationProviderModel)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 180)
+                            }
+                        }
+                        SettingRow(label: "Connection", sublabel: "Verify the current provider settings", showDivider: true) {
+                            HStack(spacing: 8) {
+                                if isTestingProvider {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                                Button(action: testProviderConnection) {
+                                    Label("Test Connection", systemImage: "network")
+                                }
+                                .controlSize(.small)
+                                .disabled(isTestingProvider)
+                            }
+                        }
+                    }
+                    if let providerStatusMessage {
+                        SettingRow(label: LocalizedStringKey(providerStatusMessage), showDivider: true) {
+                            EmptyView()
+                        }
+                    }
                     SettingRow(label: "Auto-Copy Translation", sublabel: "Copy result to clipboard automatically") {
                         Toggle("", isOn: $viewModel.translationAutoCopy)
                             .toggleStyle(.switch)
@@ -102,9 +165,46 @@ struct TextAndTranslationSettingsView: View {
             //     }
             // }
         }
-        // .onAppear {
-        //     loadSupportedLanguages()
-        // }
+        .onAppear {
+            loadProviderAPIKey()
+            // loadSupportedLanguages()
+        }
+    }
+
+    private func loadProviderAPIKey() {
+        providerAPIKey = viewModel.translationAPIKey()
+        providerStatusMessage = nil
+    }
+
+    private func saveProviderAPIKey() {
+        do {
+            try viewModel.setTranslationAPIKey(providerAPIKey)
+            providerStatusMessage = providerAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "API key cleared"
+                : "API key saved"
+        } catch {
+            providerStatusMessage = "API key could not be saved"
+        }
+    }
+
+    private func testProviderConnection() {
+        isTestingProvider = true
+        providerStatusMessage = nil
+        Task {
+            do {
+                try viewModel.setTranslationAPIKey(providerAPIKey)
+                try await viewModel.testTranslationProviderConnection()
+                await MainActor.run {
+                    providerStatusMessage = "Connection succeeded"
+                    isTestingProvider = false
+                }
+            } catch {
+                await MainActor.run {
+                    providerStatusMessage = "Connection failed: \(error.localizedDescription)"
+                    isTestingProvider = false
+                }
+            }
+        }
     }
 
     private func loadSupportedLanguages() {

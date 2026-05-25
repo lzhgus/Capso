@@ -99,6 +99,10 @@ final class MenuBarController: NSObject {
         captureAndTranslate.setShortcut(for: .captureAndTranslate)
         menu.addItem(captureAndTranslate)
 
+        let translateSelectedText = menuItem(String(localized: "Translate Selected Text"), action: #selector(self.translateSelectedText))
+        translateSelectedText.setShortcut(for: .translateSelectedText)
+        menu.addItem(translateSelectedText)
+
         let captureScrolling = menuItem(String(localized: "Scrolling Capture"), action: #selector(captureScrolling))
         captureScrolling.setShortcut(for: .captureScrolling)
         menu.addItem(captureScrolling)
@@ -186,6 +190,10 @@ final class MenuBarController: NSObject {
         translationCoordinator.startCaptureAndTranslate()
     }
 
+    @objc private func translateSelectedText() {
+        translationCoordinator.translateSelectedText()
+    }
+
     @objc private func captureScrolling() {
         captureCoordinator.captureScrolling()
     }
@@ -229,6 +237,7 @@ extension MenuBarController: NSMenuDelegate {
             case #selector(captureWindow): item.setShortcut(for: .captureWindow)
             case #selector(captureText): item.setShortcut(for: .captureText)
             case #selector(captureAndTranslate): item.setShortcut(for: .captureAndTranslate)
+            case #selector(translateSelectedText): item.setShortcut(for: .translateSelectedText)
             case #selector(recordScreen): item.setShortcut(for: .recordScreen)
             case #selector(captureScrolling): item.setShortcut(for: .captureScrolling)
             case #selector(captureSelfTimer):

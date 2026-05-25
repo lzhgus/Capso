@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureCoordinator!.shareCoordinator = shareCoordinator
         historyCoordinator!.shareCoordinator = shareCoordinator
         recordingCoordinator!.historyCoordinator = historyCoordinator
-        preferencesWindow = PreferencesWindow(settings: settings, updateManager: updateManager)
+        preferencesWindow = PreferencesWindow(settings: settings, permissionManager: permissionManager, updateManager: updateManager)
         if settings.diagnosticLoggingEnabled {
             DiagnosticLogger.append(
                 "App launched version=\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown") build=\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown")",
@@ -82,6 +82,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let tabRaw = (notification.object as? PreferencesTab)?.rawValue
             MainActor.assumeIsolated {
                 let tab = tabRaw.flatMap(PreferencesTab.init(rawValue:)) ?? .screenshots
+                self?.preferencesWindow?.show(tab: tab)
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .openPreferencesTab,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let tabRaw = (notification.object as? PreferencesTab)?.rawValue
+            MainActor.assumeIsolated {
+                let tab = tabRaw.flatMap(PreferencesTab.init(rawValue:)) ?? .general
                 self?.preferencesWindow?.show(tab: tab)
             }
         }
@@ -158,6 +169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             self.translationCoordinator?.startCaptureAndTranslate()
+        }
+        KeyboardShortcuts.onKeyDown(for: .translateSelectedText) { [weak self] in
+            self?.translationCoordinator?.translateSelectedText()
         }
     }
 

@@ -2,8 +2,9 @@
 import Combine
 import SwiftUI
 
-enum PreferencesTab: String, CaseIterable {
+enum PreferencesTab: String, CaseIterable, Sendable {
     case general
+    case permissions
     case screenshots
     case recording
     case quickAccess
@@ -15,6 +16,7 @@ enum PreferencesTab: String, CaseIterable {
     var title: LocalizedStringKey {
         switch self {
         case .general: "General"
+        case .permissions: "Permissions"
         case .screenshots: "Screenshots"
         case .recording: "Recording"
         case .quickAccess: "Quick Access"
@@ -28,6 +30,7 @@ enum PreferencesTab: String, CaseIterable {
     var icon: String {
         switch self {
         case .general: "gearshape"
+        case .permissions: "lock.shield"
         case .screenshots: "camera"
         case .recording: "record.circle"
         case .quickAccess: "bolt"
@@ -94,6 +97,8 @@ struct PreferencesView: View {
                 switch selectedTab {
                 case .general:
                     GeneralSettingsView(viewModel: viewModel, updateManager: updateManager)
+                case .permissions:
+                    PermissionSettingsView(viewModel: viewModel)
                 case .screenshots:
                     ScreenshotSettingsView(viewModel: viewModel)
                 case .recording:

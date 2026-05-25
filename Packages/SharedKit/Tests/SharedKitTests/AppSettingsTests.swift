@@ -143,6 +143,43 @@ struct AppSettingsTests {
         #expect(settings.isProUnlocked == false)
     }
 
+    @Test("Translation provider defaults to Apple")
+    func translationProviderDefaultsToApple() {
+        let suite = "test.translationProvider.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.translationProvider == .apple)
+    }
+
+    @Test("Translation provider choices exclude DeepSeek")
+    func translationProviderChoicesExcludeDeepSeek() {
+        #expect(TranslationProviderKind.allCases.map(\.rawValue) == [
+            "apple",
+            "openAICompatible",
+            "deepL",
+            "custom",
+        ])
+    }
+
+    @Test("Translation provider settings persist across instances")
+    func translationProviderSettingsPersist() {
+        let suite = "test.translationProvider.persist"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+
+        first.translationProvider = .openAICompatible
+        first.translationProviderModel = "gpt-4o-mini"
+        first.translationProviderEndpoint = "https://example.com/chat/completions"
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.translationProvider == .openAICompatible)
+        #expect(second.translationProviderModel == "gpt-4o-mini")
+        #expect(second.translationProviderEndpoint == "https://example.com/chat/completions")
+    }
+
     @Test("File formats map common extensions")
     func fileFormatExtensionMapping() {
         #expect(FileFormat(pathExtension: "png") == .png)

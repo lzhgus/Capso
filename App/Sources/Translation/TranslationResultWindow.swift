@@ -10,7 +10,12 @@ final class TranslationResultWindow: NSPanel {
     private let settings: AppSettings
     private let regions: [TextRegion]
     private let target: String
+    private let provider: TranslationProviderKind
+    private let providerConfig: TranslationProviderConfiguration
     private var dismissTimer: Timer?
+    private var localClickMonitor: Any?
+    private var globalClickMonitor: Any?
+    private var isPinned = false
 
     var onClose: (() -> Void)?
     var onPinChanged: ((Bool) -> Void)?
@@ -21,12 +26,16 @@ final class TranslationResultWindow: NSPanel {
     init(
         regions: [TextRegion],
         target: String,
+        provider: TranslationProviderKind,
+        providerConfig: TranslationProviderConfiguration,
         settings: AppSettings,
         anchor: NSRect?,
         anchorScreen: NSScreen?
     ) {
         self.regions = regions
         self.target = target
+        self.provider = provider
+        self.providerConfig = providerConfig
         self.settings = settings
 
         // Fixed window size matching the SwiftUI view's `.frame(width: 360, height: 480)`.
@@ -58,7 +67,10 @@ final class TranslationResultWindow: NSPanel {
         let view = TranslationResultView(
             regions: regions,
             target: target,
+            provider: provider,
+            providerConfig: providerConfig,
             autoCopy: settings.translationAutoCopy,
+            showOriginal: settings.translationShowOriginal,
             onClose:          { [weak self] in self?.onClose?() },
             onPinChanged:     { [weak self] isPinned in self?.onPinChanged?(isPinned) },
             onChangeLanguage: { [weak self] in self?.onChangeLanguage?() }
@@ -77,12 +89,46 @@ final class TranslationResultWindow: NSPanel {
                 Task { @MainActor in self?.onClose?() }
             }
         }
+        if settings.translationAutoDismiss == .clickOutside {
+            installClickOutsideMonitors()
+        }
+    }
+
+    func setPinned(_ pinned: Bool) {
+        isPinned = pinned
     }
 
     override func close() {
         dismissTimer?.invalidate()
         dismissTimer = nil
+        removeClickOutsideMonitors()
         super.close()
+    }
+
+    private func installClickOutsideMonitors() {
+        removeClickOutsideMonitors()
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            if !self.isPinned && event.window !== self {
+                self.onClose?()
+            }
+            return event
+        }
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            guard let self, !self.isPinned else { return }
+            self.onClose?()
+        }
+    }
+
+    private func removeClickOutsideMonitors() {
+        if let localClickMonitor {
+            NSEvent.removeMonitor(localClickMonitor)
+            self.localClickMonitor = nil
+        }
+        if let globalClickMonitor {
+            NSEvent.removeMonitor(globalClickMonitor)
+            self.globalClickMonitor = nil
+        }
     }
 
     private static func positionedFrame(
