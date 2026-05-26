@@ -266,6 +266,43 @@ struct AppSettingsTests {
         #expect(settings.translationAutoDismissDelay == 10)
     }
 
+    @Test("Cloud Share configuration supports provider-specific fields")
+    func cloudShareProviderFieldsPersist() {
+        let suite = "test.cloudShare.providerFields"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+
+        first.cloudShareProvider = "s3"
+        first.cloudShareURLPrefix = "https://cdn.example.com"
+        first.cloudShareBucket = "capso"
+        first.cloudShareRegion = "us-east-1"
+        first.cloudShareEndpoint = "https://s3.us-east-1.amazonaws.com"
+        first.cloudSharePathPrefix = "screenshots"
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.isCloudShareConfigured == true)
+        #expect(second.cloudShareRegion == "us-east-1")
+        #expect(second.cloudShareEndpoint == "https://s3.us-east-1.amazonaws.com")
+        #expect(second.cloudSharePathPrefix == "screenshots")
+    }
+
+    @Test("Cloud Share R2 configuration remains compatible with account ID")
+    func cloudShareR2Compatibility() {
+        let suite = "test.cloudShare.r2Compatibility"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        settings.cloudShareProvider = "r2"
+        settings.cloudShareURLPrefix = "https://pub.example.com"
+        settings.cloudShareBucket = "capso"
+        settings.cloudShareAccountID = "abc123"
+
+        #expect(settings.isCloudShareConfigured == true)
+        #expect(settings.cloudShareAccountID == "abc123")
+    }
+
     // MARK: Self-Timer
 
     @Test("Default self-timer duration is 5 seconds")

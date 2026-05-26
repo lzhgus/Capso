@@ -42,7 +42,7 @@ struct CloudShareSettingsView: View {
                 .foregroundStyle(.secondary)
             Text(String(localized: "Cloud Share is not set up yet"))
                 .font(.headline)
-            Text(String(localized: "Configure a Cloudflare R2 bucket to share captures with one click."))
+            Text(String(localized: "Connect your own cloud storage bucket to share captures with one click."))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button(String(localized: "Set up Cloud Share")) {
@@ -64,7 +64,7 @@ struct CloudShareSettingsView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .font(.system(size: 12))
-                            Text(viewModel.cloudShareProvider ?? "—")
+                            Text(currentProvider?.displayName ?? viewModel.cloudShareProvider ?? "—")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -81,12 +81,34 @@ struct CloudShareSettingsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
+                    if let region = viewModel.cloudShareRegion, !region.isEmpty {
+                        SettingRow(label: "Region / Endpoint", showDivider: true) {
+                            Text(region)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    if let pathPrefix = viewModel.cloudSharePathPrefix, !pathPrefix.isEmpty {
+                        SettingRow(label: "Path Prefix", showDivider: true) {
+                            Text(pathPrefix)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
 
             SettingGroup(title: "Actions") {
                 SettingCard {
-                    SettingRow(label: "Test Connection", sublabel: "Verify the bucket is reachable") {
+                    SettingRow(label: "Change Provider", sublabel: "Update storage provider or credentials") {
+                        Button(String(localized: "Configure")) {
+                            showWizard = true
+                        }
+                        .controlSize(.small)
+                    }
+                    SettingRow(label: "Test Connection", sublabel: "Verify the bucket is reachable", showDivider: true) {
                         Button {
                             Task { await testConnection() }
                         } label: {
@@ -113,12 +135,16 @@ struct CloudShareSettingsView: View {
         }
     }
 
+    private var currentProvider: ShareProvider? {
+        guard let raw = viewModel.cloudShareProvider else { return nil }
+        return ShareProvider(rawValue: raw)
+    }
+
     private func testConnection() async {
         guard
             let providerRaw = viewModel.cloudShareProvider,
             let provider = ShareProvider(rawValue: providerRaw),
             let urlPrefix = viewModel.cloudShareURLPrefix,
-            let accountID = viewModel.cloudShareAccountID,
             let bucket = viewModel.cloudShareBucket
         else {
             testResult = TestResultAlert(
@@ -141,11 +167,24 @@ struct CloudShareSettingsView: View {
         }
 
         testing = true
+        var fields: [String: String] = [:]
+        if let accountID = viewModel.cloudShareAccountID {
+            fields["accountID"] = accountID
+        }
+        if let region = viewModel.cloudShareRegion {
+            fields["region"] = region
+        }
+        if let endpoint = viewModel.cloudShareEndpoint {
+            fields["endpoint"] = endpoint
+        }
+        if let pathPrefix = viewModel.cloudSharePathPrefix {
+            fields["pathPrefix"] = pathPrefix
+        }
         let result = await CloudShareTester.runTest(
             provider: provider,
             urlPrefix: urlPrefix,
-            accountID: accountID,
             bucket: bucket,
+            fields: fields,
             accessKey: accessKey,
             secretKey: secretKey
         )
@@ -170,15 +209,15 @@ struct CloudShareSettingsView: View {
         case .notConfigured:
             return String(localized: "Configuration is incomplete. Re-run the wizard.")
         case .invalidCredentials:
-            return String(localized: "Cloudflare rejected the credentials. Verify the Access Key and Secret have Object Read & Write on this bucket.")
+            return String(localized: "The storage provider rejected the credentials. Verify the access key, secret, and bucket permissions.")
         case .invalidURLPrefix(let reason):
             return String(format: String(localized: "Invalid public URL prefix: %@"), reason)
         case .network(let underlying):
             return String(format: String(localized: "Network error: %@"), underlying)
         case .quotaExceeded:
-            return String(localized: "Storage quota exceeded — free up space in the Cloudflare dashboard.")
+            return String(localized: "Storage quota exceeded — free up space in your provider dashboard.")
         case .publicAccessUnreachable:
-            return String(localized: "Upload worked, but the file isn't publicly reachable. Enable Public access on the bucket in Cloudflare.")
+            return String(localized: "Upload worked, but the file isn't publicly reachable. Enable public access or use a public custom domain.")
         case .unknown(let s):
             return s
         }
@@ -189,21 +228,25 @@ struct CloudShareSettingsView: View {
         viewModel.cloudShareProvider = nil
         viewModel.cloudShareURLPrefix = nil
         viewModel.cloudShareAccountID = nil
+        viewModel.cloudShareRegion = nil
+        viewModel.cloudShareEndpoint = nil
+        viewModel.cloudSharePathPrefix = nil
         viewModel.cloudShareBucket = nil
 
         // 2. Delete Keychain entries — surface failures instead of silently swallowing.
-        // r2 is the only provider in v1; when B2/S3 land, derive this string from cloudShareProvider.
-        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.r2")
         var keychainErrors: [String] = []
-        do {
-            try keychain.delete(account: "accessKey")
-        } catch {
-            keychainErrors.append("Access Key (\(error.localizedDescription))")
-        }
-        do {
-            try keychain.delete(account: "secretKey")
-        } catch {
-            keychainErrors.append("Secret Access Key (\(error.localizedDescription))")
+        for provider in ShareProvider.allCases {
+            let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.\(provider.rawValue)")
+            do {
+                try keychain.delete(account: "accessKey")
+            } catch {
+                keychainErrors.append("\(provider.displayName) Access Key (\(error.localizedDescription))")
+            }
+            do {
+                try keychain.delete(account: "secretKey")
+            } catch {
+                keychainErrors.append("\(provider.displayName) Secret Access Key (\(error.localizedDescription))")
+            }
         }
 
         // 3. Tear down the live coordinator so subsequent shares fail closed.

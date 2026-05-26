@@ -184,7 +184,10 @@ struct CloudShareWizardView: View {
         // notConfiguredView → configuredView transition in CloudShareSettingsView).
         viewModel.cloudShareProvider = model.provider.rawValue
         viewModel.cloudShareURLPrefix = ShareConfig.normalizePrefix(model.urlPrefix)
-        viewModel.cloudShareAccountID = model.accountID
+        viewModel.cloudShareAccountID = model.provider == .r2 ? model.accountID : nil
+        viewModel.cloudShareRegion = model.provider == .r2 ? nil : model.region
+        viewModel.cloudShareEndpoint = model.endpoint.isEmpty ? nil : model.endpoint
+        viewModel.cloudSharePathPrefix = model.pathPrefix.isEmpty ? nil : model.pathPrefix
         viewModel.cloudShareBucket = model.bucket
 
         // Step 3: Rebuild the live ShareCoordinator with the new credentials.
@@ -206,6 +209,9 @@ final class CloudShareWizardModel {
     // Form state
     var provider: ShareProvider = .r2
     var accountID: String = ""
+    var region: String = ""
+    var endpoint: String = ""
+    var pathPrefix: String = ""
     var bucket: String = ""
     var accessKey: String = ""
     var secretKey: String = ""
@@ -244,7 +250,7 @@ final class CloudShareWizardModel {
     var canAdvance: Bool {
         switch step {
         case .welcome:     return true
-        case .provider:    return provider == .r2  // only r2 selectable in v1
+        case .provider:    return true
         case .getKeys:     return true
         case .credentials: return credentialsValid
         case .urlPrefix:
@@ -255,13 +261,102 @@ final class CloudShareWizardModel {
     }
 
     var credentialsValid: Bool {
-        accountIDError == nil
+        providerSpecificFieldsValid
+            && accountIDError == nil
             && bucketError == nil
             && accessKeyError == nil
-            && !accountID.isEmpty
             && !bucket.isEmpty
             && !accessKey.isEmpty
             && !secretKey.isEmpty
+    }
+
+    var providerSpecificFieldsValid: Bool {
+        switch provider {
+        case .r2:
+            return !accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .s3, .tencentCOS, .aliyunOSS:
+            return !region.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    var providerDisplayName: String {
+        provider.displayName
+    }
+
+    var regionLabel: String {
+        switch provider {
+        case .r2:
+            return String(localized: "Account ID")
+        case .s3:
+            return String(localized: "Region")
+        case .tencentCOS:
+            return String(localized: "Region")
+        case .aliyunOSS:
+            return String(localized: "Endpoint / Region")
+        }
+    }
+
+    var regionPlaceholder: String {
+        switch provider {
+        case .r2:
+            return String(localized: "32-character hex")
+        case .s3:
+            return "us-east-1"
+        case .tencentCOS:
+            return "ap-guangzhou"
+        case .aliyunOSS:
+            return "oss-cn-hangzhou"
+        }
+    }
+
+    var accessKeyLabel: String {
+        switch provider {
+        case .tencentCOS:
+            return "SecretId"
+        case .aliyunOSS:
+            return String(localized: "AccessKey ID")
+        case .r2, .s3:
+            return String(localized: "Access Key ID")
+        }
+    }
+
+    var secretKeyLabel: String {
+        switch provider {
+        case .aliyunOSS:
+            return String(localized: "AccessKey Secret")
+        case .r2, .s3, .tencentCOS:
+            return String(localized: "Secret Access Key")
+        }
+    }
+
+    var endpointPlaceholder: String {
+        switch provider {
+        case .s3:
+            return String(localized: "Optional for S3-compatible services")
+        case .r2, .tencentCOS, .aliyunOSS:
+            return ""
+        }
+    }
+
+    var shouldShowEndpoint: Bool {
+        provider == .s3
+    }
+
+    var configFields: [String: String] {
+        var fields: [String: String] = [:]
+        if !accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["accountID"] = accountID
+        }
+        if !region.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["region"] = region
+        }
+        if !endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["endpoint"] = endpoint
+        }
+        if !pathPrefix.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["pathPrefix"] = pathPrefix
+        }
+        return fields
     }
 
     func goNext() {
@@ -356,8 +451,8 @@ final class CloudShareWizardModel {
         let result = await CloudShareTester.runTest(
             provider: provider,
             urlPrefix: urlPrefix,
-            accountID: accountID,
             bucket: bucket,
+            fields: configFields,
             accessKey: accessKey,
             secretKey: secretKey
         )
@@ -444,7 +539,7 @@ private struct ProviderStep: View {
             StepHeader(
                 stepLabel: String(localized: "Step 2 — Provider"),
                 title: String(localized: "Choose a storage provider"),
-                subtitle: String(localized: "Capso speaks the S3 protocol, so any S3-compatible bucket works. We recommend Cloudflare R2 — generous free tier and no egress fees.")
+                subtitle: String(localized: "Choose where Capso uploads screenshots. Files stay in your own storage account and Capso copies the public share link.")
             )
 
             VStack(spacing: 10) {
@@ -461,46 +556,44 @@ private struct ProviderStep: View {
                     model.provider = .r2
                 }
                 ProviderCard(
-                    badge: "B2",
-                    badgeColor: Color(red: 0.85, green: 0.18, blue: 0.18),
-                    name: String(localized: "Backblaze B2"),
-                    sub: String(localized: "10 GB free · pay-as-you-go after"),
-                    pillText: String(localized: "COMING SOON"),
-                    pillColor: Color.white.opacity(0.20),
-                    selected: false,
-                    enabled: false
-                ) {}
-                ProviderCard(
                     badge: "S3",
                     badgeColor: Color(red: 0.62, green: 0.40, blue: 0.20),
                     name: String(localized: "Amazon S3"),
-                    sub: String(localized: "The original. AWS account required."),
-                    pillText: String(localized: "COMING SOON"),
+                    sub: String(localized: "AWS buckets and S3-compatible endpoints"),
+                    pillText: nil,
                     pillColor: Color.white.opacity(0.20),
-                    selected: false,
-                    enabled: false
-                ) {}
+                    selected: model.provider == .s3,
+                    enabled: true
+                ) {
+                    model.provider = .s3
+                }
+                ProviderCard(
+                    badge: "COS",
+                    badgeColor: Color(red: 0.25, green: 0.55, blue: 0.95),
+                    name: String(localized: "Tencent COS"),
+                    sub: String(localized: "Tencent Cloud object storage"),
+                    pillText: nil,
+                    pillColor: Color.white.opacity(0.20),
+                    selected: model.provider == .tencentCOS,
+                    enabled: true
+                ) {
+                    model.provider = .tencentCOS
+                }
+                ProviderCard(
+                    badge: "OSS",
+                    badgeColor: Color(red: 0.95, green: 0.36, blue: 0.18),
+                    name: String(localized: "Aliyun OSS"),
+                    sub: String(localized: "Alibaba Cloud object storage"),
+                    pillText: nil,
+                    pillColor: Color.white.opacity(0.20),
+                    selected: model.provider == .aliyunOSS,
+                    enabled: true
+                ) {
+                    model.provider = .aliyunOSS
+                }
             }
 
             Spacer(minLength: 8)
-
-            HStack(spacing: 4) {
-                Image(systemName: "lightbulb")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.45))
-                Button {
-                    NSWorkspace.shared.open(URL(string: "https://github.com/lzhgus/Capso/issues/new?labels=enhancement&template=feature_request.yml")!)
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(String(localized: "Want a provider added? Open an issue on GitHub"))
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.55))
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 }
@@ -510,23 +603,25 @@ private struct ProviderStep: View {
 private struct GetKeysStep: View {
     @Bindable var model: CloudShareWizardModel
 
-    private let steps: [(title: String, detail: AttributedString)] = [
-        (String(localized: "Create a bucket"),
-         attributed(String(localized: "In `R2 → Overview`, click `Create bucket`. Name it something memorable like `capso-shares`."))),
-        (String(localized: "Enable public access"),
-         attributed(String(localized: "In the bucket's `Settings` tab: click `Enable` next to **Public Development URL** for a free `pub-…r2.dev` link, OR click `+ Add` next to **Custom Domains** to use your own domain."))),
-        (String(localized: "Create an API token"),
-         attributed(String(localized: "`R2 → Manage API Tokens` → `Create API Token`. Choose **Object Read & Write**, scoped to this bucket."))),
-        (String(localized: "Copy the four values"),
-         attributed(String(localized: "You'll get `Account ID`, `Access Key ID`, and `Secret Access Key`. Note your bucket name too. The secret won't be shown again.")))
-    ]
+    private var steps: [(title: String, detail: AttributedString)] {
+        [
+            (String(localized: "Create or choose a bucket"),
+             Self.attributed(String(format: String(localized: "Use a bucket in **%@** that Capso can write objects into."), model.providerDisplayName))),
+            (String(localized: "Make uploaded files publicly readable"),
+             Self.attributed(String(localized: "Use a public bucket URL or connect a custom domain/CDN. Capso needs a public HTTPS prefix so it can copy a share link."))),
+            (String(localized: "Create access credentials"),
+             Self.attributed(String(localized: "Create a key with object read/write permission scoped to this bucket when your provider supports scoped keys."))),
+            (String(localized: "Copy the required values"),
+             Self.attributed(String(localized: "Keep the bucket, region/endpoint, access key, and secret ready. The secret will be stored in macOS Keychain.")))
+        ]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             StepHeader(
-                stepLabel: String(localized: "Step 3 — Cloudflare"),
-                title: String(localized: "Get your R2 credentials"),
-                subtitle: String(localized: "Open the Cloudflare dashboard in your browser and follow these four steps. Keep this window open — you'll paste the keys on the next screen.")
+                stepLabel: String(localized: "Step 3 — Provider"),
+                title: String(format: String(localized: "Prepare %@ credentials"), model.providerDisplayName),
+                subtitle: String(localized: "Open your provider dashboard and keep this window nearby. You'll paste the values on the next screen.")
             )
 
             VStack(spacing: 0) {
@@ -547,12 +642,12 @@ private struct GetKeysStep: View {
             HStack {
                 Spacer()
                 Button {
-                    NSWorkspace.shared.open(URL(string: "https://dash.cloudflare.com/?to=/:account/r2/overview")!)
+                    NSWorkspace.shared.open(providerURL)
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "safari")
                             .font(.system(size: 12, weight: .semibold))
-                        Text(String(localized: "Open R2 Dashboard"))
+                        Text(String(localized: "Open Provider Dashboard"))
                             .font(.system(size: 13, weight: .semibold))
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 10, weight: .bold))
@@ -574,6 +669,19 @@ private struct GetKeysStep: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    private var providerURL: URL {
+        switch model.provider {
+        case .r2:
+            return URL(string: "https://dash.cloudflare.com/?to=/:account/r2/overview")!
+        case .s3:
+            return URL(string: "https://s3.console.aws.amazon.com/s3/home")!
+        case .tencentCOS:
+            return URL(string: "https://console.cloud.tencent.com/cos")!
+        case .aliyunOSS:
+            return URL(string: "https://oss.console.aliyun.com/")!
         }
     }
 
@@ -607,7 +715,7 @@ private struct CredentialsStep: View {
     @FocusState private var focused: Field?
 
     enum Field: Hashable {
-        case accountID, bucket, accessKey, secretKey
+        case accountID, region, endpoint, pathPrefix, bucket, accessKey, secretKey
     }
 
     var body: some View {
@@ -619,26 +727,54 @@ private struct CredentialsStep: View {
             )
 
             VStack(alignment: .leading, spacing: 14) {
-                // Full-width: Account ID
-                FieldGroup(
-                    label: String(localized: "Account ID"),
-                    icon: nil,
-                    error: model.accountIDError
-                ) {
-                    MonoTextField(
-                        text: $model.accountID,
-                        placeholder: String(localized: "32-character hex"),
-                        secure: false
-                    )
-                    .focused($focused, equals: .accountID)
-                    .onChange(of: focused) { _, newValue in
-                        if newValue != .accountID && !model.accountID.isEmpty {
-                            model.blurredAccountID = true
+                if model.provider == .r2 {
+                    FieldGroup(
+                        label: model.regionLabel,
+                        icon: nil,
+                        error: model.accountIDError
+                    ) {
+                        MonoTextField(
+                            text: $model.accountID,
+                            placeholder: model.regionPlaceholder,
+                            secure: false
+                        )
+                        .focused($focused, equals: .accountID)
+                        .onChange(of: focused) { _, newValue in
+                            if newValue != .accountID && !model.accountID.isEmpty {
+                                model.blurredAccountID = true
+                            }
                         }
+                    }
+                } else {
+                    FieldGroup(
+                        label: model.regionLabel,
+                        icon: nil,
+                        error: nil
+                    ) {
+                        MonoTextField(
+                            text: $model.region,
+                            placeholder: model.regionPlaceholder,
+                            secure: false
+                        )
+                        .focused($focused, equals: .region)
                     }
                 }
 
-                // Full-width: Bucket name
+                if model.shouldShowEndpoint {
+                    FieldGroup(
+                        label: String(localized: "Endpoint"),
+                        icon: nil,
+                        error: nil
+                    ) {
+                        MonoTextField(
+                            text: $model.endpoint,
+                            placeholder: model.endpointPlaceholder,
+                            secure: false
+                        )
+                        .focused($focused, equals: .endpoint)
+                    }
+                }
+
                 FieldGroup(
                     label: String(localized: "Bucket name"),
                     icon: nil,
@@ -657,10 +793,9 @@ private struct CredentialsStep: View {
                     }
                 }
 
-                // Half-width row: Access Key + Secret Key
                 HStack(alignment: .top, spacing: 12) {
                     FieldGroup(
-                        label: String(localized: "Access Key ID"),
+                        label: model.accessKeyLabel,
                         icon: nil,
                         error: model.accessKeyError
                     ) {
@@ -677,7 +812,7 @@ private struct CredentialsStep: View {
                         }
                     }
                     FieldGroup(
-                        label: String(localized: "Secret Access Key"),
+                        label: model.secretKeyLabel,
                         icon: "lock.fill",
                         error: nil
                     ) {
@@ -688,6 +823,19 @@ private struct CredentialsStep: View {
                         )
                         .focused($focused, equals: .secretKey)
                     }
+                }
+
+                FieldGroup(
+                    label: String(localized: "Path prefix"),
+                    icon: nil,
+                    error: nil
+                ) {
+                    MonoTextField(
+                        text: $model.pathPrefix,
+                        placeholder: String(localized: "Optional, e.g. screenshots"),
+                        secure: false
+                    )
+                    .focused($focused, equals: .pathPrefix)
                 }
             }
 
@@ -720,7 +868,7 @@ private struct URLPrefixStep: View {
             StepHeader(
                 stepLabel: String(localized: "Step 5 — Public URL"),
                 title: String(localized: "Public URL & test"),
-                subtitle: String(localized: "Capso prepends this to every uploaded filename to build the share link. Use your custom domain if you connected one, otherwise use the pub-…r2.dev URL from the Public Development URL section.")
+                subtitle: String(localized: "Capso uses this HTTPS prefix to build the share link after upload. Use your public bucket URL, custom domain, or CDN URL.")
             )
 
             FieldGroup(
@@ -730,7 +878,7 @@ private struct URLPrefixStep: View {
             ) {
                 MonoTextField(
                     text: $model.urlPrefix,
-                    placeholder: "https://pub-xxxxx.r2.dev",
+                    placeholder: "https://cdn.example.com",
                     secure: false
                 )
                 .onChange(of: model.urlPrefix) { _, _ in
@@ -779,7 +927,8 @@ private struct URLPrefixStep: View {
 
     private var previewLink: String {
         let prefix = model.urlPrefix.isEmpty ? "https://<your-prefix>" : ShareConfig.normalizePrefix(model.urlPrefix)
-        return "\(prefix)/2026-04-25-screenshot.png"
+        let key = ShareConfig.normalizePathPrefix(model.pathPrefix) + "2026-04-25-screenshot.png"
+        return "\(prefix)/\(key)"
     }
 
     /// Cancel any in-flight test before launching a new one, and store the new
@@ -908,19 +1057,19 @@ private struct URLPrefixStep: View {
                     String(localized: "One or more required values are missing. Go back and double-check the previous step."))
         case .invalidCredentials:
             return (String(localized: "Those credentials were rejected."),
-                    String(localized: "Cloudflare returned an authentication error. Verify the Access Key ID and Secret Access Key, and that the token has Object Read & Write permission on this bucket."))
+                    String(localized: "The storage provider returned an authentication error. Verify the access key, secret, and bucket permissions."))
         case .invalidURLPrefix(let reason):
             return (String(localized: "That URL prefix doesn't look right."),
                     reason)
         case .network(let underlying):
-            return (String(localized: "Network error reaching Cloudflare."),
+            return (String(localized: "Network error reaching storage."),
                     underlying)
         case .quotaExceeded:
             return (String(localized: "Storage quota exceeded."),
-                    String(localized: "Your R2 account is at its storage limit. Free up space in the Cloudflare dashboard or upgrade your plan."))
+                    String(localized: "Your storage account is at its limit. Free up space or upgrade your provider plan."))
         case .publicAccessUnreachable:
             return (String(localized: "The upload worked, but the file isn't publicly reachable."),
-                    String(localized: "The bucket isn't publicly readable. Open the Cloudflare dashboard → your bucket → Settings, then enable Public Development URL or add a Custom Domain. Then re-test."))
+                    String(localized: "The bucket URL is not publicly readable. Enable public access or use a public custom domain, then re-test."))
         case .unknown(let s):
             return (String(localized: "Something went wrong."),
                     s)
@@ -1117,7 +1266,7 @@ private struct ProviderCard: View {
     let badgeColor: Color
     let name: String
     let sub: String
-    let pillText: String
+    let pillText: String?
     let pillColor: Color
     let selected: Bool
     let enabled: Bool
@@ -1147,7 +1296,9 @@ private struct ProviderCard: View {
                         Text(name)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.95))
-                        StatusPill(text: pillText, color: pillColor)
+                        if let pillText {
+                            StatusPill(text: pillText, color: pillColor)
+                        }
                     }
                     Text(sub)
                         .font(.system(size: 11))
@@ -1457,8 +1608,8 @@ enum CloudShareTester {
     static func runTest(
         provider: ShareProvider,
         urlPrefix: String,
-        accountID: String,
         bucket: String,
+        fields: [String: String],
         accessKey: String,
         secretKey: String
     ) async -> Result<TimeInterval, ShareError> {
@@ -1475,10 +1626,17 @@ enum CloudShareTester {
         let config = ShareConfig(
             provider: provider,
             urlPrefix: urlPrefix,
-            accountID: accountID,
-            bucket: bucket
+            bucket: bucket,
+            fields: fields
         )
-        let dest = R2Destination(config: config, accessKey: accessKey, secretKey: secretKey)
+        let dest: any ShareDestination
+        do {
+            dest = try ShareDestinationFactory.make(config: config, accessKey: accessKey, secretKey: secretKey)
+        } catch let err as ShareError {
+            return .failure(err)
+        } catch {
+            return .failure(.unknown(error.localizedDescription))
+        }
 
         let start = Date()
         do {

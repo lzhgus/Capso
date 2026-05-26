@@ -702,11 +702,38 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "cloudShareBucket") }
     }
 
+    public var cloudShareRegion: String? {
+        get { defaults.string(forKey: "cloudShareRegion") }
+        set { defaults.set(newValue, forKey: "cloudShareRegion") }
+    }
+
+    public var cloudShareEndpoint: String? {
+        get { defaults.string(forKey: "cloudShareEndpoint") }
+        set { defaults.set(newValue, forKey: "cloudShareEndpoint") }
+    }
+
+    public var cloudSharePathPrefix: String? {
+        get { defaults.string(forKey: "cloudSharePathPrefix") }
+        set { defaults.set(newValue, forKey: "cloudSharePathPrefix") }
+    }
+
     public var isCloudShareConfigured: Bool {
-        cloudShareProvider != nil
-            && cloudShareURLPrefix != nil
-            && cloudShareAccountID != nil
-            && cloudShareBucket != nil
+        guard
+            let provider = cloudShareProvider,
+            cloudShareURLPrefix != nil,
+            cloudShareBucket != nil
+        else {
+            return false
+        }
+
+        switch provider {
+        case "r2":
+            return cloudShareAccountID != nil
+        case "s3", "tencentCOS", "aliyunOSS":
+            return cloudShareRegion != nil
+        default:
+            return false
+        }
     }
 
     // MARK: Computed

@@ -645,6 +645,41 @@ final class PreferencesViewModel {
             }
         }
     }
+    var cloudShareRegion: String? {
+        get {
+            access(keyPath: \.cloudShareRegion)
+            return settings.cloudShareRegion
+        }
+        set {
+            withMutation(keyPath: \.cloudShareRegion) {
+                withMutation(keyPath: \.isCloudShareConfigured) {
+                    settings.cloudShareRegion = newValue
+                }
+            }
+        }
+    }
+    var cloudShareEndpoint: String? {
+        get {
+            access(keyPath: \.cloudShareEndpoint)
+            return settings.cloudShareEndpoint
+        }
+        set {
+            withMutation(keyPath: \.cloudShareEndpoint) {
+                settings.cloudShareEndpoint = newValue
+            }
+        }
+    }
+    var cloudSharePathPrefix: String? {
+        get {
+            access(keyPath: \.cloudSharePathPrefix)
+            return settings.cloudSharePathPrefix
+        }
+        set {
+            withMutation(keyPath: \.cloudSharePathPrefix) {
+                settings.cloudSharePathPrefix = newValue
+            }
+        }
+    }
 
     // MARK: Version
     // MARK: History

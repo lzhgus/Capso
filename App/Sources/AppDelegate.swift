@@ -209,7 +209,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let providerRaw = settings.cloudShareProvider,
             let provider = ShareProvider(rawValue: providerRaw),
             let urlPrefix = settings.cloudShareURLPrefix,
-            let accountID = settings.cloudShareAccountID,
             let bucket = settings.cloudShareBucket
         else {
             return nil
@@ -223,8 +222,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        let config = ShareConfig(provider: provider, urlPrefix: urlPrefix, accountID: accountID, bucket: bucket)
-        let destination = R2Destination(config: config, accessKey: access, secretKey: secret)
+        var fields: [String: String] = [:]
+        if let accountID = settings.cloudShareAccountID {
+            fields["accountID"] = accountID
+        }
+        if let region = settings.cloudShareRegion {
+            fields["region"] = region
+        }
+        if let endpoint = settings.cloudShareEndpoint {
+            fields["endpoint"] = endpoint
+        }
+        if let pathPrefix = settings.cloudSharePathPrefix {
+            fields["pathPrefix"] = pathPrefix
+        }
+
+        let config = ShareConfig(provider: provider, urlPrefix: urlPrefix, bucket: bucket, fields: fields)
+        guard let destination = try? ShareDestinationFactory.make(config: config, accessKey: access, secretKey: secret) else {
+            return nil
+        }
         return ShareCoordinator(destination: destination)
     }
 
