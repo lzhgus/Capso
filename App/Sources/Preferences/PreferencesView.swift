@@ -77,6 +77,7 @@ struct PreferencesView: View {
 
     @ViewBuilder
     private var sidebar: some View {
+#if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             GlassEffectContainer(spacing: 8) {
                 sidebarContent
@@ -84,6 +85,9 @@ struct PreferencesView: View {
         } else {
             sidebarContent
         }
+#else
+        sidebarContent
+#endif
     }
 
     private var sidebarContent: some View {
@@ -103,6 +107,7 @@ struct PreferencesView: View {
 
     @ViewBuilder
     private var content: some View {
+#if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             GlassEffectContainer(spacing: 18) {
                 scrollContent
@@ -110,6 +115,9 @@ struct PreferencesView: View {
         } else {
             scrollContent
         }
+#else
+        scrollContent
+#endif
     }
 
     private var scrollContent: some View {
