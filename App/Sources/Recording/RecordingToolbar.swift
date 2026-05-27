@@ -35,7 +35,7 @@ struct RecordingToolbarView: View {
                     Text("\(width)")
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.9))
-                        .frame(minWidth: 40)
+                        .frame(minWidth: 48)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(.white.opacity(0.1))
@@ -48,11 +48,15 @@ struct RecordingToolbarView: View {
                     Text("\(height)")
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.9))
-                        .frame(minWidth: 40)
+                        .frame(minWidth: 48)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(.white.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                    Text("px")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.45))
                 }
 
                 // Controls row
