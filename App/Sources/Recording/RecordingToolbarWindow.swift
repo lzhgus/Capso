@@ -45,9 +45,10 @@ final class RecordingToolbarWindow: NSPanel {
         self.collectionBehavior = [.canJoinAllSpaces, .transient]
         self.isMovableByWindowBackground = true
 
+        let outputSize = Self.outputVideoSize(for: selectionRect, screen: screen)
         let view = RecordingToolbarWrapper(
-            width: Int(selectionRect.width),
-            height: Int(selectionRect.height),
+            width: outputSize.width,
+            height: outputSize.height,
             settings: settings,
             onRecord: onRecord,
             onCameraToggled: onCameraToggled,
@@ -56,6 +57,18 @@ final class RecordingToolbarWindow: NSPanel {
             onCameraSettingsChanged: onCameraSettingsChanged
         )
         self.contentView = NSHostingView(rootView: view)
+    }
+
+    private static func outputVideoSize(for selectionRect: CGRect, screen: NSScreen) -> (width: Int, height: Int) {
+        let scale = max(screen.backingScaleFactor, 1)
+        return (
+            width: ensureEven(max(1, Int(ceil(selectionRect.width * scale)))),
+            height: ensureEven(max(1, Int(ceil(selectionRect.height * scale))))
+        )
+    }
+
+    private static func ensureEven(_ value: Int) -> Int {
+        value % 2 == 0 ? value : value + 1
     }
 
     func show() {

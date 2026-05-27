@@ -75,11 +75,8 @@ public final class ScreenRecorder {
                 .appendingPathComponent("capso_recording_\(UUID().uuidString).mov")
             outputFileURL = fileURL
 
-            // Calculate dimensions (same as stream config)
-            let dims = videoDims(for: config.captureRect)
-
             // Set up SCStream first (creates the dispatch queue)
-            try await setupStream(config: config, dims: dims, excludeWindowIDs: excludeWindowIDs)
+            let dims = try await setupStream(config: config, excludeWindowIDs: excludeWindowIDs)
 
             // Create writer ON the recording dispatch queue (thread affinity —
             // AVAssetWriter's AAC encoder must be created and used on same thread)
@@ -150,14 +147,7 @@ public final class ScreenRecorder {
 
     // MARK: - SCStream
 
-    private struct VideoDims { let w: Int; let h: Int }
-
-    private func videoDims(for rect: CGRect) -> VideoDims {
-        VideoDims(w: ensureEven(Int(ceil(rect.width)) * 2),
-                  h: ensureEven(Int(ceil(rect.height)) * 2))
-    }
-
-    private func setupStream(config: RecordingConfig, dims: VideoDims, excludeWindowIDs: [CGWindowID]) async throws {
+    private func setupStream(config: RecordingConfig, excludeWindowIDs: [CGWindowID]) async throws -> RecordingVideoDimensions {
         let excludeSet = Set(excludeWindowIDs)
         let content = try await shareableContent(excludingWindowIDs: excludeSet)
         guard let display = content.displays.first(where: { $0.displayID == config.displayID }) else {
@@ -183,6 +173,10 @@ public final class ScreenRecorder {
             capsoLog("Proceeding without excluding windows: \(missingIDs)")
         }
         let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
+        let dims = RecordingVideoGeometry.dimensions(
+            for: config.captureRect,
+            pointPixelScale: CGFloat(filter.pointPixelScale)
+        )
         let sc = SCStreamConfiguration()
 
         sc.width = dims.w
@@ -224,6 +218,7 @@ public final class ScreenRecorder {
         }
 
         self.stream = captureStream; self.streamOutput = output
+        return dims
     }
 
     private func shareableContent(excludingWindowIDs excludeSet: Set<CGWindowID>) async throws -> SCShareableContent {
@@ -273,7 +268,24 @@ public final class ScreenRecorder {
     }
 }
 
-private func ensureEven(_ v: Int) -> Int { v % 2 == 0 ? v : v + 1 }
+struct RecordingVideoDimensions: Sendable, Equatable {
+    let w: Int
+    let h: Int
+}
+
+enum RecordingVideoGeometry {
+    static func dimensions(for rect: CGRect, pointPixelScale: CGFloat) -> RecordingVideoDimensions {
+        let scale = max(pointPixelScale, 1)
+        return RecordingVideoDimensions(
+            w: ensureEven(max(1, Int(ceil(rect.width * scale)))),
+            h: ensureEven(max(1, Int(ceil(rect.height * scale))))
+        )
+    }
+
+    private static func ensureEven(_ v: Int) -> Int {
+        v % 2 == 0 ? v : v + 1
+    }
+}
 
 // MARK: - RecordingWriter
 
