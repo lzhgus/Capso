@@ -24,6 +24,28 @@ struct FileNamingTests {
         #expect(name.contains(String(year)))
     }
 
+    @Test("Screenshot name includes source app when provided")
+    func screenshotNameIncludesSourceApp() {
+        let date = Date(timeIntervalSince1970: 1_705_348_800)
+        let name = FileNaming.generateName(for: .screenshot, date: date, sourceAppName: "Safari")
+
+        #expect(name.hasPrefix("Capso Screenshot - Safari "))
+    }
+
+    @Test("Source app name is sanitized for filenames")
+    func sourceAppNameIsSanitized() {
+        let date = Date(timeIntervalSince1970: 1_705_348_800)
+        let fileName = FileNaming.generateFileName(
+            for: .screenshot,
+            format: .png,
+            date: date,
+            sourceAppName: "Foo/Bar:Beta"
+        )
+
+        #expect(fileName.hasPrefix("Capso Screenshot - Foo-Bar-Beta "))
+        #expect(fileName.hasSuffix(".png"))
+    }
+
     @Test("File extension for PNG")
     func fileExtensionPNG() {
         let ext = FileNaming.fileExtension(for: .png)

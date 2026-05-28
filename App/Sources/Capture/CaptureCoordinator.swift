@@ -43,6 +43,12 @@ final class CaptureCoordinator {
 
     /// Post-capture action override. When set, ignores Settings toggles.
     private var pendingAction: PostCaptureAction = .default
+    private var pendingSourceApplication: SourceApplication?
+
+    private struct SourceApplication: Sendable {
+        let name: String?
+        let bundleIdentifier: String?
+    }
 
     enum PostCaptureAction {
         case `default`    // Use Settings (Show Preview / Copy / Auto Save)
@@ -75,6 +81,41 @@ final class CaptureCoordinator {
 
     init(settings: AppSettings) {
         self.settings = settings
+    }
+
+    private func rememberSourceApplication() {
+        pendingSourceApplication = currentSourceApplication()
+    }
+
+    private func currentSourceApplication() -> SourceApplication? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        if app.bundleIdentifier == Bundle.main.bundleIdentifier {
+            return nil
+        }
+
+        let name = app.localizedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bundleIdentifier = app.bundleIdentifier
+        guard !(name?.isEmpty ?? true) || bundleIdentifier != nil else { return nil }
+        return SourceApplication(name: name, bundleIdentifier: bundleIdentifier)
+    }
+
+    private func captureResultWithPendingSource(_ result: CaptureResult) -> CaptureResult {
+        defer { pendingSourceApplication = nil }
+        guard let source = pendingSourceApplication,
+              result.appName == nil || result.appBundleIdentifier == nil else {
+            return result
+        }
+
+        return CaptureResult(
+            image: result.image,
+            mode: result.mode,
+            captureRect: result.captureRect,
+            windowName: result.windowName,
+            appName: result.appName ?? source.name,
+            appBundleIdentifier: result.appBundleIdentifier ?? source.bundleIdentifier,
+            timestamp: result.timestamp,
+            displayID: result.displayID
+        )
     }
 
     func captureArea() {
@@ -123,12 +164,14 @@ final class CaptureCoordinator {
 
     func captureAllInOne() {
         pendingAction = .default
+        rememberSourceApplication()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.showFrozenAllInOneOverlay()
         }
     }
 
     private func startAreaCapture() {
+        rememberSourceApplication()
         if settings.freezeScreen && !settings.screenshotShowsCursor {
             showFrozenOverlay()
         } else {
@@ -139,6 +182,7 @@ final class CaptureCoordinator {
     }
 
     func captureFullscreen() {
+        rememberSourceApplication()
         // Capture the display the user is currently looking at (the one
         // containing the mouse cursor), not unconditionally the primary.
         // For keyboard-shortcut invocations this matches where attention is;
@@ -164,6 +208,7 @@ final class CaptureCoordinator {
     }
 
     func captureScrolling() {
+        rememberSourceApplication()
         // Use area selection overlay, then start scrolling capture on the selected region
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.showOverlay(mode: .area, isScrollingCapture: true)
@@ -174,6 +219,7 @@ final class CaptureCoordinator {
     /// Uses `settings.selfTimerDurationSeconds` as the delay.
     func captureAreaWithSelfTimer() {
         pendingAction = .default
+        rememberSourceApplication()
         let seconds = settings.selfTimerDurationSeconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.showOverlay(mode: .area, selfTimerSeconds: seconds)
@@ -181,6 +227,7 @@ final class CaptureCoordinator {
     }
 
     func captureWindow() {
+        pendingSourceApplication = nil
         // Enumerate windows first, then show overlay in window selection mode
         Task {
             do {
@@ -267,6 +314,7 @@ final class CaptureCoordinator {
                 self?.performWindowCapture(windowID: windowID)
             }
             overlay.onCancelled = { [weak self] in
+                self?.pendingSourceApplication = nil
                 self?.dismissOverlay()
             }
             overlay.activate(mode: mode)
@@ -305,6 +353,7 @@ final class CaptureCoordinator {
                 self?.performWindowCapture(windowID: windowID)
             }
             overlay.onCancelled = { [weak self] in
+                self?.pendingSourceApplication = nil
                 self?.dismissOverlay()
             }
             overlay.activate(mode: .area)
@@ -455,7 +504,8 @@ final class CaptureCoordinator {
             guard let self else { return }
             self.dismissAllInOneToolbar()
             self.dismissFreezeWindows()
-            self.saveRenderedImage(image)
+            self.saveRenderedImage(image, sourceAppName: self.pendingSourceApplication?.name)
+            self.pendingSourceApplication = nil
         }
         toolbar.onPin = { [weak self] rect in
             guard let self else { return }
@@ -477,9 +527,15 @@ final class CaptureCoordinator {
             guard let self else { return }
             self.dismissAllInOneToolbar()
             self.dismissFreezeWindows()
-            self.pinRenderedImage(image, anchor: self.globalRect(fromScreenLocalRect: rect, screen: screen))
+            self.pinRenderedImage(
+                image,
+                anchor: self.globalRect(fromScreenLocalRect: rect, screen: screen),
+                sourceAppName: self.pendingSourceApplication?.name
+            )
+            self.pendingSourceApplication = nil
         }
         toolbar.onCancel = { [weak self] in
+            self?.pendingSourceApplication = nil
             self?.dismissAllInOneToolbar()
             self?.dismissFreezeWindows()
         }
@@ -547,6 +603,7 @@ final class CaptureCoordinator {
                 }
             }
             overlay.onCancelled = { [weak self] in
+                self?.pendingSourceApplication = nil
                 self?.dismissOverlay()
             }
             overlay.activate(mode: .area)
@@ -944,7 +1001,8 @@ final class CaptureCoordinator {
         )
     }
 
-    private func handleCaptureResult(_ result: CaptureResult) {
+    private func handleCaptureResult(_ capturedResult: CaptureResult) {
+        let result = captureResultWithPendingSource(capturedResult)
         lastCaptureResult = result
 
         let action = pendingAction
@@ -972,7 +1030,7 @@ final class CaptureCoordinator {
         case .pin:
             pinToScreen(result, anchor: anchorRect(for: result))
         case .save:
-            saveImageToFile(result.image)
+            saveImageToFile(result)
         case .share:
             // Skip Quick Access, save to history, then upload in background.
             logDiagnostic("Cloud Share capture completed mode=\(result.mode) displayID=\(result.displayID)")
@@ -992,7 +1050,7 @@ final class CaptureCoordinator {
                 copyImageToClipboard(result.image)
             }
             if settings.screenshotAutoSave {
-                saveImageToFile(result.image)
+                saveImageToFile(result)
             }
             if settings.screenshotShowPreview {
                 showQuickAccess(for: result, entryID: entryID)
@@ -1044,7 +1102,7 @@ final class CaptureCoordinator {
         }
         window.onSave = { [weak self, weak window] in
             guard let self, let window else { return }
-            self.saveImageToFile(result.image)
+            self.saveImageToFile(result)
             self.dismissQuickAccessWindow(window)
         }
         window.onAnnotate = { [weak self, weak window] in
@@ -1139,7 +1197,7 @@ final class CaptureCoordinator {
             image: result.image,
             anchorScreen: screen,
             onSave: { [weak self] (rendered: CGImage) in
-                self?.saveRenderedImage(rendered)
+                self?.saveRenderedImage(rendered, sourceAppName: result.appName, date: result.timestamp)
                 self?.annotationWindow = nil
             },
             onCopy: { [weak self] (rendered: CGImage) in
@@ -1147,7 +1205,7 @@ final class CaptureCoordinator {
                 self?.annotationWindow = nil
             },
             onPin: { [weak self] (rendered: CGImage, anchor: CGRect?) in
-                self?.pinRenderedImage(rendered, anchor: anchor)
+                self?.pinRenderedImage(rendered, anchor: anchor, sourceAppName: result.appName, date: result.timestamp)
                 self?.annotationWindow = nil
             },
             onClose: { [weak self] in
@@ -1189,7 +1247,7 @@ final class CaptureCoordinator {
             screen: screen,
             screenLocalRect: screenLocalRect,
             onSave: { [weak self] rendered in
-                self?.saveRenderedImage(rendered)
+                self?.saveRenderedImage(rendered, sourceAppName: result.appName, date: result.timestamp)
                 self?.inlineAnnotationWindow = nil
             },
             onCopy: { [weak self] rendered in
@@ -1197,7 +1255,7 @@ final class CaptureCoordinator {
                 self?.inlineAnnotationWindow = nil
             },
             onPin: { [weak self] rendered, anchor in
-                self?.pinRenderedImage(rendered, anchor: anchor)
+                self?.pinRenderedImage(rendered, anchor: anchor, sourceAppName: result.appName, date: result.timestamp)
                 self?.inlineAnnotationWindow = nil
             },
             onClose: { [weak self] in
@@ -1258,10 +1316,15 @@ final class CaptureCoordinator {
     }
 
     private func pinToScreen(_ result: CaptureResult, anchor: CGRect) {
-        pinRenderedImage(result.image, anchor: anchor)
+        pinRenderedImage(result.image, anchor: anchor, sourceAppName: result.appName, date: result.timestamp)
     }
 
-    private func pinRenderedImage(_ image: CGImage, anchor: CGRect?) {
+    private func pinRenderedImage(
+        _ image: CGImage,
+        anchor: CGRect?,
+        sourceAppName: String? = nil,
+        date: Date = Date()
+    ) {
         let controller = PinnedScreenshotController(
             image: image,
             anchorRect: anchor,
@@ -1269,7 +1332,7 @@ final class CaptureCoordinator {
                 self?.copyImageToClipboard(image)
             },
             onSave: { [weak self] in
-                self?.saveImageToFile(image)
+                self?.saveImageToFile(image, sourceAppName: sourceAppName, date: date)
             },
             onDidClose: { [weak self] controllerID in
                 self?.pinnedControllers.removeAll { $0.id == controllerID }
@@ -1286,7 +1349,11 @@ final class CaptureCoordinator {
         pasteboard.writeObjects([nsImage])
     }
 
-    private func saveImageToFile(_ image: CGImage) {
+    private func saveImageToFile(_ result: CaptureResult) {
+        saveImageToFile(result.image, sourceAppName: result.appName, date: result.timestamp)
+    }
+
+    private func saveImageToFile(_ image: CGImage, sourceAppName: String? = nil, date: Date = Date()) {
         guard let encoded = screenshotData(from: image) else { return }
         let directory = settings.screenshotMonthlyFolders
             ? FileNaming.monthlyDirectory(in: settings.exportLocation)
@@ -1294,7 +1361,9 @@ final class CaptureCoordinator {
         let url = FileNaming.generateFileURL(
             in: directory,
             type: .screenshot,
-            format: encoded.format
+            format: encoded.format,
+            date: date,
+            sourceAppName: sourceAppName
         )
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? encoded.data.write(to: url)
@@ -1314,8 +1383,8 @@ final class CaptureCoordinator {
         return (data, preset.fileFormat)
     }
 
-    private func saveRenderedImage(_ image: CGImage) {
-        saveImageToFile(image)
+    private func saveRenderedImage(_ image: CGImage, sourceAppName: String? = nil, date: Date = Date()) {
+        saveImageToFile(image, sourceAppName: sourceAppName, date: date)
     }
 
     private func copyRenderedImage(_ image: CGImage) {

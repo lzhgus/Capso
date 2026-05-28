@@ -351,12 +351,19 @@ final class HistoryCoordinator {
         guard let sourceURL = fullImageURL(for: entry) else { return }
         let fileFormat = preferredFileFormat(for: entry, sourceURL: sourceURL)
         let captureType = preferredCaptureType(for: entry)
+        let sourceAppName: String? = switch captureType {
+        case .screenshot:
+            entry.sourceAppName
+        case .recording:
+            nil
+        }
 
         let panel = NSSavePanel()
         panel.nameFieldStringValue = FileNaming.generateFileName(
             for: captureType,
             format: fileFormat,
-            date: entry.createdAt
+            date: entry.createdAt,
+            sourceAppName: sourceAppName
         )
         panel.allowedContentTypes = [fileFormat.contentType]
         panel.canCreateDirectories = true

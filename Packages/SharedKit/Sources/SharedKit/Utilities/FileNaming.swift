@@ -66,29 +66,56 @@ public enum FileNaming {
         return f
     }()
 
-    public static func generateName(for type: CaptureType, date: Date = Date()) -> String {
+    public static func generateName(for type: CaptureType, date: Date = Date(), sourceAppName: String? = nil) -> String {
         let prefix = switch type {
         case .screenshot: "Capso Screenshot"
         case .recording: "Capso Recording"
         }
+        let source = sanitizedSourceAppName(sourceAppName).map { " - \($0)" } ?? ""
         let dateString = dateFormatter.string(from: date)
         let timeString = timeFormatter.string(from: date)
-        return "\(prefix) \(dateString) at \(timeString)"
+        return "\(prefix)\(source) \(dateString) at \(timeString)"
     }
 
     public static func fileExtension(for format: FileFormat) -> String {
         format.rawValue
     }
 
-    public static func generateFileName(for type: CaptureType, format: FileFormat, date: Date = Date()) -> String {
-        "\(generateName(for: type, date: date)).\(fileExtension(for: format))"
+    public static func generateFileName(
+        for type: CaptureType,
+        format: FileFormat,
+        date: Date = Date(),
+        sourceAppName: String? = nil
+    ) -> String {
+        "\(generateName(for: type, date: date, sourceAppName: sourceAppName)).\(fileExtension(for: format))"
     }
 
-    public static func generateFileURL(in directory: URL, type: CaptureType, format: FileFormat, date: Date = Date()) -> URL {
-        directory.appendingPathComponent(generateFileName(for: type, format: format, date: date))
+    public static func generateFileURL(
+        in directory: URL,
+        type: CaptureType,
+        format: FileFormat,
+        date: Date = Date(),
+        sourceAppName: String? = nil
+    ) -> URL {
+        directory.appendingPathComponent(
+            generateFileName(for: type, format: format, date: date, sourceAppName: sourceAppName)
+        )
     }
 
     public static func monthlyDirectory(in baseDirectory: URL, date: Date = Date()) -> URL {
         baseDirectory.appendingPathComponent(monthFormatter.string(from: date), isDirectory: true)
+    }
+
+    private static func sanitizedSourceAppName(_ name: String?) -> String? {
+        guard let name else { return nil }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let invalidCharacters = CharacterSet(charactersIn: "/:")
+        let sanitized = trimmed
+            .components(separatedBy: invalidCharacters)
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return sanitized.isEmpty ? nil : sanitized
     }
 }
