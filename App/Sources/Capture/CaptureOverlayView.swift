@@ -90,7 +90,7 @@ final class CaptureOverlayView: NSView {
         ))
 
         // Listen for preset changes from other overlay views (multi-screen sync)
-        guard !presetsDisabled else { return }
+        guard !self.presetsDisabled else { return }
         presetObserver = NotificationCenter.default.addObserver(
             forName: .capturePresetChanged,
             object: nil,
@@ -343,6 +343,8 @@ final class CaptureOverlayView: NSView {
     /// Draw a centered badge at the top of the screen showing the active
     /// preset and a hint to press R to change it.
     private func drawPresetBadge(in context: CGContext) {
+        guard !presetsDisabled else { return }
+
         let presetName = activePreset.displayName
         let hintText = "   R to change"
         let fullText = "\(presetName)\(hintText)"
