@@ -231,6 +231,9 @@ final class RecordingCoordinator {
                 width: selectedRect.width,
                 height: selectedRect.height
             )
+            if settings.rememberLastRecordingArea {
+                settings.lastRecordingArea = .area(rect: viewRect, screenID: screen.displayID)
+            }
             showToolbar(selectionViewRect: viewRect, screen: screen)
         }
     }
