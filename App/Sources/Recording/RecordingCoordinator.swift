@@ -53,6 +53,7 @@ final class RecordingCoordinator {
     private var selectedRect: CGRect = .zero
     private var selectedScreen: NSScreen?
     private var selectedDisplayID: CGDirectDisplayID = CGMainDisplayID()
+    private var selectedTarget: RecordingTarget?
 
     // Current recording inputs (used by restart)
     private var currentRecordingFormat: RecordingFormatChoice?
@@ -130,6 +131,7 @@ final class RecordingCoordinator {
             }
             overlay.onCancelled = { [weak self] in
                 self?.dismissOverlay()
+                self?.selectedTarget = nil
             }
             overlay.onSpaceToggle = onSpaceToggle
             overlay.activate(mode: mode)
@@ -190,6 +192,7 @@ final class RecordingCoordinator {
             width: rect.width,
             height: rect.height
         )
+        selectedTarget = .displayArea(displayID: screen.displayID, rect: selectedRect)
 
         // Show the recording toolbar below the selected area
         showToolbar(selectionViewRect: rect, screen: screen)
@@ -200,28 +203,22 @@ final class RecordingCoordinator {
             let windows = try? await ContentEnumerator.windows()
             guard let window = windows?.first(where: { $0.id == windowID }) else { return }
 
-            // `window.frame` is CG global top-left (from ScreenCaptureKit).
-            // Pick the display containing the window's center so a window
-            // on a secondary display doesn't get attributed to primary.
-            let center = CGPoint(x: window.frame.midX, y: window.frame.midY)
-            let pickedDisplayID = displayID(containing: center) ?? CGMainDisplayID()
-            guard let screen = NSScreen.screens.first(where: { $0.displayID == pickedDisplayID })
+            guard let screen = screenWithLargestIntersection(forGlobalTopLeftRect: window.frame)
                     ?? NSScreen.main ?? NSScreen.screens.first else {
                 return
             }
+            let pickedDisplayID = screen.displayID
             selectedScreen = screen
             selectedDisplayID = pickedDisplayID
 
-            // Convert to display-local top-left — same coord system that
-            // `handleAreaSelected` produces and that every downstream
-            // consumer (border, controls, ScreenCaptureKit) expects.
             let displayBounds = CGDisplayBounds(pickedDisplayID)
-            selectedRect = CGRect(
-                x: window.frame.origin.x - displayBounds.origin.x,
-                y: window.frame.origin.y - displayBounds.origin.y,
-                width: window.frame.width,
-                height: window.frame.height
+            let displayLocalRect = CaptureDisplayGeometry.displayLocalRect(
+                fromGlobalTopLeftRect: window.frame,
+                displayBounds: displayBounds
             )
+            guard !displayLocalRect.isNull, !displayLocalRect.isEmpty else { return }
+            selectedRect = displayLocalRect
+            selectedTarget = .window(windowID: windowID)
 
             let screenFrame = screen.frame
             let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
@@ -231,19 +228,17 @@ final class RecordingCoordinator {
                 width: selectedRect.width,
                 height: selectedRect.height
             )
-            if settings.rememberLastRecordingArea {
-                settings.lastRecordingArea = .area(rect: viewRect, screenID: screen.displayID)
-            }
             showToolbar(selectionViewRect: viewRect, screen: screen)
         }
     }
 
-    private func displayID(containing point: CGPoint) -> CGDirectDisplayID? {
-        var displays = [CGDirectDisplayID](repeating: 0, count: 16)
-        var count: UInt32 = 0
-        let err = CGGetDisplaysWithPoint(point, 16, &displays, &count)
-        guard err == .success, count > 0 else { return nil }
-        return displays[0]
+    private func screenWithLargestIntersection(forGlobalTopLeftRect rect: CGRect) -> NSScreen? {
+        let screensByVisibleArea = NSScreen.screens.compactMap { screen -> (screen: NSScreen, area: CGFloat)? in
+            let intersection = rect.intersection(CGDisplayBounds(screen.displayID))
+            guard !intersection.isNull, !intersection.isEmpty else { return nil }
+            return (screen, intersection.width * intersection.height)
+        }
+        return screensByVisibleArea.max { $0.area < $1.area }?.screen
     }
 
     // MARK: - Step 2: Recording Toolbar
@@ -407,6 +402,7 @@ final class RecordingCoordinator {
         countdownWindow?.cancel()
         countdownWindow = nil
         dismissToolbarUI()
+        selectedTarget = nil
     }
 
     private func dismissToolbarUI(keepCamera: Bool = false, removeEscapeMonitors shouldRemoveEscapeMonitors: Bool = true) {
@@ -426,6 +422,36 @@ final class RecordingCoordinator {
 
     // MARK: - Step 3: Start Recording
 
+    private func makeRecordingConfig(
+        format: RecordingKit.RecordingFormat,
+        fps: Int,
+        captureSystemAudio: Bool,
+        captureMicrophone: Bool,
+        showCursor: Bool
+    ) -> RecordingConfig {
+        switch selectedTarget ?? .displayArea(displayID: selectedDisplayID, rect: selectedRect) {
+        case .displayArea(let displayID, let rect):
+            return RecordingConfig(
+                captureRect: rect,
+                displayID: displayID,
+                format: format,
+                fps: fps,
+                captureSystemAudio: captureSystemAudio,
+                captureMicrophone: captureMicrophone,
+                showCursor: showCursor
+            )
+        case .window(let windowID):
+            return RecordingConfig(
+                windowID: windowID,
+                format: format,
+                fps: fps,
+                captureSystemAudio: captureSystemAudio,
+                captureMicrophone: captureMicrophone,
+                showCursor: showCursor
+            )
+        }
+    }
+
     private func startRecording(
         format: RecordingFormatChoice,
         cameraEnabled: Bool,
@@ -440,9 +466,7 @@ final class RecordingCoordinator {
         // Editor flow renders the cursor from telemetry, so avoid baking the
         // hardware cursor into the source video in that path. The quick-preview
         // flow still keeps the native hardware cursor in the captured file.
-        let config = RecordingConfig(
-            captureRect: selectedRect,
-            displayID: selectedDisplayID,
+        let config = makeRecordingConfig(
             format: format == .gif ? .gif : .video,
             fps: 30,
             captureSystemAudio: systemAudioEnabled,
@@ -523,7 +547,8 @@ final class RecordingCoordinator {
                     openEditor(
                         tempURL: tempURL,
                         cursorTelemetryURL: cursorTelemetryURL,
-                        showsCursor: settings.showCursor
+                        showsCursor: settings.showCursor,
+                        recordingAreaSize: result.size
                     )
                 } else {
                     // Quick-preview flow: show thumbnail preview with Save/Copy/Discard
@@ -650,7 +675,12 @@ final class RecordingCoordinator {
         alert.runModal()
     }
 
-    func openEditor(tempURL: URL, cursorTelemetryURL: URL?, showsCursor: Bool) {
+    func openEditor(
+        tempURL: URL,
+        cursorTelemetryURL: URL?,
+        showsCursor: Bool,
+        recordingAreaSize: CGSize
+    ) {
         Task {
             let asset = AVURLAsset(url: tempURL)
             let duration = (try? await asset.load(.duration).seconds) ?? 0
@@ -663,10 +693,7 @@ final class RecordingCoordinator {
                 showsCursor: showsCursor,
                 videoDuration: duration,
                 videoSize: naturalSize,
-                recordingAreaSize: CGSize(
-                    width: selectedRect.width,
-                    height: selectedRect.height
-                )
+                recordingAreaSize: recordingAreaSize
             )
 
             let coordinator = EditorCoordinator(project: project)

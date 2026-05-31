@@ -823,8 +823,7 @@ final class CaptureOverlayView: NSView {
         if event.keyCode == 53 { // ESC
             cancelOverlay()
         } else if event.keyCode == 49 { // Space
-            guard !isDragging, onSpaceToggle != nil else { return }
-            onSpaceToggle?()
+            requestSpaceToggle()
         } else if event.keyCode == 15 { // R key
             guard case .area = mode, !isDragging, !presetsDisabled else { return }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -836,6 +835,11 @@ final class CaptureOverlayView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func requestSpaceToggle() {
+        guard !isDragging, onSpaceToggle != nil else { return }
+        onSpaceToggle?()
+    }
 
     private func cancelCurrentSelection() {
         isDragging = false

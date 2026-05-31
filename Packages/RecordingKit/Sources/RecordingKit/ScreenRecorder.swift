@@ -20,6 +20,7 @@ func capsoLog(_ msg: String) {
 public enum RecordingError: Error, LocalizedError {
     case noMatchingDisplay, writerSetupFailed(String), writerFailedToStart
     case writerFailed(Error?), notRecording, alreadyRecording, cancelled, noFramesCaptured
+    case windowNotFound(CGWindowID)
 
     public var errorDescription: String? {
         switch self {
@@ -31,6 +32,7 @@ public enum RecordingError: Error, LocalizedError {
         case .alreadyRecording: return "Already recording."
         case .cancelled: return "Cancelled."
         case .noFramesCaptured: return "No frames captured."
+        case .windowNotFound(let id): return "Window not found: \(id)."
         }
     }
 }
@@ -55,6 +57,7 @@ public final class ScreenRecorder {
     private var recordingStartTime: Date?
     private var outputFileURL: URL?
     private var recordingConfig: RecordingConfig?
+    private var recordingSourceSize: CGSize?
 
     public init() {}
 
@@ -62,7 +65,7 @@ public final class ScreenRecorder {
         config: RecordingConfig,
         excludeWindowIDs: [CGWindowID] = []
     ) async throws {
-        capsoLog("startRecording rect=\(config.captureRect) display=\(config.displayID)")
+        capsoLog("startRecording target=\(config.target)")
         guard state == .idle else { throw RecordingError.alreadyRecording }
 
         state = .preparing
@@ -76,13 +79,14 @@ public final class ScreenRecorder {
             outputFileURL = fileURL
 
             // Set up SCStream first (creates the dispatch queue)
-            let dims = try await setupStream(config: config, excludeWindowIDs: excludeWindowIDs)
+            let streamSetup = try await setupStream(config: config, excludeWindowIDs: excludeWindowIDs)
+            recordingSourceSize = streamSetup.sourceSize
 
             // Create writer ON the recording dispatch queue (thread affinity —
             // AVAssetWriter's AAC encoder must be created and used on same thread)
             let wr = writer
             let cfg = config
-            let w = dims.w; let h = dims.h; let url = fileURL
+            let w = streamSetup.dimensions.w; let h = streamSetup.dimensions.h; let url = fileURL
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
                 self.recordingQueue!.async {
                     do {
@@ -138,8 +142,12 @@ public final class ScreenRecorder {
             cleanup(); state = .idle; throw RecordingError.notRecording
         }
 
-        let result = RecordingResult(fileURL: url, duration: elapsedTime,
-                                     format: cfg.format, size: cfg.captureRect.size)
+        let result = RecordingResult(
+            fileURL: url,
+            duration: elapsedTime,
+            format: cfg.format,
+            size: recordingSourceSize ?? .zero
+        )
         capsoLog("Done: \(url.lastPathComponent) \(elapsedTime)s")
         cleanup(); state = .idle
         return result
@@ -147,45 +155,22 @@ public final class ScreenRecorder {
 
     // MARK: - SCStream
 
-    private func setupStream(config: RecordingConfig, excludeWindowIDs: [CGWindowID]) async throws -> RecordingVideoDimensions {
+    private func setupStream(config: RecordingConfig, excludeWindowIDs: [CGWindowID]) async throws -> RecordingStreamSetup {
         let excludeSet = Set(excludeWindowIDs)
         let content = try await shareableContent(excludingWindowIDs: excludeSet)
-        guard let display = content.displays.first(where: { $0.displayID == config.displayID }) else {
-            throw RecordingError.noMatchingDisplay
-        }
-
-        // Two layers of window exclusion:
-        // 1. Per-window `sharingType = .none` on RecordingBorderWindow,
-        //    RecordingControlsWindow, CountdownWindow, ClickHighlightWindow
-        //    — macOS 14.2+ hides them from ScreenCaptureKit entirely (belt).
-        // 2. `SCContentFilter(excludingWindows:)` below — works on older
-        //    macOS and handles arbitrary window IDs the caller wants
-        //    excluded that aren't covered by (1) (suspenders).
-        // `sharingType = .none` windows won't appear in `content.windows`,
-        // so they'll be silently skipped by the filter build; the
-        // "Proceeding without excluding" log below is only meaningful for
-        // windows that don't use sharingType.
-        let excludedWindows = excludeSet.isEmpty
-            ? []
-            : content.windows.filter { excludeSet.contains($0.windowID) }
-        if !excludeSet.isEmpty, excludedWindows.count != excludeSet.count {
-            let missingIDs = excludeSet.subtracting(excludedWindows.map(\.windowID))
-            capsoLog("Proceeding without excluding windows: \(missingIDs)")
-        }
-        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
-        let dims = RecordingVideoGeometry.dimensions(
-            for: config.captureRect,
-            pointPixelScale: CGFloat(filter.pointPixelScale)
-        )
+        let target = try makeStreamTarget(for: config.target, content: content, excludeSet: excludeSet)
         let sc = SCStreamConfiguration()
 
-        sc.width = dims.w
-        sc.height = dims.h
-        sc.sourceRect = config.captureRect
+        sc.width = target.dimensions.w
+        sc.height = target.dimensions.h
+        if let sourceRect = target.sourceRect {
+            sc.sourceRect = sourceRect
+        }
         sc.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(config.fps))
         sc.showsCursor = config.showCursor
         sc.queueDepth = 5
         sc.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange  // NV12
+        sc.ignoreShadowsSingleWindow = true
 
         if config.captureSystemAudio {
             sc.capturesAudio = true
@@ -197,10 +182,10 @@ public final class ScreenRecorder {
             sc.captureMicrophone = true
         }
 
-        capsoLog("Stream: \(dims.w)x\(dims.h) NV12")
+        capsoLog("Stream: \(target.dimensions.w)x\(target.dimensions.h) NV12")
 
         let output = StreamOutput()
-        let captureStream = SCStream(filter: filter, configuration: sc, delegate: output)
+        let captureStream = SCStream(filter: target.filter, configuration: sc, delegate: output)
 
         let wr = writer
         output.onVideo = { buf in wr.appendVideo(buf) }
@@ -218,7 +203,60 @@ public final class ScreenRecorder {
         }
 
         self.stream = captureStream; self.streamOutput = output
-        return dims
+        return RecordingStreamSetup(dimensions: target.dimensions, sourceSize: target.sourceSize)
+    }
+
+    private func makeStreamTarget(
+        for target: RecordingTarget,
+        content: SCShareableContent,
+        excludeSet: Set<CGWindowID>
+    ) throws -> RecordingResolvedTarget {
+        switch target {
+        case .displayArea(let displayID, let rect):
+            guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
+                throw RecordingError.noMatchingDisplay
+            }
+
+            // Two layers of window exclusion:
+            // 1. Per-window `sharingType = .none` on Capso's recording chrome.
+            // 2. `SCContentFilter(excludingWindows:)` for OS versions or
+            //    windows not covered by sharingType.
+            let excludedWindows = excludeSet.isEmpty
+                ? []
+                : content.windows.filter { excludeSet.contains($0.windowID) }
+            if !excludeSet.isEmpty, excludedWindows.count != excludeSet.count {
+                let missingIDs = excludeSet.subtracting(excludedWindows.map(\.windowID))
+                capsoLog("Proceeding without excluding windows: \(missingIDs)")
+            }
+            let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
+            let dimensions = RecordingVideoGeometry.dimensions(
+                for: rect,
+                pointPixelScale: CGFloat(filter.pointPixelScale)
+            )
+            return RecordingResolvedTarget(
+                filter: filter,
+                sourceRect: rect,
+                dimensions: dimensions,
+                sourceSize: rect.size
+            )
+
+        case .window(let windowID):
+            guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+                throw RecordingError.windowNotFound(windowID)
+            }
+            let filter = SCContentFilter(desktopIndependentWindow: window)
+            let sourceSize = filter.contentRect.size
+            let dimensions = RecordingVideoGeometry.dimensions(
+                for: CGRect(origin: .zero, size: sourceSize),
+                pointPixelScale: CGFloat(filter.pointPixelScale)
+            )
+            return RecordingResolvedTarget(
+                filter: filter,
+                sourceRect: nil,
+                dimensions: dimensions,
+                sourceSize: sourceSize
+            )
+        }
     }
 
     private func shareableContent(excludingWindowIDs excludeSet: Set<CGWindowID>) async throws -> SCShareableContent {
@@ -263,9 +301,21 @@ public final class ScreenRecorder {
     }
 
     private func cleanup() {
-        stream = nil; streamOutput = nil; recordingConfig = nil; recordingQueue = nil
+        stream = nil; streamOutput = nil; recordingConfig = nil; recordingQueue = nil; recordingSourceSize = nil
         writer.reset(); stopElapsedTimer()
     }
+}
+
+private struct RecordingStreamSetup: Sendable {
+    let dimensions: RecordingVideoDimensions
+    let sourceSize: CGSize
+}
+
+private struct RecordingResolvedTarget {
+    let filter: SCContentFilter
+    let sourceRect: CGRect?
+    let dimensions: RecordingVideoDimensions
+    let sourceSize: CGSize
 }
 
 struct RecordingVideoDimensions: Sendable, Equatable {
