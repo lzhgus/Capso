@@ -18,7 +18,7 @@ import EffectsKit
 import EditorKit
 
 /// Orchestrates recording flow:
-/// 1. Show overlay for area selection (drag or Space for window)
+/// 1. Show overlay for area selection (drag, or Space to switch to window selection)
 /// 2. Show recording toolbar (format, camera, mic, audio)
 /// 3. User clicks Record → start recording with selected area
 /// 4. Show controls (pause/stop/timer) + red border
@@ -87,6 +87,35 @@ final class RecordingCoordinator {
     // MARK: - Step 1: Area Selection
 
     private func showAreaSelectionOverlay() {
+        presentSelectionOverlay(mode: .area) { [weak self] in
+            self?.requestWindowSelectionOverlay()
+        }
+    }
+
+    private func requestWindowSelectionOverlay() {
+        Task {
+            let overlayIDs = Set(overlayWindows.map { CGWindowID($0.windowNumber) })
+            do {
+                let windows = try await ContentEnumerator.windows()
+                    .filter { !overlayIDs.contains($0.id) }
+                guard !windows.isEmpty else { return }
+                showWindowSelectionOverlay(windows: windows)
+            } catch {
+                print("Window enumeration failed: \(error)")
+            }
+        }
+    }
+
+    private func showWindowSelectionOverlay(windows: [WindowInfo]) {
+        presentSelectionOverlay(mode: .windowSelection(windows)) { [weak self] in
+            self?.showAreaSelectionOverlay()
+        }
+    }
+
+    private func presentSelectionOverlay(
+        mode: CaptureOverlayMode,
+        onSpaceToggle: @escaping () -> Void
+    ) {
         dismissOverlay()
 
         for screen in NSScreen.screens {
@@ -102,8 +131,8 @@ final class RecordingCoordinator {
             overlay.onCancelled = { [weak self] in
                 self?.dismissOverlay()
             }
-            // Use area mode — user can drag to select recording region
-            overlay.activate(mode: .area)
+            overlay.onSpaceToggle = onSpaceToggle
+            overlay.activate(mode: mode)
             overlayWindows.append(overlay)
         }
     }
