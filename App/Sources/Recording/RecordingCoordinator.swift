@@ -196,27 +196,51 @@ final class RecordingCoordinator {
     }
 
     private func handleWindowSelected(windowID: CGWindowID) {
-        // If window selection happens, get window frame and use that
         Task {
             let windows = try? await ContentEnumerator.windows()
             guard let window = windows?.first(where: { $0.id == windowID }) else { return }
 
-            let screen = NSScreen.main ?? NSScreen.screens.first!
+            // `window.frame` is CG global top-left (from ScreenCaptureKit).
+            // Pick the display containing the window's center so a window
+            // on a secondary display doesn't get attributed to primary.
+            let center = CGPoint(x: window.frame.midX, y: window.frame.midY)
+            let pickedDisplayID = displayID(containing: center) ?? CGMainDisplayID()
+            guard let screen = NSScreen.screens.first(where: { $0.displayID == pickedDisplayID })
+                    ?? NSScreen.main ?? NSScreen.screens.first else {
+                return
+            }
             selectedScreen = screen
-            selectedDisplayID = screen.displayID
-            selectedRect = window.frame
+            selectedDisplayID = pickedDisplayID
 
-            // Convert screen rect to view rect for toolbar positioning
-            let screenFrame = screen.frame
-            let viewY = screenFrame.height - window.frame.origin.y - window.frame.height
-            let viewRect = CGRect(
-                x: window.frame.origin.x,
-                y: viewY,
+            // Convert to display-local top-left — same coord system that
+            // `handleAreaSelected` produces and that every downstream
+            // consumer (border, controls, ScreenCaptureKit) expects.
+            let displayBounds = CGDisplayBounds(pickedDisplayID)
+            selectedRect = CGRect(
+                x: window.frame.origin.x - displayBounds.origin.x,
+                y: window.frame.origin.y - displayBounds.origin.y,
                 width: window.frame.width,
                 height: window.frame.height
             )
+
+            let screenFrame = screen.frame
+            let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
+            let viewRect = CGRect(
+                x: selectedRect.origin.x,
+                y: viewY,
+                width: selectedRect.width,
+                height: selectedRect.height
+            )
             showToolbar(selectionViewRect: viewRect, screen: screen)
         }
+    }
+
+    private func displayID(containing point: CGPoint) -> CGDirectDisplayID? {
+        var displays = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        let err = CGGetDisplaysWithPoint(point, 16, &displays, &count)
+        guard err == .success, count > 0 else { return nil }
+        return displays[0]
     }
 
     // MARK: - Step 2: Recording Toolbar
