@@ -48,4 +48,26 @@ public enum CaptureDisplayGeometry {
             height: screenLocalRect.height * scaleY
         ).integral
     }
+
+    public static func displayLocalRect(
+        fromGlobalTopLeftRect globalRect: CGRect,
+        displayBounds: CGRect
+    ) -> CGRect {
+        guard globalRect.width > 0,
+              globalRect.height > 0,
+              displayBounds.width > 0,
+              displayBounds.height > 0 else {
+            return .null
+        }
+
+        let localRect = CGRect(
+            x: globalRect.origin.x - displayBounds.origin.x,
+            y: globalRect.origin.y - displayBounds.origin.y,
+            width: globalRect.width,
+            height: globalRect.height
+        )
+        let localBounds = CGRect(origin: .zero, size: displayBounds.size)
+        let visibleRect = localRect.intersection(localBounds)
+        return visibleRect.isNull || visibleRect.isEmpty ? .null : visibleRect
+    }
 }

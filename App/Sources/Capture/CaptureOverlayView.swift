@@ -26,6 +26,7 @@ final class CaptureOverlayView: NSView {
     var onSelectionComplete: ((CGRect) -> Void)?
     var onWindowSelected: ((CGWindowID) -> Void)?
     var onCancel: (() -> Void)?
+    var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
     /// When true, preset features (badge, R-key, right-click menu, ratio lock) are disabled.
@@ -821,6 +822,8 @@ final class CaptureOverlayView: NSView {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // ESC
             cancelOverlay()
+        } else if event.keyCode == 49 { // Space
+            requestSpaceToggle()
         } else if event.keyCode == 15 { // R key
             guard case .area = mode, !isDragging, !presetsDisabled else { return }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -832,6 +835,11 @@ final class CaptureOverlayView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func requestSpaceToggle() {
+        guard !isDragging, onSpaceToggle != nil else { return }
+        onSpaceToggle?()
+    }
 
     private func cancelCurrentSelection() {
         isDragging = false

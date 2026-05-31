@@ -8,6 +8,7 @@ final class CaptureOverlayWindow: NSPanel {
     var onAreaSelected: ((CGRect, NSScreen) -> Void)?
     var onWindowSelected: ((CGWindowID) -> Void)?
     var onCancelled: (() -> Void)?
+    var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
     private var overlayView: CaptureOverlayView!
@@ -50,6 +51,9 @@ final class CaptureOverlayWindow: NSPanel {
         overlayView.onCancel = { [weak self] in
             self?.onCancelled?()
         }
+        overlayView.onSpaceToggle = { [weak self] in
+            self?.onSpaceToggle?()
+        }
 
         self.contentView = overlayView
     }
@@ -76,7 +80,7 @@ final class CaptureOverlayWindow: NSPanel {
 
         // Also install global ESC monitor as fallback
         // (in case the window doesn't receive key events)
-        installEscMonitor()
+        installKeyMonitor()
     }
 
     func setFrozenBackground(_ image: CGImage) {
@@ -88,30 +92,42 @@ final class CaptureOverlayWindow: NSPanel {
 
     func deactivate() {
         overlayView.restoreCursorIfNeeded()
-        removeEscMonitor()
+        removeKeyMonitor()
         orderOut(nil)
     }
 
-    private func installEscMonitor() {
-        // Global monitor: catches ESC even when another app is frontmost
+    private func installKeyMonitor() {
+        // Global monitor: catches ESC/Space even when another app is frontmost.
         globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
+            switch event.keyCode {
+            case 53:
                 DispatchQueue.main.async {
                     self?.onCancelled?()
                 }
+            case 49:
+                DispatchQueue.main.async {
+                    self?.overlayView.requestSpaceToggle()
+                }
+            default:
+                break
             }
         }
-        // Local monitor: catches ESC when our window is key
+        // Local monitor: catches ESC/Space when our window is key.
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
+            switch event.keyCode {
+            case 53:
                 self?.onCancelled?()
                 return nil
+            case 49:
+                self?.overlayView.requestSpaceToggle()
+                return nil
+            default:
+                return event
             }
-            return event
         }
     }
 
-    private func removeEscMonitor() {
+    private func removeKeyMonitor() {
         if let globalEscMonitor {
             NSEvent.removeMonitor(globalEscMonitor)
             self.globalEscMonitor = nil

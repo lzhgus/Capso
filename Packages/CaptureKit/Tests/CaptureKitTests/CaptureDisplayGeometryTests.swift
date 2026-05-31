@@ -55,4 +55,24 @@ struct CaptureDisplayGeometryTests {
 
         #expect(crop.isNull)
     }
+
+    @Test("Converts global top-left window frame to display-local rect")
+    func displayLocalRectFromGlobalWindowFrame() {
+        let rect = CaptureDisplayGeometry.displayLocalRect(
+            fromGlobalTopLeftRect: CGRect(x: 1540, y: 140, width: 500, height: 320),
+            displayBounds: CGRect(x: 1440, y: 0, width: 1920, height: 1080)
+        )
+
+        #expect(rect == CGRect(x: 100, y: 140, width: 500, height: 320))
+    }
+
+    @Test("Clamps display-local window frame to visible display area")
+    func displayLocalRectClampsPartiallyOffscreenWindow() {
+        let rect = CaptureDisplayGeometry.displayLocalRect(
+            fromGlobalTopLeftRect: CGRect(x: -20, y: 10, width: 100, height: 80),
+            displayBounds: CGRect(x: 0, y: 0, width: 1920, height: 1080)
+        )
+
+        #expect(rect == CGRect(x: 0, y: 10, width: 80, height: 80))
+    }
 }

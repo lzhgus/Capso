@@ -19,9 +19,13 @@ public enum RecordingFormat: String, Sendable {
     case gif
 }
 
+public enum RecordingTarget: Sendable, Equatable {
+    case displayArea(displayID: CGDirectDisplayID, rect: CGRect)
+    case window(windowID: CGWindowID)
+}
+
 public struct RecordingConfig: Sendable {
-    public let captureRect: CGRect
-    public let displayID: CGDirectDisplayID
+    public let target: RecordingTarget
     public var format: RecordingFormat
     public var fps: Int
     public var captureSystemAudio: Bool
@@ -37,8 +41,23 @@ public struct RecordingConfig: Sendable {
         captureMicrophone: Bool = false,
         showCursor: Bool = true
     ) {
-        self.captureRect = captureRect
-        self.displayID = displayID
+        self.target = .displayArea(displayID: displayID, rect: captureRect)
+        self.format = format
+        self.fps = fps
+        self.captureSystemAudio = captureSystemAudio
+        self.captureMicrophone = captureMicrophone
+        self.showCursor = showCursor
+    }
+
+    public init(
+        windowID: CGWindowID,
+        format: RecordingFormat = .video,
+        fps: Int = 30,
+        captureSystemAudio: Bool = true,
+        captureMicrophone: Bool = false,
+        showCursor: Bool = true
+    ) {
+        self.target = .window(windowID: windowID)
         self.format = format
         self.fps = fps
         self.captureSystemAudio = captureSystemAudio
