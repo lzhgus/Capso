@@ -8,6 +8,7 @@ final class CaptureOverlayWindow: NSPanel {
     var onAreaSelected: ((CGRect, NSScreen) -> Void)?
     var onWindowSelected: ((CGWindowID) -> Void)?
     var onCancelled: (() -> Void)?
+    var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
     private var overlayView: CaptureOverlayView!
@@ -49,6 +50,9 @@ final class CaptureOverlayWindow: NSPanel {
         }
         overlayView.onCancel = { [weak self] in
             self?.onCancelled?()
+        }
+        overlayView.onSpaceToggle = { [weak self] in
+            self?.onSpaceToggle?()
         }
 
         self.contentView = overlayView
