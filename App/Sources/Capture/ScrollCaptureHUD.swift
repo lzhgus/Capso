@@ -11,7 +11,8 @@ final class ScrollCaptureOverlay {
     private var controlsWindow: NSPanel?
     private var previewWindow: NSPanel?
     private let viewModel = ScrollCaptureViewModel()
-    private var escMonitor: Any?
+    private var localKeyMonitor: Any?
+    private var globalKeyMonitor: Any?
 
     var onStart: (() -> Void)?
     var onDone: (() -> Void)?
@@ -29,7 +30,7 @@ final class ScrollCaptureOverlay {
         showBorder(screenRect: screenRect)
         showControls(screenRect: screenRect, screen: screen)
         showPreview(screenRect: screenRect, screen: screen)
-        installEscHandler()
+        installKeyHandlers()
     }
 
     func setCapturing(_ capturing: Bool) {
@@ -43,9 +44,13 @@ final class ScrollCaptureOverlay {
     }
 
     func close() {
-        if let escMonitor {
-            NSEvent.removeMonitor(escMonitor)
-            self.escMonitor = nil
+        if let localKeyMonitor {
+            NSEvent.removeMonitor(localKeyMonitor)
+            self.localKeyMonitor = nil
+        }
+        if let globalKeyMonitor {
+            NSEvent.removeMonitor(globalKeyMonitor)
+            self.globalKeyMonitor = nil
         }
         borderWindow?.orderOut(nil)
         borderWindow = nil
@@ -64,14 +69,39 @@ final class ScrollCaptureOverlay {
         return ids
     }
 
-    private func installEscHandler() {
-        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 { // ESC key
-                self?.onCancel?()
+    private func installKeyHandlers() {
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+
+            switch event.keyCode {
+            case 53: // ESC
+                self.onCancel?()
                 return nil // consume the event
+            case 36, 76: // Return, keypad Enter
+                self.startCaptureFromKeyboard()
+                return nil
+            default:
+                return event
             }
-            return event
         }
+
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            Task { @MainActor in
+                switch event.keyCode {
+                case 53: // ESC
+                    self?.onCancel?()
+                case 36, 76: // Return, keypad Enter
+                    self?.startCaptureFromKeyboard()
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    private func startCaptureFromKeyboard() {
+        guard !viewModel.isCapturing else { return }
+        onStart?()
     }
 
     // MARK: - Border
