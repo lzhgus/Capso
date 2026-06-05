@@ -62,47 +62,48 @@ public final class PixelateObject: AnnotationObject, @unchecked Sendable {
             return
         }
 
-        let imgH = CGFloat(sourceImage.height)
-
-        // CGImage.cropping uses bottom-left origin — flip Y
+        // Redaction bounds already use source-image pixel coordinates with a top-left origin.
         let cropRect = CGRect(
             x: rect.origin.x,
-            y: imgH - rect.origin.y - rect.height,
+            y: rect.origin.y,
             width: rect.width,
             height: rect.height
-        ).intersection(CGRect(x: 0, y: 0, width: CGFloat(sourceImage.width), height: imgH))
+        ).intersection(CGRect(
+            x: 0,
+            y: 0,
+            width: CGFloat(sourceImage.width),
+            height: CGFloat(sourceImage.height)
+        ))
 
-        guard !cropRect.isEmpty, let cropped = sourceImage.cropping(to: cropRect) else { return }
+        guard !cropRect.isEmpty,
+              let cropped = sourceImage.cropping(to: cropRect),
+              let redacted = Self.makeRedactedImage(from: cropped, blockSize: blockSize, mode: mode)
+        else { return }
 
-        let redacted: CGImage?
+        draw(redacted, in: cropRect, context: ctx)
+    }
 
+    private static func makeRedactedImage(
+        from image: CGImage,
+        blockSize: CGFloat,
+        mode: RedactionMode
+    ) -> CGImage? {
         switch mode {
         case .pixelate:
-            redacted = Self.makePixelatedImage(from: cropped, blockSize: blockSize)
+            makePixelatedImage(from: image, blockSize: blockSize)
         case .blur:
-            let ciImage = CIImage(cgImage: cropped)
-            let filter = CIFilter(name: "CIGaussianBlur")
-            filter?.setValue(ciImage.clampedToExtent(), forKey: kCIInputImageKey)
-            filter?.setValue(max(4, blockSize * 0.9), forKey: kCIInputRadiusKey)
-            if let outputImage = filter?.outputImage?.cropped(to: ciImage.extent) {
-                redacted = CIContext().createCGImage(outputImage, from: ciImage.extent)
-            } else {
-                redacted = nil
-            }
+            makeBlurredImage(from: image, radius: max(4, blockSize * 0.9))
         case .solid:
-            redacted = nil
+            nil
         }
+    }
 
-        guard let redacted else { return }
-
-        // Draw pixelated result — flip for CGContext.draw in flipped coordinate system
+    private func draw(_ image: CGImage, in rect: CGRect, context ctx: CGContext) {
         ctx.saveGState()
-        if mode == .pixelate {
-            ctx.interpolationQuality = .none
-        }
-        ctx.translateBy(x: rect.origin.x, y: rect.origin.y + rect.height)
+        ctx.interpolationQuality = mode == .pixelate ? .none : .high
+        ctx.translateBy(x: rect.minX, y: rect.maxY)
         ctx.scaleBy(x: 1, y: -1)
-        ctx.draw(redacted, in: CGRect(origin: .zero, size: rect.size))
+        ctx.draw(image, in: CGRect(origin: .zero, size: rect.size))
         ctx.restoreGState()
     }
 
@@ -153,6 +154,15 @@ public final class PixelateObject: AnnotationObject, @unchecked Sendable {
         outputContext.interpolationQuality = .none
         outputContext.draw(chunky, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         return outputContext.makeImage()
+    }
+
+    private static func makeBlurredImage(from image: CGImage, radius: CGFloat) -> CGImage? {
+        let ciImage = CIImage(cgImage: image)
+        let filter = CIFilter(name: "CIGaussianBlur")
+        filter?.setValue(ciImage.clampedToExtent(), forKey: kCIInputImageKey)
+        filter?.setValue(radius, forKey: kCIInputRadiusKey)
+        guard let outputImage = filter?.outputImage?.cropped(to: ciImage.extent) else { return nil }
+        return CIContext().createCGImage(outputImage, from: ciImage.extent)
     }
 
     public func move(by delta: CGSize) {
