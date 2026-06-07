@@ -60,49 +60,7 @@ struct ExportSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
-                    SettingRow(label: "Screenshot Filename", sublabel: "Extension is added automatically", showDivider: true) {
-                        HStack(spacing: 8) {
-                            TextField("", text: $filenameTemplateDraft)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 12, design: .monospaced))
-                                .frame(width: 220)
-                                .onSubmit {
-                                    normalizeFilenameTemplate()
-                                }
-                            Button {
-                                showingFilenameTokens.toggle()
-                            } label: {
-                                Image(systemName: "info.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Show filename tokens")
-                            .popover(isPresented: $showingFilenameTokens, arrowEdge: .bottom) {
-                                filenameTokensPopover
-                            }
-                            Button("Reset") {
-                                viewModel.resetScreenshotFilenameTemplate()
-                                filenameTemplateDraft = viewModel.screenshotFilenameTemplate
-                            }
-                            .controlSize(.small)
-                        }
-                    }
-                    VStack(spacing: 0) {
-                        Divider()
-                            .background(Color.white.opacity(0.06))
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Text("Preview")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.tertiary)
-                            Text(viewModel.screenshotFilenamePreview)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                    }
+                    filenameTemplateEditor
                 }
             }
         }
@@ -126,6 +84,75 @@ struct ExportSettingsView: View {
         panel.prompt = String(localized: "Select")
         if panel.runModal() == .OK, let url = panel.url {
             viewModel.setExportLocation(url)
+        }
+    }
+
+    private var filenameTemplateEditor: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .background(Color.white.opacity(0.06))
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Screenshot Filename")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                        Text("Extension is added automatically")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    Button {
+                        showingFilenameTokens.toggle()
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .help("Show available filename tokens")
+                    .popover(isPresented: $showingFilenameTokens, arrowEdge: .bottom) {
+                        filenameTokensPopover
+                    }
+                    Button {
+                        viewModel.resetScreenshotFilenameTemplate()
+                        filenameTemplateDraft = viewModel.screenshotFilenameTemplate
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .help("Reset to the default filename template")
+                }
+                TextField("", text: $filenameTemplateDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+                    .onSubmit {
+                        normalizeFilenameTemplate()
+                    }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            Divider()
+                .background(Color.white.opacity(0.06))
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("Preview")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                Text(viewModel.screenshotFilenamePreview)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
         }
     }
 
