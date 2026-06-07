@@ -4,6 +4,8 @@ import SharedKit
 
 struct ExportSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
+    @State private var showingFilenameTokens = false
+    @State private var filenameTemplateDraft = ""
 
     private var displayedPath: String {
         viewModel.exportLocation.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
@@ -58,8 +60,60 @@ struct ExportSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(label: "Screenshot Filename", sublabel: "Extension is added automatically", showDivider: true) {
+                        HStack(spacing: 8) {
+                            TextField("", text: $filenameTemplateDraft)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12, design: .monospaced))
+                                .frame(width: 220)
+                                .onSubmit {
+                                    normalizeFilenameTemplate()
+                                }
+                            Button {
+                                showingFilenameTokens.toggle()
+                            } label: {
+                                Image(systemName: "info.circle")
+                            }
+                            .buttonStyle(.plain)
+                            .help("Show filename tokens")
+                            .popover(isPresented: $showingFilenameTokens, arrowEdge: .bottom) {
+                                filenameTokensPopover
+                            }
+                            Button("Reset") {
+                                viewModel.resetScreenshotFilenameTemplate()
+                                filenameTemplateDraft = viewModel.screenshotFilenameTemplate
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                    VStack(spacing: 0) {
+                        Divider()
+                            .background(Color.white.opacity(0.06))
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("Preview")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                            Text(viewModel.screenshotFilenamePreview)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                    }
                 }
             }
+        }
+        .onAppear {
+            filenameTemplateDraft = viewModel.screenshotFilenameTemplate
+        }
+        .onDisappear {
+            normalizeFilenameTemplate()
+        }
+        .onChange(of: filenameTemplateDraft) { _, newValue in
+            viewModel.screenshotFilenameTemplate = newValue
         }
     }
 
@@ -72,6 +126,40 @@ struct ExportSettingsView: View {
         panel.prompt = String(localized: "Select")
         if panel.runModal() == .OK, let url = panel.url {
             viewModel.setExportLocation(url)
+        }
+    }
+
+    private func normalizeFilenameTemplate() {
+        if filenameTemplateDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            viewModel.resetScreenshotFilenameTemplate()
+            filenameTemplateDraft = viewModel.screenshotFilenameTemplate
+        }
+    }
+
+    private var filenameTokensPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Filename Tokens")
+                .font(.system(size: 13, weight: .semibold))
+            tokenRow("{date}", "2026-06-07")
+            tokenRow("{time}", "16.11.23")
+            tokenRow("{timestamp}", "2026-06-07 at 16.11.23")
+            tokenRow("{source}", " - Safari")
+            tokenRow("{app}", "Safari")
+            tokenRow("{window}", "Example Window")
+            tokenRow("{random}", "8-character random text")
+        }
+        .padding(14)
+        .frame(width: 300, alignment: .leading)
+    }
+
+    private func tokenRow(_ token: String, _ description: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(token)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(width: 88, alignment: .leading)
+            Text(description)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
         }
     }
 }

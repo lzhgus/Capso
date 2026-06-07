@@ -1197,7 +1197,12 @@ final class CaptureCoordinator {
             image: result.image,
             anchorScreen: screen,
             onSave: { [weak self] (rendered: CGImage) in
-                self?.saveRenderedImage(rendered, sourceAppName: result.appName, date: result.timestamp)
+                self?.saveRenderedImage(
+                    rendered,
+                    sourceAppName: result.appName,
+                    sourceWindowTitle: result.windowName,
+                    date: result.timestamp
+                )
                 self?.annotationWindow = nil
             },
             onCopy: { [weak self] (rendered: CGImage) in
@@ -1205,7 +1210,13 @@ final class CaptureCoordinator {
                 self?.annotationWindow = nil
             },
             onPin: { [weak self] (rendered: CGImage, anchor: CGRect?) in
-                self?.pinRenderedImage(rendered, anchor: anchor, sourceAppName: result.appName, date: result.timestamp)
+                self?.pinRenderedImage(
+                    rendered,
+                    anchor: anchor,
+                    sourceAppName: result.appName,
+                    sourceWindowTitle: result.windowName,
+                    date: result.timestamp
+                )
                 self?.annotationWindow = nil
             },
             onClose: { [weak self] in
@@ -1247,7 +1258,12 @@ final class CaptureCoordinator {
             screen: screen,
             screenLocalRect: screenLocalRect,
             onSave: { [weak self] rendered in
-                self?.saveRenderedImage(rendered, sourceAppName: result.appName, date: result.timestamp)
+                self?.saveRenderedImage(
+                    rendered,
+                    sourceAppName: result.appName,
+                    sourceWindowTitle: result.windowName,
+                    date: result.timestamp
+                )
                 self?.inlineAnnotationWindow = nil
             },
             onCopy: { [weak self] rendered in
@@ -1255,7 +1271,13 @@ final class CaptureCoordinator {
                 self?.inlineAnnotationWindow = nil
             },
             onPin: { [weak self] rendered, anchor in
-                self?.pinRenderedImage(rendered, anchor: anchor, sourceAppName: result.appName, date: result.timestamp)
+                self?.pinRenderedImage(
+                    rendered,
+                    anchor: anchor,
+                    sourceAppName: result.appName,
+                    sourceWindowTitle: result.windowName,
+                    date: result.timestamp
+                )
                 self?.inlineAnnotationWindow = nil
             },
             onClose: { [weak self] in
@@ -1316,13 +1338,20 @@ final class CaptureCoordinator {
     }
 
     private func pinToScreen(_ result: CaptureResult, anchor: CGRect) {
-        pinRenderedImage(result.image, anchor: anchor, sourceAppName: result.appName, date: result.timestamp)
+        pinRenderedImage(
+            result.image,
+            anchor: anchor,
+            sourceAppName: result.appName,
+            sourceWindowTitle: result.windowName,
+            date: result.timestamp
+        )
     }
 
     private func pinRenderedImage(
         _ image: CGImage,
         anchor: CGRect?,
         sourceAppName: String? = nil,
+        sourceWindowTitle: String? = nil,
         date: Date = Date()
     ) {
         let controller = PinnedScreenshotController(
@@ -1332,7 +1361,12 @@ final class CaptureCoordinator {
                 self?.copyImageToClipboard(image)
             },
             onSave: { [weak self] in
-                self?.saveImageToFile(image, sourceAppName: sourceAppName, date: date)
+                self?.saveImageToFile(
+                    image,
+                    sourceAppName: sourceAppName,
+                    sourceWindowTitle: sourceWindowTitle,
+                    date: date
+                )
             },
             onDidClose: { [weak self] controllerID in
                 self?.pinnedControllers.removeAll { $0.id == controllerID }
@@ -1350,10 +1384,20 @@ final class CaptureCoordinator {
     }
 
     private func saveImageToFile(_ result: CaptureResult) {
-        saveImageToFile(result.image, sourceAppName: result.appName, date: result.timestamp)
+        saveImageToFile(
+            result.image,
+            sourceAppName: result.appName,
+            sourceWindowTitle: result.windowName,
+            date: result.timestamp
+        )
     }
 
-    private func saveImageToFile(_ image: CGImage, sourceAppName: String? = nil, date: Date = Date()) {
+    private func saveImageToFile(
+        _ image: CGImage,
+        sourceAppName: String? = nil,
+        sourceWindowTitle: String? = nil,
+        date: Date = Date()
+    ) {
         guard let encoded = screenshotData(from: image) else { return }
         let directory = settings.screenshotMonthlyFolders
             ? FileNaming.monthlyDirectory(in: settings.exportLocation)
@@ -1363,7 +1407,9 @@ final class CaptureCoordinator {
             type: .screenshot,
             format: encoded.format,
             date: date,
-            sourceAppName: sourceAppName
+            sourceAppName: sourceAppName,
+            sourceWindowTitle: sourceWindowTitle,
+            template: settings.screenshotFilenameTemplate
         )
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? encoded.data.write(to: url)
@@ -1383,8 +1429,18 @@ final class CaptureCoordinator {
         return (data, preset.fileFormat)
     }
 
-    private func saveRenderedImage(_ image: CGImage, sourceAppName: String? = nil, date: Date = Date()) {
-        saveImageToFile(image, sourceAppName: sourceAppName, date: date)
+    private func saveRenderedImage(
+        _ image: CGImage,
+        sourceAppName: String? = nil,
+        sourceWindowTitle: String? = nil,
+        date: Date = Date()
+    ) {
+        saveImageToFile(
+            image,
+            sourceAppName: sourceAppName,
+            sourceWindowTitle: sourceWindowTitle,
+            date: date
+        )
     }
 
     private func copyRenderedImage(_ image: CGImage) {

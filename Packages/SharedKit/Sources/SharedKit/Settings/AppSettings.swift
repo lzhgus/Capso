@@ -378,6 +378,16 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "screenshotMonthlyFolders") }
     }
 
+    public var screenshotFilenameTemplate: String {
+        get {
+            let raw = defaults.string(forKey: "screenshotFilenameTemplate") ?? FileNaming.defaultScreenshotTemplate
+            return raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? FileNaming.defaultScreenshotTemplate
+                : raw
+        }
+        set { defaults.set(newValue, forKey: "screenshotFilenameTemplate") }
+    }
+
     public var screenshotShowsCursor: Bool {
         get { defaults.object(forKey: "screenshotShowsCursor") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "screenshotShowsCursor") }

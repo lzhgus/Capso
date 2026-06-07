@@ -357,13 +357,27 @@ final class HistoryCoordinator {
         case .recording:
             nil
         }
+        let sourceWindowTitle: String? = switch captureType {
+        case .screenshot:
+            entry.sourceWindowTitle
+        case .recording:
+            nil
+        }
+        let filenameTemplate: String? = switch captureType {
+        case .screenshot:
+            settings.screenshotFilenameTemplate
+        case .recording:
+            nil
+        }
 
         let panel = NSSavePanel()
         panel.nameFieldStringValue = FileNaming.generateFileName(
             for: captureType,
             format: fileFormat,
             date: entry.createdAt,
-            sourceAppName: sourceAppName
+            sourceAppName: sourceAppName,
+            sourceWindowTitle: sourceWindowTitle,
+            template: filenameTemplate
         )
         panel.allowedContentTypes = [fileFormat.contentType]
         panel.canCreateDirectories = true

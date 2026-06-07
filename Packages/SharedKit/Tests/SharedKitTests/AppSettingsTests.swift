@@ -49,6 +49,29 @@ struct AppSettingsTests {
         #expect(settings.screenshotOutputPreset == .standardJPEG)
     }
 
+    @Test("Default screenshot filename template matches FileNaming default")
+    func defaultScreenshotFilenameTemplate() {
+        let suite = "test.screenshotFilenameTemplate.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.screenshotFilenameTemplate == FileNaming.defaultScreenshotTemplate)
+    }
+
+    @Test("Screenshot filename template persists")
+    func screenshotFilenameTemplatePersists() {
+        let suite = "test.screenshotFilenameTemplate.persist"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        first.screenshotFilenameTemplate = "{date}-{time}"
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.screenshotFilenameTemplate == "{date}-{time}")
+    }
+
     @Test("Monthly screenshot folders are disabled by default")
     func defaultScreenshotMonthlyFolders() {
         let suite = "test.screenshotMonthlyFolders.default"

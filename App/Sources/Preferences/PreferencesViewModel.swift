@@ -15,6 +15,19 @@ final class PreferencesViewModel {
     private(set) var cameraGranted: Bool = false
     private(set) var microphoneGranted: Bool = false
 
+    private static let filenamePreviewDate: Date = {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = .current
+        components.year = 2026
+        components.month = 6
+        components.day = 7
+        components.hour = 16
+        components.minute = 11
+        components.second = 23
+        return components.date ?? Date(timeIntervalSince1970: 0)
+    }()
+
     init(settings: AppSettings, permissionManager: PermissionManager) {
         self.settings = settings
         self.permissionManager = permissionManager
@@ -417,6 +430,30 @@ final class PreferencesViewModel {
         withMutation(keyPath: \.exportLocation) {
             settings.setExportLocation(url)
         }
+    }
+    var screenshotFilenameTemplate: String {
+        get {
+            access(keyPath: \.screenshotFilenameTemplate)
+            return settings.screenshotFilenameTemplate
+        }
+        set {
+            withMutation(keyPath: \.screenshotFilenameTemplate) {
+                settings.screenshotFilenameTemplate = newValue
+            }
+        }
+    }
+    func resetScreenshotFilenameTemplate() {
+        screenshotFilenameTemplate = FileNaming.defaultScreenshotTemplate
+    }
+    var screenshotFilenamePreview: String {
+        FileNaming.generateFileName(
+            for: .screenshot,
+            format: screenshotOutputPreset.fileFormat,
+            date: Self.filenamePreviewDate,
+            sourceAppName: "Safari",
+            sourceWindowTitle: "Example Window",
+            template: screenshotFilenameTemplate
+        )
     }
 
     // MARK: OCR
