@@ -29,6 +29,7 @@ final class CaptureOverlayView: NSView {
     var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
+    private let safeAreaTopInset: CGFloat
     /// When true, preset features (badge, R-key, right-click menu, ratio lock) are disabled.
     /// Used by OCR and Recording overlays which always use freeform selection.
     private let presetsDisabled: Bool
@@ -76,8 +77,14 @@ final class CaptureOverlayView: NSView {
 
     nonisolated(unsafe) private var presetObserver: Any?
 
-    init(frame: NSRect, settings: AppSettings, presetsDisabled: Bool = false) {
+    init(
+        frame: NSRect,
+        settings: AppSettings,
+        safeAreaTopInset: CGFloat,
+        presetsDisabled: Bool = false
+    ) {
         self.settings = settings
+        self.safeAreaTopInset = safeAreaTopInset
         // Presets are disabled when explicitly requested (OCR/Recording) or when
         // the user has turned off the feature in Settings.
         self.presetsDisabled = presetsDisabled || !settings.capturePresetsEnabled
@@ -374,7 +381,11 @@ final class CaptureOverlayView: NSView {
         let badgeHeight = textSize.height + vPadding * 2
 
         let badgeX = (bounds.width - badgeWidth) / 2
-        let badgeY = bounds.height - badgeHeight - 20   // near top of screen
+        let badgeY = CaptureDisplayGeometry.presetBadgeY(
+            viewHeight: bounds.height,
+            badgeHeight: badgeHeight,
+            safeAreaTopInset: safeAreaTopInset
+        )
 
         let bgRect = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
         let pillRadius = badgeHeight / 2
