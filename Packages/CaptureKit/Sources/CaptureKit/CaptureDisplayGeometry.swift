@@ -24,6 +24,15 @@ public enum CaptureDisplayGeometry {
         return min(screenRect.width / imageSize.width, screenRect.height / imageSize.height)
     }
 
+    public static func presetBadgeY(
+        viewHeight: CGFloat,
+        badgeHeight: CGFloat,
+        safeAreaTopInset: CGFloat
+    ) -> CGFloat {
+        let topMargin: CGFloat = safeAreaTopInset > 0 ? 64 : 20
+        return viewHeight - badgeHeight - safeAreaTopInset - topMargin
+    }
+
     public static func frozenImageCropRect(
         screenLocalRect: CGRect,
         screenSize: CGSize,

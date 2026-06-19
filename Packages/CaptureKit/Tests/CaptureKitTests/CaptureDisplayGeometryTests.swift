@@ -26,6 +26,28 @@ struct CaptureDisplayGeometryTests {
         #expect(scale == 0.5)
     }
 
+    @Test("Positions preset badge below the physical top on screens without a notch")
+    func presetBadgeYWithoutSafeAreaInset() {
+        let y = CaptureDisplayGeometry.presetBadgeY(
+            viewHeight: 1117,
+            badgeHeight: 29,
+            safeAreaTopInset: 0
+        )
+
+        #expect(y == 1068)
+    }
+
+    @Test("Positions preset badge below the notch safe area")
+    func presetBadgeYWithSafeAreaInset() {
+        let y = CaptureDisplayGeometry.presetBadgeY(
+            viewHeight: 1117,
+            badgeHeight: 29,
+            safeAreaTopInset: 32
+        )
+
+        #expect(y == 992)
+    }
+
     @Test("Rejects invalid geometry")
     func invalidGeometry() {
         #expect(CaptureDisplayGeometry.displayScale(
