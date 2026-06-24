@@ -398,11 +398,6 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "captureWindowShadow") }
     }
 
-    public var freezeScreen: Bool {
-        get { defaults.object(forKey: "freezeScreen") as? Bool ?? true }
-        set { defaults.set(newValue, forKey: "freezeScreen") }
-    }
-
     public var showMagnifier: Bool {
         get { defaults.object(forKey: "showMagnifier") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "showMagnifier") }

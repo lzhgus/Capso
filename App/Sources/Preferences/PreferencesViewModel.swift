@@ -147,17 +147,6 @@ final class PreferencesViewModel {
             }
         }
     }
-    var freezeScreen: Bool {
-        get {
-            access(keyPath: \.freezeScreen)
-            return settings.freezeScreen
-        }
-        set {
-            withMutation(keyPath: \.freezeScreen) {
-                settings.freezeScreen = newValue
-            }
-        }
-    }
     var showMagnifier: Bool {
         get {
             access(keyPath: \.showMagnifier)

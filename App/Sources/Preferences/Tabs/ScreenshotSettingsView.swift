@@ -49,7 +49,7 @@ struct ScreenshotSettingsView: View {
                             .controlSize(.small)
                     }
                     // TODO: Re-enable the rows below once underlying
-                    // behaviors are implemented (freezeScreen, showMagnifier,
+                    // behaviors are implemented (showMagnifier,
                     // rememberLastCaptureArea).
                 }
             }
