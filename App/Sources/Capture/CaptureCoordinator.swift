@@ -172,12 +172,12 @@ final class CaptureCoordinator {
 
     private func startAreaCapture() {
         rememberSourceApplication()
-        if settings.freezeScreen && !settings.screenshotShowsCursor {
-            showFrozenOverlay()
-        } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.showOverlay()
-            }
+        // Always freeze the screen first, then show the selection overlay on top
+        // of the frozen backdrop. Freezing captures the current frame (including
+        // any open dropdowns/popovers/menus) BEFORE the overlay takes key-window
+        // status and dismisses that transient UI. See showFrozenOverlay().
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.showFrozenOverlay()
         }
     }
 
@@ -194,6 +194,26 @@ final class CaptureCoordinator {
             ?? NSScreen.main
         let displayID = targetScreen?.displayID ?? CGMainDisplayID()
         settings.lastCaptureSelection = .fullscreen(screenID: displayID)
+
+        // Freeze the display synchronously BEFORE any focus change so open
+        // dropdowns/popovers/menus are baked into the capture. CGDisplayCreateImage
+        // does not include the cursor, so we draw it back onto the frozen frame
+        // when the user has opted into cursor-inclusive screenshots.
+        if let image = Self.syncCaptureDisplay(displayID) {
+            let fullScreenRect = CGRect(origin: .zero, size: targetScreen?.frame.size ?? .zero)
+            let outputImage = targetScreen.flatMap {
+                cursorCompositedIfNeeded(on: image, selectionRect: fullScreenRect, screen: $0)
+            } ?? image
+            let result = CaptureResult(
+                image: outputImage,
+                mode: .fullscreen,
+                captureRect: CGDisplayBounds(displayID),
+                displayID: displayID
+            )
+            handleCaptureResult(result)
+            return
+        }
+
         Task {
             do {
                 let result = try await ScreenCaptureManager.captureFullscreen(
@@ -209,9 +229,13 @@ final class CaptureCoordinator {
 
     func captureScrolling() {
         rememberSourceApplication()
-        // Use area selection overlay, then start scrolling capture on the selected region
+        // Freeze first (preserves open dropdowns), then select area on the
+        // frozen backdrop. After selection, dismiss the freeze layer and run
+        // the live scrolling capture on the real desktop.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.showOverlay(mode: .area, isScrollingCapture: true)
+            self?.showFrozenOverlay { rect, screen in
+                self?.startScrollingCapture(rect: rect, screen: screen)
+            }
         }
     }
 
@@ -221,14 +245,23 @@ final class CaptureCoordinator {
         pendingAction = .default
         rememberSourceApplication()
         let seconds = settings.selfTimerDurationSeconds
+        // Freeze first (preserves open dropdowns), then select area on the
+        // frozen backdrop. After selection, dismiss the freeze layer and run
+        // the self-timer countdown + live capture.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.showOverlay(mode: .area, selfTimerSeconds: seconds)
+            self?.showFrozenOverlay { rect, screen in
+                self?.runSelfTimerThenCapture(rect: rect, screen: screen, seconds: seconds)
+            }
         }
     }
 
     func captureWindow() {
         pendingSourceApplication = nil
-        // Enumerate windows first, then show overlay in window selection mode
+        // Enumerate windows first (async, no focus change), then freeze the
+        // screen and show the window-selection overlay on the frozen backdrop.
+        // Freezing happens AFTER enumeration but BEFORE the overlay takes key
+        // status, so any open dropdown/popover is baked into the frozen frame
+        // and won't disappear when our overlay becomes key.
         Task {
             do {
                 // Exclude only Capso's overlay windows (not all Capso windows
@@ -242,7 +275,7 @@ final class CaptureCoordinator {
                     return
                 }
 
-                showOverlay(mode: .windowSelection(windows))
+                showFrozenOverlay(mode: .windowSelection(windows))
             } catch {
                 print("Window enumeration failed: \(error)")
             }
@@ -287,7 +320,8 @@ final class CaptureCoordinator {
         mode: CaptureOverlayMode = .area,
         isScrollingCapture: Bool = false,
         selfTimerSeconds: Int? = nil,
-        isAllInOne: Bool = false
+        isAllInOne: Bool = false,
+        areaSelected: ((CGRect, NSScreen) -> Void)? = nil
     ) {
         dismissOverlay()
         dismissAllInOneToolbar()
@@ -295,7 +329,10 @@ final class CaptureCoordinator {
             let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
-                if isAllInOne {
+                if let areaSelected {
+                    self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+                    areaSelected(rect, screen)
+                } else if isAllInOne {
                     self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
                     self?.showAllInOneToolbar(selectionRect: rect, screen: screen)
                 } else if isScrollingCapture {
@@ -581,12 +618,19 @@ final class CaptureCoordinator {
     ///    → no sub-pixel mismatch → no shaking. Pre-rendered before showing.
     ///
     /// 2. Top window: TRANSPARENT overlay for crosshair + selection + dark tint.
-    private func showFrozenOverlay() {
+    ///
+    /// `areaSelected` is invoked when the user confirms an area selection for
+    /// flows that should use the live desktop after selection, such as
+    /// scrolling capture or the self-timer.
+    private func showFrozenOverlay(
+        mode: CaptureOverlayMode = .area,
+        areaSelected: ((CGRect, NSScreen) -> Void)? = nil
+    ) {
         dismissOverlay()
 
         let frozenScreens = captureFrozenScreens()
         guard !frozenScreens.isEmpty else {
-            showOverlay()
+            showOverlay(mode: mode, areaSelected: areaSelected)
             return
         }
 
@@ -596,17 +640,24 @@ final class CaptureCoordinator {
         for (screen, frozenImage) in frozenScreens {
             let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
             overlay.onAreaSelected = { [weak self] rect, screen in
-                self?.dismissOverlay()
-                self?.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
-                if let result = self?.frozenAreaResult(rect: rect, screen: screen, frozenImage: frozenImage) {
-                    self?.handleCaptureResult(result)
+                guard let self else { return }
+                self.dismissOverlay()
+                self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+                if let areaSelected {
+                    areaSelected(rect, screen)
+                } else if let result = self.frozenAreaResult(rect: rect, screen: screen, frozenImage: frozenImage) {
+                    self.handleCaptureResult(result)
                 }
+            }
+            overlay.onWindowSelected = { [weak self] windowID in
+                self?.dismissOverlay()
+                self?.performWindowCapture(windowID: windowID)
             }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
                 self?.dismissOverlay()
             }
-            overlay.activate(mode: .area)
+            overlay.activate(mode: mode)
             overlayWindows.append(overlay)
         }
     }
@@ -993,12 +1044,96 @@ final class CaptureCoordinator {
             width: rect.width,
             height: rect.height
         )
+        let image = cursorCompositedIfNeeded(
+            on: cropped,
+            selectionRect: rect,
+            screen: screen
+        ) ?? cropped
+
         return CaptureResult(
-            image: cropped,
+            image: image,
             mode: .area,
             captureRect: captureRect,
             displayID: screen.displayID
         )
+    }
+
+    private func cursorCompositedIfNeeded(
+        on image: CGImage,
+        selectionRect: CGRect,
+        screen: NSScreen
+    ) -> CGImage? {
+        guard settings.screenshotShowsCursor else { return image }
+
+        let mouseLocation = NSEvent.mouseLocation
+        guard screen.frame.contains(mouseLocation) else { return image }
+
+        let screenLocalMouse = CGPoint(
+            x: mouseLocation.x - screen.frame.minX,
+            y: mouseLocation.y - screen.frame.minY
+        )
+        guard selectionRect.contains(screenLocalMouse) else { return image }
+
+        return Self.compositeCursor(
+            on: image,
+            cursorLocation: screenLocalMouse,
+            selectionRect: selectionRect
+        )
+    }
+
+    private static func compositeCursor(
+        on image: CGImage,
+        cursorLocation: CGPoint,
+        selectionRect: CGRect
+    ) -> CGImage? {
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0, selectionRect.width > 0, selectionRect.height > 0 else {
+            return nil
+        }
+
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        let canvasRect = CGRect(x: 0, y: 0, width: width, height: height)
+        context.draw(image, in: canvasRect)
+
+        let cursor = NSCursor.arrow
+        var cursorImageRect = NSRect(origin: .zero, size: cursor.image.size)
+        guard let cursorImage = cursor.image.cgImage(
+            forProposedRect: &cursorImageRect,
+            context: nil,
+            hints: nil
+        ) else {
+            return context.makeImage()
+        }
+
+        let scaleX = CGFloat(width) / selectionRect.width
+        let scaleY = CGFloat(height) / selectionRect.height
+        let cursorSize = cursor.image.size
+        let cursorWidth = cursorSize.width * scaleX
+        let cursorHeight = cursorSize.height * scaleY
+        let pointX = (cursorLocation.x - selectionRect.minX) * scaleX
+        let pointY = (cursorLocation.y - selectionRect.minY) * scaleY
+        let hotSpot = cursor.hotSpot
+        let drawRect = CGRect(
+            x: pointX - hotSpot.x * scaleX,
+            y: pointY - (cursorSize.height - hotSpot.y) * scaleY,
+            width: cursorWidth,
+            height: cursorHeight
+        )
+
+        context.draw(cursorImage, in: drawRect)
+        return context.makeImage()
     }
 
     private func handleCaptureResult(_ capturedResult: CaptureResult) {
