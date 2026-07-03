@@ -54,7 +54,7 @@ Every macOS screenshot tool worth using costs money — CleanShot X is $29, Cap 
 
 Capso is our answer: a **fully native, feature-complete alternative** that's free forever, built in the open, and architected so the underlying pieces (CaptureKit, AnnotationKit, OCRKit…) are reusable SPM packages you can drop into your own app.
 
-We make our money from [other tools](https://www.awesomemacapp.com/). Capso exists to give back to the macOS community and to show what a modern, modular Swift 6 app can look like.
+Capso exists to give back to the macOS community and to show what a modern, modular Swift 6 app can look like.
 
 ---
 
