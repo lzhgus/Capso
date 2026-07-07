@@ -194,6 +194,14 @@ final class AnnotationCanvasNSView: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         let pointInView = convert(event.locationInWindow, from: nil)
+        // Mouse-moved events can still reach this first-responder canvas while
+        // the pointer is over SwiftUI toolbar controls. Do not let the canvas
+        // leak its drawing cursor into non-canvas chrome.
+        guard bounds.contains(pointInView) else {
+            NSCursor.arrow.set()
+            return
+        }
+
         if let handle = liveTextHandleHitTest(pointInView: pointInView) {
             cursorForHandle(handle).set()
             return
@@ -218,12 +226,16 @@ final class AnnotationCanvasNSView: NSView {
         }
     }
 
+    override func mouseExited(with event: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         for area in trackingAreas { removeTrackingArea(area) }
         addTrackingArea(NSTrackingArea(
             rect: bounds,
-            options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
             owner: self, userInfo: nil
         ))
     }

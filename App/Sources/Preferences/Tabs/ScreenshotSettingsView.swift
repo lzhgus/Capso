@@ -54,6 +54,59 @@ struct ScreenshotSettingsView: View {
                 }
             }
 
+            SettingGroup(title: "Timestamp") {
+                SettingCard {
+                    SettingRow(label: "Add Timestamp", sublabel: "Draw the capture time onto screenshots") {
+                        Toggle("", isOn: $viewModel.screenshotTimestampEnabled)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+
+                    if viewModel.screenshotTimestampEnabled {
+                        SettingRow(label: "Position", showDivider: true) {
+                            Picker("", selection: $viewModel.screenshotTimestampPosition) {
+                                ForEach(ScreenshotTimestampPosition.allCases, id: \.self) { position in
+                                    Text(position.displayName).tag(position)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 150)
+                        }
+
+                        SettingRow(label: "Format", showDivider: true) {
+                            Picker("", selection: $viewModel.screenshotTimestampFormat) {
+                                ForEach(ScreenshotTimestampFormat.allCases, id: \.self) { format in
+                                    Text(format.displayName).tag(format)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 150)
+                        }
+
+                        SettingRow(label: "Color", showDivider: true) {
+                            TextField("#FFFFFF", text: $viewModel.screenshotTimestampColorHex)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12, design: .monospaced))
+                                .frame(width: 88)
+                        }
+
+                        SettingRow(label: "Font Size", showDivider: true) {
+                            HStack(spacing: 8) {
+                                Text("\(viewModel.screenshotTimestampFontSize) pt")
+                                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                                    .frame(minWidth: 42, alignment: .trailing)
+                                Stepper(
+                                    "",
+                                    value: $viewModel.screenshotTimestampFontSize,
+                                    in: ScreenshotTimestampOptions.fontSizeRange
+                                )
+                                .labelsHidden()
+                            }
+                        }
+                    }
+                }
+            }
+
             SettingGroup(title: "Self-Timer") {
                 SettingCard {
                     SettingRow(

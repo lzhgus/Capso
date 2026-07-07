@@ -136,6 +136,61 @@ final class PreferencesViewModel {
             }
         }
     }
+    var screenshotTimestampEnabled: Bool {
+        get {
+            access(keyPath: \.screenshotTimestampEnabled)
+            return settings.screenshotTimestampEnabled
+        }
+        set {
+            withMutation(keyPath: \.screenshotTimestampEnabled) {
+                settings.screenshotTimestampEnabled = newValue
+            }
+        }
+    }
+    var screenshotTimestampPosition: ScreenshotTimestampPosition {
+        get {
+            access(keyPath: \.screenshotTimestampPosition)
+            return settings.screenshotTimestampPosition
+        }
+        set {
+            withMutation(keyPath: \.screenshotTimestampPosition) {
+                settings.screenshotTimestampPosition = newValue
+            }
+        }
+    }
+    var screenshotTimestampFormat: ScreenshotTimestampFormat {
+        get {
+            access(keyPath: \.screenshotTimestampFormat)
+            return settings.screenshotTimestampFormat
+        }
+        set {
+            withMutation(keyPath: \.screenshotTimestampFormat) {
+                settings.screenshotTimestampFormat = newValue
+            }
+        }
+    }
+    var screenshotTimestampColorHex: String {
+        get {
+            access(keyPath: \.screenshotTimestampColorHex)
+            return settings.screenshotTimestampColorHex
+        }
+        set {
+            withMutation(keyPath: \.screenshotTimestampColorHex) {
+                settings.screenshotTimestampColorHex = newValue
+            }
+        }
+    }
+    var screenshotTimestampFontSize: Int {
+        get {
+            access(keyPath: \.screenshotTimestampFontSize)
+            return settings.screenshotTimestampFontSize
+        }
+        set {
+            withMutation(keyPath: \.screenshotTimestampFontSize) {
+                settings.screenshotTimestampFontSize = newValue
+            }
+        }
+    }
     var captureWindowShadow: Bool {
         get {
             access(keyPath: \.captureWindowShadow)

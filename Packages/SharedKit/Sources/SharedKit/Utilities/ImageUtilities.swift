@@ -48,4 +48,22 @@ public enum ImageUtilities {
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
         return context.makeImage()
     }
+
+    public static func resized(_ cgImage: CGImage, width: Int, height: Int) -> CGImage? {
+        guard width > 0, height > 0 else { return nil }
+
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: cgImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        context.interpolationQuality = .high
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
 }

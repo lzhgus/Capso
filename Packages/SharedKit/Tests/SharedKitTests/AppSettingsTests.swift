@@ -102,6 +102,41 @@ struct AppSettingsTests {
         #expect(second.screenshotShowsCursor == true)
     }
 
+    @Test("Screenshot timestamp defaults are opt-in")
+    func screenshotTimestampDefaultsAreOptIn() {
+        let suite = "test.screenshotTimestamp.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.screenshotTimestampEnabled == false)
+        #expect(settings.screenshotTimestampPosition == .bottomRight)
+        #expect(settings.screenshotTimestampFormat == .dateTime)
+        #expect(settings.screenshotTimestampColorHex == "#FFFFFF")
+        #expect(settings.screenshotTimestampFontSize == 14)
+    }
+
+    @Test("Screenshot timestamp settings persist")
+    func screenshotTimestampSettingsPersist() {
+        let suite = "test.screenshotTimestamp.persist"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+
+        first.screenshotTimestampEnabled = true
+        first.screenshotTimestampPosition = .topLeft
+        first.screenshotTimestampFormat = .iso8601
+        first.screenshotTimestampColorHex = "#112233"
+        first.screenshotTimestampFontSize = 22
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.screenshotTimestampEnabled == true)
+        #expect(second.screenshotTimestampPosition == .topLeft)
+        #expect(second.screenshotTimestampFormat == .iso8601)
+        #expect(second.screenshotTimestampColorHex == "#112233")
+        #expect(second.screenshotTimestampFontSize == 22)
+    }
+
     @Test("Default Quick Access position is bottomLeft")
     func defaultQuickAccessPosition() {
         let settings = AppSettings()

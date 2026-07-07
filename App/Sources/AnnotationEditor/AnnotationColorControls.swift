@@ -57,6 +57,17 @@ struct AnnotationColorControls: View {
             }
             .buttonStyle(.plain)
             .help("Pick Color From Screen")
+
+            Button(action: copyCurrentHex) {
+                Text(currentColor.hexRGB)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 56, height: swatchSize + 8)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.06)))
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+            .help("Copy HEX Color")
         }
     }
 
@@ -75,6 +86,12 @@ struct AnnotationColorControls: View {
             }
             self.sampler = nil
         }
+    }
+
+    private func copyCurrentHex() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(currentColor.hexRGB, forType: .string)
     }
 
     private func readableGlyphColor(for color: NSColor) -> Color {

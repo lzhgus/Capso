@@ -1,4 +1,5 @@
 // App/Sources/AnnotationEditor/AnnotationToolbar.swift
+import AppKit
 import SwiftUI
 import AnnotationKit
 
@@ -59,6 +60,14 @@ struct AnnotationToolbar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.arrow.set()
+            }
+        }
+        .onChange(of: currentTool) { _, _ in
+            NSCursor.arrow.set()
+        }
     }
 
     private var toolGroup: some View {
