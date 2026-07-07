@@ -23,7 +23,6 @@
 
 <p align="center">
   <a href="https://github.com/lzhgus/Capso/releases/latest"><strong>下载 &rarr;</strong></a> &nbsp;&bull;&nbsp;
-  <a href="https://www.awesomemacapp.com/app/capso">官网</a> &nbsp;&bull;&nbsp;
   <a href="https://x.com/lzhgus">关注 @lzhgus</a> &nbsp;&bull;&nbsp;
   <a href="#功能特性">功能</a> &nbsp;&bull;&nbsp;
   <a href="#从源码构建">源码构建</a>
@@ -54,7 +53,7 @@ brew install --cask capso
 
 所以我们做了 Capso：一个功能完整的免费替代品，完全开源。底层的 CaptureKit、AnnotationKit、OCRKit 等模块都是独立的 SPM 包，你完全可以拿去用在自己的项目里。
 
-我们通过[其他产品](https://www.awesomemacapp.com/)赚钱，Capso 是我们送给 macOS 社区的礼物。也希望它能成为一个现代 Swift 6 模块化应用的参考。
+Capso 是我们送给 macOS 社区的礼物。也希望它能成为一个现代 Swift 6 模块化应用的参考。
 
 欢迎大家来试用、提 issue、贡献代码，一起把它做得更好！
 
@@ -134,10 +133,6 @@ brew install --cask capso
   <img src=".github/assets/recording-pip.jpeg" alt="摄像头画中画录屏" width="600"><br>
   <em>录屏 + 摄像头画中画 + GIF/视频选项</em>
 </p>
-
-更多截图请访问 [**Capso 官网 →**](https://www.awesomemacapp.com/app/capso)
-
----
 
 ## 功能对比
 
@@ -290,5 +285,5 @@ Capso 采用 [Business Source License 1.1](LICENSE) 许可。
 </p>
 
 <p align="center">
-  由 <a href="https://www.awesomemacapp.com/">Awesome Mac Apps</a> 出品，欢迎了解我们的其他 macOS 工具。
+  由 Capso 项目开放构建。
 </p>

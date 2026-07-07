@@ -154,7 +154,7 @@ struct CloudShareSettingsView: View {
             return
         }
 
-        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.\(provider.rawValue)")
+        let keychain = KeychainHelper(service: "io.github.lzhgus.capso.share.\(provider.rawValue)")
         let accessKey = (try? keychain.get(account: "accessKey")) ?? ""
         let secretKey = (try? keychain.get(account: "secretKey")) ?? ""
 
@@ -236,7 +236,7 @@ struct CloudShareSettingsView: View {
         // 2. Delete Keychain entries — surface failures instead of silently swallowing.
         var keychainErrors: [String] = []
         for provider in ShareProvider.allCases {
-            let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.\(provider.rawValue)")
+            let keychain = KeychainHelper(service: "io.github.lzhgus.capso.share.\(provider.rawValue)")
             do {
                 try keychain.delete(account: "accessKey")
             } catch {
@@ -272,7 +272,7 @@ struct CloudShareSettingsView: View {
             let list = keychainErrors.joined(separator: ", ")
             testResult = TestResultAlert(
                 title: String(localized: "Couldn't fully clear Keychain"),
-                message: String(format: String(localized: "Some credentials may still be in Keychain: %@.\n\nOpen 'Keychain Access.app' and search for 'com.awesomemacapps.capso.share' to remove them manually."), list)
+                message: String(format: String(localized: "Some credentials may still be in Keychain: %@.\n\nOpen 'Keychain Access.app' and search for 'io.github.lzhgus.capso.share' to remove them manually."), list)
             )
         }
     }

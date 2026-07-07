@@ -325,7 +325,7 @@ jobs:
             app "Capso.app"
 
             zap trash: [
-              "~/Library/Preferences/com.awesomemacapps.capso.plist",
+              "~/Library/Preferences/io.github.lzhgus.capso.plist",
             ]
           end
           CASK

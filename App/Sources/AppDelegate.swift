@@ -214,7 +214,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.\(provider.rawValue)")
+        let keychain = KeychainHelper(service: "io.github.lzhgus.capso.share.\(provider.rawValue)")
         guard
             let access = AppDelegate.keychainString(keychain, account: "accessKey"),
             let secret = AppDelegate.keychainString(keychain, account: "secretKey")

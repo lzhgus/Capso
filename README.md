@@ -23,7 +23,6 @@ A native, feature-rich alternative to CleanShot X. Built with Swift 6.0 and Swif
 
 <p align="center">
   <a href="https://github.com/lzhgus/Capso/releases/latest"><strong>Download &rarr;</strong></a> &nbsp;&bull;&nbsp;
-  <a href="https://www.awesomemacapp.com/app/capso">Website</a> &nbsp;&bull;&nbsp;
   <a href="https://x.com/lzhgus">Follow @lzhgus</a> &nbsp;&bull;&nbsp;
   <a href="#features">Features</a> &nbsp;&bull;&nbsp;
   <a href="#build-from-source">Build from Source</a>
@@ -132,10 +131,6 @@ Capso exists to give back to the macOS community and to show what a modern, modu
   <img src=".github/assets/recording-pip.jpeg" alt="Screen Recording with Webcam PiP" width="600"><br>
   <em>Screen recording with webcam PiP and GIF/Video options</em>
 </p>
-
-See more screenshots and a full walkthrough on the [**Capso website →**](https://www.awesomemacapp.com/app/capso)
-
----
 
 ## Comparison
 
@@ -267,7 +262,7 @@ The license auto-converts to Apache 2.0 three years after each release — so ev
 
 - [Report a bug](https://github.com/lzhgus/Capso/issues/new?template=bug_report.yml)
 - [Request a feature](https://github.com/lzhgus/Capso/issues/new?template=feature_request.yml)
-- [Follow @lzhgus on X](https://x.com/lzhgus) for release notes, behind-the-scenes updates, and other macOS tools
+- [Follow @lzhgus on X](https://x.com/lzhgus) for release notes and behind-the-scenes updates
 
 If Capso saves you time, a small tip keeps it growing — every bit funds more polish, more features, fewer bugs.
 
@@ -286,5 +281,5 @@ If Capso saves you time, a small tip keeps it growing — every bit funds more p
 </p>
 
 <p align="center">
-  Built by <a href="https://www.awesomemacapp.com/">Awesome Mac Apps</a> — check out our other macOS tools.
+  Built in the open by the Capso project.
 </p>
