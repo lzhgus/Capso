@@ -456,7 +456,8 @@ final class RecordingCoordinator {
         format: RecordingFormatChoice,
         cameraEnabled: Bool,
         micEnabled: Bool,
-        systemAudioEnabled: Bool
+        systemAudioEnabled: Bool,
+        restoredCameraPiPFrame: CGRect? = nil
     ) {
         currentRecordingFormat = format
         currentCameraEnabled = cameraEnabled
@@ -479,7 +480,7 @@ final class RecordingCoordinator {
         // uses the sync `start()` — at this point we know it's granted.
         if cameraEnabled && cameraPiPWindow == nil {
             try? cameraManager.start()
-            showCameraPiP()
+            showCameraPiP(restoredFrame: restoredCameraPiPFrame)
         }
 
         let actuallyStart: @MainActor () -> Void = { [weak self] in
@@ -568,6 +569,7 @@ final class RecordingCoordinator {
 
     private func restartRecording() {
         guard let format = currentRecordingFormat else { return }
+        let restoredCameraPiPFrame = currentCameraEnabled ? cameraPiPWindow?.frame : nil
 
         Task {
             do {
@@ -580,7 +582,8 @@ final class RecordingCoordinator {
                     format: format,
                     cameraEnabled: currentCameraEnabled,
                     micEnabled: currentMicEnabled,
-                    systemAudioEnabled: currentSystemAudioEnabled
+                    systemAudioEnabled: currentSystemAudioEnabled,
+                    restoredCameraPiPFrame: restoredCameraPiPFrame
                 )
             } catch {
                 print("Failed to restart recording: \(error)")
@@ -933,7 +936,7 @@ final class RecordingCoordinator {
         borderWindow?.show()
     }
 
-    private func showCameraPiP() {
+    private func showCameraPiP(restoredFrame: CGRect? = nil) {
         // Close existing PiP first to prevent duplicates
         cameraPiPWindow?.orderOut(nil)
         cameraPiPWindow?.close()
@@ -950,7 +953,12 @@ final class RecordingCoordinator {
                 height: selectedRect.height
             )
         }
-        cameraPiPWindow = CameraPiPWindow(cameraManager: cameraManager, settings: settings, recordingFrame: recordingFrame)
+        cameraPiPWindow = CameraPiPWindow(
+            cameraManager: cameraManager,
+            settings: settings,
+            recordingFrame: recordingFrame,
+            restoredFrame: restoredFrame
+        )
         cameraPiPWindow?.show()
     }
 
