@@ -6,7 +6,7 @@ import CaptureKit
 import OCRKit
 import SharedKit
 
-private let logger = Logger(subsystem: "com.awesomemacapps.capso", category: "OCR")
+private let logger = Logger(subsystem: "io.github.lzhgus.capso", category: "OCR")
 
 @MainActor
 @Observable

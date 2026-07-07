@@ -6247,11 +6247,11 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未能完全清除 Keychain" } }
       }
     },
-    "Some credentials may still be in Keychain: %@.\n\nOpen 'Keychain Access.app' and search for 'com.awesomemacapps.capso.share' to remove them manually." : {
+    "Some credentials may still be in Keychain: %@.\n\nOpen 'Keychain Access.app' and search for 'io.github.lzhgus.capso.share' to remove them manually." : {
       "localizations" : {
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の資格情報が Keychain に残っている可能性があります：%@。\n\n「キーチェーンアクセス.app」を開き、'com.awesomemacapps.capso.share' で検索して手動で削除してください。" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 자격 증명이 Keychain에 남아 있을 수 있습니다: %@.\n\n'키체인 접근.app'을 열고 'com.awesomemacapps.capso.share'를 검색하여 수동으로 삭제하세요." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分凭据可能仍保留在 Keychain 中：%@。\n\n请打开“钥匙串访问.app”，搜索 'com.awesomemacapps.capso.share' 手动删除。" } }
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の資格情報が Keychain に残っている可能性があります：%@。\n\n「キーチェーンアクセス.app」を開き、'io.github.lzhgus.capso.share' で検索して手動で削除してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 자격 증명이 Keychain에 남아 있을 수 있습니다: %@.\n\n'키체인 접근.app'을 열고 'io.github.lzhgus.capso.share'를 검색하여 수동으로 삭제하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分凭据可能仍保留在 Keychain 中：%@。\n\n请打开“钥匙串访问.app”，搜索 'io.github.lzhgus.capso.share' 手动删除。" } }
       }
     },
     "All-in-One" : {

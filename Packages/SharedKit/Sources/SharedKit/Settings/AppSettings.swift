@@ -686,12 +686,12 @@ public final class AppSettings: @unchecked Sendable {
     }
 
     public func translationAPIKey() -> String? {
-        try? KeychainHelper(service: "com.awesomemacapps.capso.translation")
+        try? KeychainHelper(service: "io.github.lzhgus.capso.translation")
             .get(account: translationProvider.rawValue)
     }
 
     public func setTranslationAPIKey(_ value: String?) throws {
-        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.translation")
+        let keychain = KeychainHelper(service: "io.github.lzhgus.capso.translation")
         let account = translationProvider.rawValue
         let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if trimmed.isEmpty {

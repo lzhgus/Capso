@@ -10,7 +10,7 @@ import OCRKit
 import SharedKit
 import TranslationKit
 
-private let logger = Logger(subsystem: "com.awesomemacapps.capso", category: "Translation")
+private let logger = Logger(subsystem: "io.github.lzhgus.capso", category: "Translation")
 
 @MainActor
 @Observable

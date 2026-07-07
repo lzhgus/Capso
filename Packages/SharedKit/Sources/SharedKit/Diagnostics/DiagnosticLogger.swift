@@ -19,12 +19,12 @@ private func capsoUncaughtExceptionHandler(_ exception: NSException) {
 public enum DiagnosticLogger {
     public static let maxLogBytes = 1_000_000
 
-    private static let queue = DispatchQueue(label: "com.awesomemacapps.capso.diagnostic-logger")
+    private static let queue = DispatchQueue(label: "io.github.lzhgus.capso.diagnostic-logger")
 
     public static var logDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport
-            .appendingPathComponent("com.awesomemacapps.capso", isDirectory: true)
+            .appendingPathComponent("io.github.lzhgus.capso", isDirectory: true)
             .appendingPathComponent("logs", isDirectory: true)
     }
 
@@ -95,7 +95,7 @@ public enum DiagnosticLogger {
             return urls.filter { url in
                 let name = url.lastPathComponent.lowercased()
                 let ext = url.pathExtension.lowercased()
-                return (name.contains("capso") || name.contains("com.awesomemacapps.capso"))
+                return (name.contains("capso") || name.contains("io.github.lzhgus.capso"))
                     && ["crash", "ips", "diag"].contains(ext)
             }
         }

@@ -5,7 +5,7 @@ import Foundation
 
 @Suite("KeychainHelper")
 struct KeychainHelperTests {
-    private let testService = "com.awesomemacapps.capso.test.\(UUID().uuidString)"
+    private let testService = "io.github.lzhgus.capso.test.\(UUID().uuidString)"
 
     @Test("write then read returns the value")
     func roundTrip() throws {

@@ -1,7 +1,7 @@
 # project.yml
 name: Capso
 options:
-  bundleIdPrefix: com.awesomemacapps
+  bundleIdPrefix: io.github.lzhgus
   deploymentTarget:
     macOS: "15.0"
   xcodeVersion: "26.0"
@@ -69,7 +69,7 @@ targets:
           - "Info.plist"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.awesomemacapps.capso
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.lzhgus.capso
         INFOPLIST_FILE: App/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: App/Entitlements/Capso.entitlements
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
