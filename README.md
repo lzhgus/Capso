@@ -74,7 +74,7 @@ Capso exists to give back to the macOS community and to show what a modern, modu
 
 ### Screen Recording
 - **Video (MP4)** and **GIF** recording
-- **Webcam PiP** — 4 shapes (circle, square, portrait, landscape), drag-resize, snap-to-corners
+- **Webcam PiP** — 4 shapes (circle, square, portrait, landscape), drag-resize, snap-to-corners, and restart recording without losing your PiP placement or size
 - **Camera presentation mode** — click PiP to expand fullscreen, click again to restore
 - **System audio + microphone** capture
 - **Recording controls** — pause, stop, restart, delete, timer
