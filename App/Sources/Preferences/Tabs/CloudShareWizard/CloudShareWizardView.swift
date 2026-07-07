@@ -168,7 +168,7 @@ struct CloudShareWizardView: View {
     private func save() async {
         // Step 1: Keychain first — if this fails, abort (no AppSettings writes,
         // so the UI never shows a half-saved "configured" state).
-        let keychain = KeychainHelper(service: "io.github.lzhgus.capso.share.\(model.provider.rawValue)")
+        let keychain = KeychainHelper(service: "com.awesomemacapps.capso.share.\(model.provider.rawValue)")
         do {
             try keychain.set(model.accessKey, account: "accessKey")
             try keychain.set(model.secretKey, account: "secretKey")
