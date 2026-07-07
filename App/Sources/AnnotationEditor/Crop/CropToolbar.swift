@@ -83,7 +83,7 @@ struct CropToolbar: View {
             .keyboardShortcut(.cancelAction)
 
             Button(action: onCommit) {
-                Text("Crop").font(.system(size: 12, weight: .medium))
+                Text("Apply").font(.system(size: 12, weight: .medium))
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)

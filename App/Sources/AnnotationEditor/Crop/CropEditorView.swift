@@ -5,6 +5,7 @@ import AnnotationKit
 struct CropEditorView: View {
     let sourceImage: CGImage
     let initialCropRect: CGRect?
+    let initialOutputSize: CGSize?
     /// True when the document already has annotations. Rotate and flip are
     /// disabled in that case to avoid orphaning annotations whose coordinates
     /// assume the pre-transform image space.
@@ -13,12 +14,16 @@ struct CropEditorView: View {
     /// Receives the (possibly transformed) image and the committed crop rect.
     /// `image` is nil if no rotate/flip was applied (caller keeps its existing
     /// source image). `cropRect` is nil when the rect covers the full image.
-    let onCommit: (_ image: CGImage?, _ cropRect: CGRect?) -> Void
+    let onCommit: (_ image: CGImage?, _ cropRect: CGRect?, _ outputSize: CGSize?) -> Void
 
     /// The live preview image. Starts equal to `sourceImage` and accumulates
     /// rotate/flip transforms on user action. Never mutated by Cancel.
     @State private var displayImage: CGImage
     @State private var cropRect: CGRect
+    @State private var resizeOutputEnabled: Bool
+    @State private var outputWidthDraft: String
+    @State private var outputHeightDraft: String
+    @State private var outputAspectLocked = true
     /// Persist the most recently chosen ratio preset across editor sessions.
     @AppStorage("annotationLastCropPreset") private var preset: CropPreset = .freeform
     @AppStorage("annotationCropSnapEnabled") private var snapEnabled: Bool = true
@@ -40,22 +45,32 @@ struct CropEditorView: View {
     /// `true` once the user has applied a rotate or flip. Drives the commit
     /// callback so the caller knows to swap its source image.
     @State private var didTransformImage: Bool = false
+    @FocusState private var focusedOutputField: OutputField?
+
+    private enum OutputField { case width, height }
 
     init(
         sourceImage: CGImage,
         initialCropRect: CGRect?,
+        initialOutputSize: CGSize?,
         canTransformImage: Bool,
         onCancel: @escaping () -> Void,
-        onCommit: @escaping (_ image: CGImage?, _ cropRect: CGRect?) -> Void
+        onCommit: @escaping (_ image: CGImage?, _ cropRect: CGRect?, _ outputSize: CGSize?) -> Void
     ) {
         self.sourceImage = sourceImage
         self.initialCropRect = initialCropRect
+        self.initialOutputSize = initialOutputSize
         self.canTransformImage = canTransformImage
         self.onCancel = onCancel
         self.onCommit = onCommit
         let size = CGSize(width: sourceImage.width, height: sourceImage.height)
+        let cropSize = initialCropRect?.size ?? size
+        let outputSize = initialOutputSize ?? cropSize
         self._displayImage = State(initialValue: sourceImage)
-        self._cropRect = State(initialValue: initialCropRect ?? CGRect(origin: .zero, size: size))
+        self._cropRect = State(initialValue: CGRect(origin: initialCropRect?.origin ?? .zero, size: cropSize))
+        self._resizeOutputEnabled = State(initialValue: initialOutputSize != nil)
+        self._outputWidthDraft = State(initialValue: "\(Int(outputSize.width.rounded()))")
+        self._outputHeightDraft = State(initialValue: "\(Int(outputSize.height.rounded()))")
     }
 
     private var imageSize: CGSize {
@@ -89,7 +104,8 @@ struct CropEditorView: View {
                 onCommit: {
                     onCommit(
                         didTransformImage ? displayImage : nil,
-                        isIdentityCrop ? nil : cropRect
+                        isIdentityCrop ? nil : cropRect,
+                        committedOutputSize
                     )
                 }
             )
@@ -137,6 +153,11 @@ struct CropEditorView: View {
                 .onChange(of: selectedCustom) { _, newCustom in
                     guard !isApplyingHistory else { return }
                     if let newCustom { applyRatio(newCustom.ratio) }
+                }
+                .onChange(of: cropRect) { _, _ in
+                    if !resizeOutputEnabled {
+                        syncOutputDraftsToCrop()
+                    }
                 }
             }
 
@@ -216,6 +237,10 @@ struct CropEditorView: View {
 
             Spacer()
 
+            outputResizeControls
+
+            Divider().frame(height: 18)
+
             if !isIdentityCrop {
                 Button("Revert to Original") {
                     cropRect = CGRect(origin: .zero, size: imageSize)
@@ -228,6 +253,106 @@ struct CropEditorView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.bar)
+    }
+
+    private var outputResizeControls: some View {
+        HStack(spacing: 8) {
+            Toggle("Resize output", isOn: resizeOutputBinding)
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+
+            if resizeOutputEnabled {
+                outputDimensionField(draft: $outputWidthDraft, field: .width)
+                    .help("Output width in pixels")
+                Text("×")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                outputDimensionField(draft: $outputHeightDraft, field: .height)
+                    .help("Output height in pixels")
+                Text("px")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+
+                Button {
+                    outputAspectLocked.toggle()
+                    if outputAspectLocked {
+                        commitOutputDraft(for: .width)
+                    }
+                } label: {
+                    Image(systemName: outputAspectLocked ? "lock.fill" : "lock.open")
+                        .font(.system(size: 11, weight: .medium))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.borderless)
+                .help(outputAspectLocked ? "Keep crop aspect ratio" : "Allow custom output ratio")
+            }
+        }
+        .onChange(of: focusedOutputField) { oldField, newField in
+            if let oldField, newField != oldField {
+                commitOutputDraft(for: oldField)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func outputDimensionField(draft: Binding<String>, field: OutputField) -> some View {
+        TextField("", text: draft)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .font(.system(size: 12, design: .monospaced))
+            .multilineTextAlignment(.center)
+            .frame(width: 62)
+            .focused($focusedOutputField, equals: field)
+            .onSubmit { commitOutputDraft(for: field) }
+    }
+
+    private var resizeOutputBinding: Binding<Bool> {
+        Binding(
+            get: { resizeOutputEnabled },
+            set: { enabled in
+                resizeOutputEnabled = enabled
+                if enabled {
+                    syncOutputDraftsToCrop()
+                }
+            }
+        )
+    }
+
+    private var committedOutputSize: CGSize? {
+        guard resizeOutputEnabled,
+              let width = Int(outputWidthDraft),
+              let height = Int(outputHeightDraft),
+              width > 0,
+              height > 0 else {
+            return nil
+        }
+        return CGSize(width: width, height: height)
+    }
+
+    private func syncOutputDraftsToCrop() {
+        outputWidthDraft = "\(max(1, Int(cropRect.width.rounded())))"
+        outputHeightDraft = "\(max(1, Int(cropRect.height.rounded())))"
+    }
+
+    private func commitOutputDraft(for field: OutputField) {
+        let rawWidth = max(1, Int(outputWidthDraft) ?? max(1, Int(cropRect.width.rounded())))
+        let rawHeight = max(1, Int(outputHeightDraft) ?? max(1, Int(cropRect.height.rounded())))
+
+        guard outputAspectLocked, cropRect.width > 0, cropRect.height > 0 else {
+            outputWidthDraft = "\(rawWidth)"
+            outputHeightDraft = "\(rawHeight)"
+            return
+        }
+
+        let ratio = cropRect.width / cropRect.height
+        switch field {
+        case .width:
+            outputWidthDraft = "\(rawWidth)"
+            outputHeightDraft = "\(max(1, Int((CGFloat(rawWidth) / ratio).rounded())))"
+        case .height:
+            outputHeightDraft = "\(rawHeight)"
+            outputWidthDraft = "\(max(1, Int((CGFloat(rawHeight) * ratio).rounded())))"
+        }
     }
 
     private func rotateCCW() {

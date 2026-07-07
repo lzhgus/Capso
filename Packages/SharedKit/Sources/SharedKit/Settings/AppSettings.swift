@@ -393,6 +393,67 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "screenshotShowsCursor") }
     }
 
+    public var screenshotTimestampEnabled: Bool {
+        get { defaults.object(forKey: "screenshotTimestampEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "screenshotTimestampEnabled") }
+    }
+
+    public var screenshotTimestampPosition: ScreenshotTimestampPosition {
+        get {
+            guard let raw = defaults.string(forKey: "screenshotTimestampPosition"),
+                  let value = ScreenshotTimestampPosition(rawValue: raw) else { return .bottomRight }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "screenshotTimestampPosition") }
+    }
+
+    public var screenshotTimestampFormat: ScreenshotTimestampFormat {
+        get {
+            guard let raw = defaults.string(forKey: "screenshotTimestampFormat"),
+                  let value = ScreenshotTimestampFormat(rawValue: raw) else { return .dateTime }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "screenshotTimestampFormat") }
+    }
+
+    public var screenshotTimestampColorHex: String {
+        get {
+            let raw = defaults.string(forKey: "screenshotTimestampColorHex") ?? "#FFFFFF"
+            return ScreenshotTimestampOptions.normalizedColorHex(raw) ?? "#FFFFFF"
+        }
+        set {
+            let normalized = ScreenshotTimestampOptions.normalizedColorHex(newValue) ?? "#FFFFFF"
+            defaults.set(normalized, forKey: "screenshotTimestampColorHex")
+        }
+    }
+
+    public var screenshotTimestampFontSize: Int {
+        get {
+            let raw = defaults.object(forKey: "screenshotTimestampFontSize") as? Int ?? 14
+            return min(
+                max(raw, ScreenshotTimestampOptions.fontSizeRange.lowerBound),
+                ScreenshotTimestampOptions.fontSizeRange.upperBound
+            )
+        }
+        set {
+            let clamped = min(
+                max(newValue, ScreenshotTimestampOptions.fontSizeRange.lowerBound),
+                ScreenshotTimestampOptions.fontSizeRange.upperBound
+            )
+            defaults.set(clamped, forKey: "screenshotTimestampFontSize")
+        }
+    }
+
+    public var screenshotTimestampOptions: ScreenshotTimestampOptions {
+        ScreenshotTimestampOptions(
+            isEnabled: screenshotTimestampEnabled,
+            position: screenshotTimestampPosition,
+            format: screenshotTimestampFormat,
+            colorHex: screenshotTimestampColorHex,
+            fontSize: screenshotTimestampFontSize
+        )
+    }
+
     public var captureWindowShadow: Bool {
         get { defaults.object(forKey: "captureWindowShadow") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "captureWindowShadow") }

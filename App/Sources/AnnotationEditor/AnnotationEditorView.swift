@@ -2,6 +2,7 @@
 import SwiftUI
 import AnnotationKit
 import OCRKit
+import SharedKit
 
 struct AnnotationEditorView: View {
     let initialSourceImage: CGImage
@@ -68,6 +69,7 @@ struct AnnotationEditorView: View {
     @State private var refreshTrigger = 0
     @State private var zoomScale: CGFloat = 1.0
     @State private var isCropMode = false
+    @State private var outputSize: CGSize?
     @State private var commitEditingTrigger = 0
     /// Cached text line bounding boxes for smart highlighter snapping.
     @State private var textRegions: [CGRect] = []
@@ -205,6 +207,7 @@ struct AnnotationEditorView: View {
         CropEditorView(
             sourceImage: sourceImage,
             initialCropRect: document.cropRect,
+            initialOutputSize: outputSize,
             canTransformImage: document.objects.isEmpty,
             onCancel: { isCropMode = false },
             onCommit: commitCrop
@@ -365,7 +368,7 @@ struct AnnotationEditorView: View {
         beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 6 * zoomScale : 0
     }
 
-    private func commitCrop(newImage: CGImage?, newRect: CGRect?) {
+    private func commitCrop(newImage: CGImage?, newRect: CGRect?, newOutputSize: CGSize?) {
         if let newImage {
             sourceImage = newImage
             document.replaceImage(size: CGSize(width: newImage.width, height: newImage.height))
@@ -373,6 +376,7 @@ struct AnnotationEditorView: View {
         } else {
             document.setCropRect(newRect)
         }
+        outputSize = newOutputSize
         isCropMode = false
     }
 
@@ -501,7 +505,17 @@ struct AnnotationEditorView: View {
         ) else {
             return nil
         }
-        return BeautifyRenderer.render(image: annotated, settings: beautifySettings)
+        guard let rendered = BeautifyRenderer.render(image: annotated, settings: beautifySettings) else {
+            return nil
+        }
+        guard let outputSize else { return rendered }
+
+        let width = max(1, Int(outputSize.width.rounded()))
+        let height = max(1, Int(outputSize.height.rounded()))
+        guard width != rendered.width || height != rendered.height else {
+            return rendered
+        }
+        return ImageUtilities.resized(rendered, width: width, height: height) ?? rendered
     }
 
     private func save() {

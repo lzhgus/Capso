@@ -118,6 +118,29 @@ final class CaptureCoordinator {
         )
     }
 
+    private func timestampedResultIfNeeded(_ result: CaptureResult) -> CaptureResult {
+        let options = settings.screenshotTimestampOptions
+        guard options.isEnabled,
+              let image = ScreenshotTimestampRenderer.render(
+                image: result.image,
+                date: result.timestamp,
+                options: options
+              ) else {
+            return result
+        }
+
+        return CaptureResult(
+            image: image,
+            mode: result.mode,
+            captureRect: result.captureRect,
+            windowName: result.windowName,
+            appName: result.appName,
+            appBundleIdentifier: result.appBundleIdentifier,
+            timestamp: result.timestamp,
+            displayID: result.displayID
+        )
+    }
+
     func captureArea() {
         pendingAction = .default
         startAreaCapture()
@@ -1138,6 +1161,7 @@ final class CaptureCoordinator {
 
     private func handleCaptureResult(_ capturedResult: CaptureResult) {
         let result = captureResultWithPendingSource(capturedResult)
+        let outputResult = timestampedResultIfNeeded(result)
         lastCaptureResult = result
 
         let action = pendingAction
@@ -1154,24 +1178,24 @@ final class CaptureCoordinator {
 
         switch action {
         case .clipboard:
-            copyImageToClipboard(result.image)
+            copyImageToClipboard(outputResult.image)
         case .annotate:
             // Open the editor on the same screen the capture came from.
-            openAnnotationEditor(result, anchorScreen: screenFor(result: result))
+            openAnnotationEditor(outputResult, anchorScreen: screenFor(result: result))
         case .inlineAnnotate:
-            openInlineAnnotationEditor(result, anchorScreen: screenFor(result: result))
+            openInlineAnnotationEditor(outputResult, anchorScreen: screenFor(result: result))
         case .ocr:
             ocrCoordinator?.startVisualOCR(image: result.image, anchorScreen: screenFor(result: result))
         case .pin:
-            pinToScreen(result, anchor: anchorRect(for: result))
+            pinToScreen(outputResult, anchor: anchorRect(for: result))
         case .save:
-            saveImageToFile(result)
+            saveImageToFile(outputResult)
         case .share:
             // Skip Quick Access, save to history, then upload in background.
-            logDiagnostic("Cloud Share capture completed mode=\(result.mode) displayID=\(result.displayID)")
-            historyCoordinator?.saveCapture(result: result, entryID: entryID)
+            logDiagnostic("Cloud Share capture completed mode=\(outputResult.mode) displayID=\(outputResult.displayID)")
+            historyCoordinator?.saveCapture(result: outputResult, entryID: entryID)
             if let coord = shareCoordinator {
-                Task { await self.performShareAfterCapture(result: result, entryID: entryID, coord: coord) }
+                Task { await self.performShareAfterCapture(result: outputResult, entryID: entryID, coord: coord) }
             } else {
                 logDiagnostic("Cloud Share capture completed but coordinator is nil")
                 Self.postNotification(
@@ -1182,18 +1206,18 @@ final class CaptureCoordinator {
             return  // history already saved above; skip the call below
         case .default:
             if settings.screenshotAutoCopy {
-                copyImageToClipboard(result.image)
+                copyImageToClipboard(outputResult.image)
             }
             if settings.screenshotAutoSave {
-                saveImageToFile(result)
+                saveImageToFile(outputResult)
             }
             if settings.screenshotShowPreview {
-                showQuickAccess(for: result, entryID: entryID)
+                showQuickAccess(for: outputResult, entryID: entryID)
             }
         }
 
         if action.savesOriginalCaptureToHistory {
-            historyCoordinator?.saveCapture(result: result, entryID: entryID)
+            historyCoordinator?.saveCapture(result: action == .ocr ? result : outputResult, entryID: entryID)
         }
     }
 
