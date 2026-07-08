@@ -26,6 +26,7 @@ private struct AnnotationToolShortcutMonitor: NSViewRepresentable {
         coordinator.uninstall()
     }
 
+    @MainActor
     final class Coordinator {
         var currentTool: Binding<AnnotationTool>?
         var isEnabled = true
