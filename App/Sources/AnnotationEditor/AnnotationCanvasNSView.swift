@@ -722,6 +722,28 @@ final class AnnotationCanvasNSView: NSView {
         resizeOriginalEndpoints = nil
         resizeOriginalLineControlPoint = nil
 
+        if let selected = doc.selectedObject,
+           let handle = handleHitTest(point: point, object: selected) {
+            activeResizeHandle = handle
+            resizeOriginalBounds = selected.bounds
+            resizeOriginalFreehandPoints = (selected as? FreehandObject)?.points
+            if let arrow = selected as? ArrowObject {
+                resizeOriginalEndpoints = (arrow.start, arrow.end)
+                resizeOriginalLineControlPoint = arrow.controlPoint ?? pathMidpoint(arrow)
+            } else if let line = selected as? LineObject {
+                resizeOriginalEndpoints = (line.start, line.end)
+                resizeOriginalLineControlPoint = line.controlPoint ?? pathMidpoint(line)
+            }
+            if let text = selected as? TextObject {
+                resizeOriginalTextFontSize = text.fontSize
+            }
+            dragObjectID = selected.id
+            doc.beginDrag()
+            cursorForHandle(handle).set()
+            needsDisplay = true
+            return
+        }
+
         if let selected = doc.selectedObject as? CounterObject,
            let action = counterSelectionAction(at: point, counter: selected) {
             isDragging = false
@@ -743,28 +765,6 @@ final class AnnotationCanvasNSView: NSView {
             }
             needsDisplay = true
             onDocumentChanged?()
-            return
-        }
-
-        if let selected = doc.selectedObject,
-           let handle = handleHitTest(point: point, object: selected) {
-            activeResizeHandle = handle
-            resizeOriginalBounds = selected.bounds
-            resizeOriginalFreehandPoints = (selected as? FreehandObject)?.points
-            if let arrow = selected as? ArrowObject {
-                resizeOriginalEndpoints = (arrow.start, arrow.end)
-                resizeOriginalLineControlPoint = arrow.controlPoint ?? pathMidpoint(arrow)
-            } else if let line = selected as? LineObject {
-                resizeOriginalEndpoints = (line.start, line.end)
-                resizeOriginalLineControlPoint = line.controlPoint ?? pathMidpoint(line)
-            }
-            if let text = selected as? TextObject {
-                resizeOriginalTextFontSize = text.fontSize
-            }
-            dragObjectID = selected.id
-            doc.beginDrag()
-            cursorForHandle(handle).set()
-            needsDisplay = true
             return
         }
 
