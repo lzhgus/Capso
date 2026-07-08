@@ -1,4 +1,5 @@
 // App/Sources/AnnotationEditor/AnnotationEditorView.swift
+import AppKit
 import SwiftUI
 import AnnotationKit
 import OCRKit
@@ -8,9 +9,16 @@ struct AnnotationEditorView: View {
     let initialSourceImage: CGImage
     let document: AnnotationDocument
     let interactionState: AnnotationEditorInteractionState
+    let sourceAppName: String?
+    let sourceWindowTitle: String?
+    let captureDate: Date
+    let screenshotOutputPreset: ScreenshotOutputPreset
+    let screenshotFilenameTemplate: String
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
     let onPin: (CGImage) -> Void
+    let onDragStarted: () -> Void
+    let onDragEnded: () -> Void
     let onCancel: () -> Void
 
     /// The working image shown in the canvas. Starts equal to
@@ -22,17 +30,31 @@ struct AnnotationEditorView: View {
         sourceImage: CGImage,
         document: AnnotationDocument,
         interactionState: AnnotationEditorInteractionState,
+        sourceAppName: String?,
+        sourceWindowTitle: String?,
+        captureDate: Date,
+        screenshotOutputPreset: ScreenshotOutputPreset,
+        screenshotFilenameTemplate: String,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage) -> Void,
+        onDragStarted: @escaping () -> Void,
+        onDragEnded: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.initialSourceImage = sourceImage
         self.document = document
         self.interactionState = interactionState
+        self.sourceAppName = sourceAppName
+        self.sourceWindowTitle = sourceWindowTitle
+        self.captureDate = captureDate
+        self.screenshotOutputPreset = screenshotOutputPreset
+        self.screenshotFilenameTemplate = screenshotFilenameTemplate
         self.onSave = onSave
         self.onCopy = onCopy
         self.onPin = onPin
+        self.onDragStarted = onDragStarted
+        self.onDragEnded = onDragEnded
         self.onCancel = onCancel
         self._sourceImage = State(initialValue: sourceImage)
     }
@@ -71,6 +93,7 @@ struct AnnotationEditorView: View {
     @State private var isCropMode = false
     @State private var outputSize: CGSize?
     @State private var commitEditingTrigger = 0
+    @State private var dragFileStore = QuickAccessDragFileStore()
     /// Cached text line bounding boxes for smart highlighter snapping.
     @State private var textRegions: [CGRect] = []
 
@@ -250,6 +273,11 @@ struct AnnotationEditorView: View {
             onSave: { save() },
             onCopy: { copy() },
             onPin: { pin() },
+            onDragFileURL: dragFileURL,
+            onDragPreviewImage: dragPreviewImage,
+            onDragStarted: onDragStarted,
+            onDragEnded: onDragEnded,
+            isDragDisabled: isEditingText,
             onCancel: onCancel,
             onCrop: { isCropMode = true }
         )
@@ -517,6 +545,32 @@ struct AnnotationEditorView: View {
             return rendered
         }
         return ImageUtilities.resized(rendered, width: width, height: height) ?? rendered
+    }
+
+    private func dragFileURL() -> URL? {
+        guard !isEditingText,
+              let rendered = renderedOutputImage() else {
+            return nil
+        }
+
+        do {
+            return try dragFileStore.fileURL(
+                for: rendered,
+                id: UUID(),
+                preset: screenshotOutputPreset,
+                date: captureDate,
+                sourceAppName: sourceAppName,
+                sourceWindowTitle: sourceWindowTitle,
+                template: screenshotFilenameTemplate
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    private func dragPreviewImage() -> NSImage? {
+        guard let rendered = renderedOutputImage() else { return nil }
+        return NSImage(cgImage: rendered, size: NSSize(width: rendered.width, height: rendered.height))
     }
 
     private func save() {

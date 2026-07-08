@@ -1378,6 +1378,11 @@ final class CaptureCoordinator {
         annotationWindow = AnnotationEditorWindow(
             image: result.image,
             anchorScreen: screen,
+            sourceAppName: result.appName,
+            sourceWindowTitle: result.windowName,
+            captureDate: result.timestamp,
+            screenshotOutputPreset: settings.screenshotOutputPreset,
+            screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
             onSave: { [weak self] (rendered: CGImage) in
                 self?.saveRenderedImage(
                     rendered,

@@ -6,6 +6,7 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
     let thumbnail: NSImage
     let dragImageSize: CGSize
     let fileURLProvider: () -> URL?
+    let dragImageProvider: () -> NSImage?
     let onDragStarted: () -> Void
     let onDragEnded: () -> Void
 
@@ -13,12 +14,14 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
         thumbnail: NSImage,
         dragImageSize: CGSize,
         fileURLProvider: @escaping () -> URL?,
+        dragImageProvider: @escaping () -> NSImage? = { nil },
         onDragStarted: @escaping () -> Void,
         onDragEnded: @escaping () -> Void
     ) {
         self.thumbnail = thumbnail
         self.dragImageSize = dragImageSize
         self.fileURLProvider = fileURLProvider
+        self.dragImageProvider = dragImageProvider
         self.onDragStarted = onDragStarted
         self.onDragEnded = onDragEnded
     }
@@ -28,6 +31,7 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
             thumbnail: thumbnail,
             dragImageSize: dragImageSize,
             fileURLProvider: fileURLProvider,
+            dragImageProvider: dragImageProvider,
             onDragStarted: onDragStarted,
             onDragEnded: onDragEnded
         )
@@ -37,6 +41,7 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
         nsView.thumbnail = thumbnail
         nsView.dragImageSize = dragImageSize
         nsView.fileURLProvider = fileURLProvider
+        nsView.dragImageProvider = dragImageProvider
         nsView.onDragStarted = onDragStarted
         nsView.onDragEnded = onDragEnded
     }
@@ -48,6 +53,7 @@ final class DragSourceNSView: NSView, NSDraggingSource {
     var thumbnail: NSImage
     var dragImageSize: CGSize
     var fileURLProvider: () -> URL?
+    var dragImageProvider: () -> NSImage?
     var onDragStarted: () -> Void
     var onDragEnded: () -> Void
 
@@ -58,12 +64,14 @@ final class DragSourceNSView: NSView, NSDraggingSource {
         thumbnail: NSImage,
         dragImageSize: CGSize,
         fileURLProvider: @escaping () -> URL?,
+        dragImageProvider: @escaping () -> NSImage?,
         onDragStarted: @escaping () -> Void,
         onDragEnded: @escaping () -> Void
     ) {
         self.thumbnail = thumbnail
         self.dragImageSize = dragImageSize
         self.fileURLProvider = fileURLProvider
+        self.dragImageProvider = dragImageProvider
         self.onDragStarted = onDragStarted
         self.onDragEnded = onDragEnded
         super.init(frame: .zero)
@@ -90,7 +98,7 @@ final class DragSourceNSView: NSView, NSDraggingSource {
         guard let fileURL = fileURLProvider() else { return }
 
         self.mouseDownEvent = nil
-        beginDrag(for: fileURL, from: mouseDownEvent)
+        beginDrag(for: fileURL, from: mouseDownEvent, previewImage: dragImageProvider() ?? thumbnail)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -116,9 +124,9 @@ final class DragSourceNSView: NSView, NSDraggingSource {
         onDragEnded()
     }
 
-    private func beginDrag(for fileURL: URL, from event: NSEvent) {
+    private func beginDrag(for fileURL: URL, from event: NSEvent, previewImage: NSImage) {
         let draggingItem = NSDraggingItem(pasteboardWriter: fileURL as NSURL)
-        draggingItem.setDraggingFrame(draggingFrame, contents: dragImage)
+        draggingItem.setDraggingFrame(draggingFrame, contents: dragImage(previewImage: previewImage))
 
         let session = beginDraggingSession(with: [draggingItem], event: event, source: self)
         session.animatesToStartingPositionsOnCancelOrFail = true
@@ -133,7 +141,7 @@ final class DragSourceNSView: NSView, NSDraggingSource {
         return NSRect(origin: origin, size: size)
     }
 
-    private var dragImage: NSImage {
+    private func dragImage(previewImage: NSImage) -> NSImage {
         let size = NSSize(width: dragImageSize.width, height: dragImageSize.height)
         let image = NSImage(size: size)
         image.lockFocus()
@@ -146,8 +154,8 @@ final class DragSourceNSView: NSView, NSDraggingSource {
         NSColor.black.withAlphaComponent(0.12).setFill()
         rect.fill()
 
-        thumbnail.draw(
-            in: aspectFitRect(for: thumbnail.size, in: rect),
+        previewImage.draw(
+            in: aspectFitRect(for: previewImage.size, in: rect),
             from: .zero,
             operation: .sourceOver,
             fraction: 1,
