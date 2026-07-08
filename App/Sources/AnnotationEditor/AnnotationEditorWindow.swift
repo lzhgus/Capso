@@ -83,25 +83,37 @@ final class AnnotationEditorWindow: NSPanel {
             screenshotFilenameTemplate: screenshotFilenameTemplate,
             onSave: { [weak self] rendered in
                 onSave(rendered)
-                self?.close()
+                MainActor.assumeIsolated {
+                    self?.close()
+                }
             },
             onCopy: { [weak self] rendered in
                 onCopy(rendered)
-                self?.close()
+                MainActor.assumeIsolated {
+                    self?.close()
+                }
             },
             onPin: { [weak self] rendered in
-                onPin(rendered, self?.frame)
-                self?.close()
+                MainActor.assumeIsolated {
+                    onPin(rendered, self?.frame)
+                    self?.close()
+                }
             },
             onDragStarted: { [weak self] in
-                self?.hideDuringExternalDrag()
+                MainActor.assumeIsolated {
+                    self?.hideDuringExternalDrag()
+                }
             },
             onDragEnded: { [weak self] in
-                self?.showAfterExternalDrag()
+                MainActor.assumeIsolated {
+                    self?.showAfterExternalDrag()
+                }
             },
             onCancel: { [weak self] in
                 onClose()
-                self?.close()
+                MainActor.assumeIsolated {
+                    self?.close()
+                }
             }
         )
 
