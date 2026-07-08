@@ -18,6 +18,7 @@ final class TranslationCoordinator {
     private let settings: AppSettings
     private var overlayWindows: [CaptureOverlayWindow] = []
     private var onboardingWindow: TranslationOnboardingWindow?
+    private var typedInputWindow: TypedTranslationInputWindow?
     private var resultWindow: TranslationResultWindow?
     private var toastWindow: ToastWindow?
 
@@ -41,6 +42,24 @@ final class TranslationCoordinator {
         } else {
             beginSelectedTextFlow()
         }
+    }
+
+    func translateTypedText() {
+        typedInputWindow?.close()
+        let window = TypedTranslationInputWindow(
+            onSubmit: { [weak self] text in
+                self?.submitTypedText(text)
+            },
+            onCancel: { [weak self] in
+                self?.typedInputWindow?.close()
+                self?.typedInputWindow = nil
+            },
+            onClose: { [weak self] in
+                self?.typedInputWindow = nil
+            }
+        )
+        typedInputWindow = window
+        window.show()
     }
 
     /// - Parameter anchorScreen: The screen where the capture came from.
@@ -215,6 +234,22 @@ final class TranslationCoordinator {
                 anchor: anchor,
                 anchorScreen: screen
             )
+        }
+    }
+
+    private func submitTypedText(_ text: String) {
+        do {
+            let region = try TypedTranslationInput(rawText: text).makeTextRegion()
+            typedInputWindow?.close()
+            typedInputWindow = nil
+            showLoadingResult(
+                regions: [region],
+                target: settings.translationTargetLanguage,
+                anchor: nil,
+                anchorScreen: NSScreen.main
+            )
+        } catch {
+            showToast(error.localizedDescription, icon: "text.cursor", iconColor: .systemYellow)
         }
     }
 

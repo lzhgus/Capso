@@ -33,6 +33,7 @@ final class CaptureCoordinator {
     private var scrollCaptureController: ScrollCaptureController?
     private var scrollCaptureOverlay: ScrollCaptureOverlay?
     private var selfTimerHUD: SelfTimerHUD?
+    private var toastWindow: ToastWindow?
 
     var lastCaptureResult: CaptureResult?
     var ocrCoordinator: OCRCoordinator?
@@ -154,6 +155,28 @@ final class CaptureCoordinator {
     func captureAreaAndAnnotate() {
         pendingAction = .annotate
         startAreaCapture()
+    }
+
+    func editClipboardImage() {
+        guard let image = ClipboardImageReader.image() else {
+            showToast(
+                String(localized: "No image found on clipboard"),
+                icon: "photo.on.rectangle.angled",
+                iconColor: .systemYellow
+            )
+            return
+        }
+
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
+        let result = CaptureResult(
+            image: image,
+            mode: .area,
+            captureRect: CGRect(x: 0, y: 0, width: image.width, height: image.height),
+            appName: String(localized: "Clipboard"),
+            displayID: screen?.displayID ?? CGMainDisplayID()
+        )
+        openAnnotationEditor(result, anchorScreen: screen)
     }
 
     func captureAreaAndShare() {
@@ -1604,6 +1627,17 @@ final class CaptureCoordinator {
 
     private func copyRenderedImage(_ image: CGImage) {
         copyImageToClipboard(image)
+    }
+
+    private func showToast(
+        _ message: String,
+        icon: String = "checkmark.circle.fill",
+        iconColor: NSColor = .systemGreen,
+        screen: NSScreen? = nil
+    ) {
+        toastWindow?.close()
+        toastWindow = ToastWindow(message: message, icon: icon, iconColor: iconColor, screen: screen)
+        toastWindow?.show()
     }
 
     // MARK: - Cloud Share Upload

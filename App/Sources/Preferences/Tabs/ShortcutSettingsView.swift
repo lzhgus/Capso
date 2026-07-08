@@ -13,9 +13,11 @@ extension KeyboardShortcuts.Name {
     static let captureAreaToClipboard = Self("captureAreaToClipboard", default: .init(.seven, modifiers: [.option, .shift]))
     static let captureAreaAndShare = Self("captureAreaAndShare", default: .init(.zero, modifiers: [.option, .shift]))
     static let captureAreaAndAnnotate = Self("captureAreaAndAnnotate", default: .init(.eight, modifiers: [.option, .shift]))
+    static let editClipboardImage = Self("editClipboardImage")
     static let screenshotHistory = Self("screenshotHistory", default: .init(.nine, modifiers: [.option, .shift]))
     static let captureAndTranslate = Self("captureAndTranslate", default: .init(.t, modifiers: [.option, .shift]))
     static let translateSelectedText = Self("translateSelectedText", default: .init(.y, modifiers: [.option, .shift]))
+    static let translateTypedText = Self("translateTypedText")
     /// No default binding — opt-in. Self-Timer is discoverable from the
     /// menu bar; shipping a default risks colliding with whatever the user
     /// has already bound in macOS or third-party apps.
@@ -78,8 +80,15 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Capture Area to Clipboard", name: .captureAreaToClipboard, showDivider: true)
                     shortcutRow("Capture and Share to Cloud", name: .captureAreaAndShare, showDivider: true)
                     shortcutRow("Capture Area & Annotate", name: .captureAreaAndAnnotate, showDivider: true)
+                    shortcutRow(
+                        "Edit Clipboard Image",
+                        name: .editClipboardImage,
+                        showDivider: true,
+                        help: "Open the image currently copied to the clipboard in Annotate"
+                    )
                     shortcutRow("Capture & Translate", name: .captureAndTranslate, showDivider: true)
                     shortcutRow("Translate Selected Text", name: .translateSelectedText, showDivider: true)
+                    shortcutRow("Translate Typed Text", name: .translateTypedText, showDivider: true)
                     shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
                     shortcutRow("Start / Stop Recording", name: .recordScreen, showDivider: true)
                     shortcutRow("Screenshot History", name: .screenshotHistory)
@@ -96,10 +105,22 @@ struct ShortcutSettingsView: View {
         }
     }
 
-    private func shortcutRow(_ label: LocalizedStringKey, name: KeyboardShortcuts.Name, showDivider: Bool = false) -> some View {
-        SettingRow(label: label, showDivider: showDivider) {
+    @ViewBuilder
+    private func shortcutRow(
+        _ label: LocalizedStringKey,
+        name: KeyboardShortcuts.Name,
+        showDivider: Bool = false,
+        help: LocalizedStringKey? = nil
+    ) -> some View {
+        let row = SettingRow(label: label, showDivider: showDivider) {
             KeyboardShortcuts.Recorder(for: name)
                 .controlSize(.small)
+        }
+
+        if let help {
+            row.help(help)
+        } else {
+            row
         }
     }
 

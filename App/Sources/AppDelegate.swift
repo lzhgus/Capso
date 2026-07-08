@@ -152,6 +152,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .captureAreaAndAnnotate) { [weak self] in
             self?.captureCoordinator?.captureAreaAndAnnotate()
         }
+        KeyboardShortcuts.onKeyDown(for: .editClipboardImage) { [weak self] in
+            self?.captureCoordinator?.editClipboardImage()
+        }
         KeyboardShortcuts.onKeyDown(for: .captureLastArea) { [weak self] in
             self?.captureCoordinator?.replayLastCapture()
         }
@@ -172,6 +175,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         KeyboardShortcuts.onKeyDown(for: .translateSelectedText) { [weak self] in
             self?.translationCoordinator?.translateSelectedText()
+        }
+        KeyboardShortcuts.onKeyDown(for: .translateTypedText) { [weak self] in
+            self?.translationCoordinator?.translateTypedText()
         }
     }
 

@@ -72,20 +72,20 @@ struct AnnotationToolbar: View {
 
     private var toolGroup: some View {
         HStack(spacing: 4) {
-            toolButton(.select, icon: "cursorarrow", label: "Select")
-            toolButton(.arrow, icon: "arrow.up.right", label: "Arrow")
-            toolButton(.line, icon: "line.diagonal", label: "Line")
-            toolButton(.rectangle, icon: "rectangle", label: "Rectangle")
-            toolButton(.ellipse, icon: "circle", label: "Ellipse")
+            toolButton(.select, icon: "cursorarrow")
+            toolButton(.arrow, icon: "arrow.up.right")
+            toolButton(.line, icon: "line.diagonal")
+            toolButton(.rectangle, icon: "rectangle")
+            toolButton(.ellipse, icon: "circle")
             textToolButton
-            toolButton(.freehand, icon: "pencil.tip", label: "Draw")
-            toolButton(.pixelate, icon: "eye.slash.fill", label: "Pixelate / Blur")
-            toolButton(.counter, icon: "number.circle.fill", label: "Counter")
-            toolButton(.highlighter, icon: "highlighter", label: "Highlighter")
+            toolButton(.freehand, icon: "pencil.tip")
+            toolButton(.pixelate, icon: "eye.slash.fill")
+            toolButton(.counter, icon: "number.circle.fill")
+            toolButton(.highlighter, icon: "highlighter")
         }
     }
 
-    private func toolButton(_ tool: AnnotationTool, icon: String, label: LocalizedStringKey) -> some View {
+    private func toolButton(_ tool: AnnotationTool, icon: String) -> some View {
         Button(action: { currentTool = tool }) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .medium))
@@ -96,7 +96,7 @@ struct AnnotationToolbar: View {
                 .overlay(toolbarButtonStroke)
         }
         .buttonStyle(.plain)
-        .help(label)
+        .help(tool.localizedShortcutHelpTitle)
     }
 
     /// Text-tool button. Rendered as a literal "Aa" glyph rather than the
@@ -118,7 +118,7 @@ struct AnnotationToolbar: View {
                 .overlay(toolbarButtonStroke)
         }
         .buttonStyle(.plain)
-        .help("Text")
+        .help(AnnotationTool.text.localizedShortcutHelpTitle)
     }
 
     private var colorGroup: some View {
@@ -351,6 +351,27 @@ struct AnnotationToolbar: View {
     private func actionButtonStroke(isPrimary: Bool) -> some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
             .stroke(isPrimary ? Color.white.opacity(0.18) : Color.primary.opacity(0.08), lineWidth: 0.5)
+    }
+}
+
+extension AnnotationTool {
+    var localizedShortcutHelpTitle: String {
+        AnnotationToolShortcut.helpTitle(localizedToolName, for: self)
+    }
+
+    private var localizedToolName: String {
+        switch self {
+        case .select: return String(localized: "Select")
+        case .arrow: return String(localized: "Arrow")
+        case .line: return String(localized: "Line")
+        case .rectangle: return String(localized: "Rectangle")
+        case .ellipse: return String(localized: "Ellipse")
+        case .text: return String(localized: "Text")
+        case .freehand: return String(localized: "Draw")
+        case .pixelate: return String(localized: "Pixelate / Blur")
+        case .counter: return String(localized: "Counter")
+        case .highlighter: return String(localized: "Highlighter")
+        }
     }
 }
 

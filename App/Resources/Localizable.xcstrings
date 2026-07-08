@@ -1888,6 +1888,13 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭" } }
       }
     },
+    "Clipboard" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クリップボード" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클립보드" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剪贴板" } }
+      }
+    },
     "Copy" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1909,6 +1916,69 @@
             "value" : "复制"
           }
         }
+      }
+    },
+    "Copy original" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "原文をコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원문 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制原文" } }
+      }
+    },
+    "Edit Clipboard Image" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クリップボードの画像を編集" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클립보드 이미지 편집" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑剪贴板图片" } }
+      }
+    },
+    "Open the image currently copied to the clipboard in Annotate" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "現在クリップボードにコピーされている画像を注釈エディタで開く" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "현재 클립보드에 복사된 이미지를 주석 편집기에서 열기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在标注编辑器中打开当前复制到剪贴板的图片" } }
+      }
+    },
+    "No image found on clipboard" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クリップボードに画像がありません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클립보드에 이미지가 없습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剪贴板中没有图片" } }
+      }
+    },
+    "No text to translate." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳するテキストがありません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역할 텍스트가 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可翻译的文本。" } }
+      }
+    },
+    "Original" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "原文" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "원문" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "原文" } }
+      }
+    },
+    "Translate" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "翻译" } }
+      }
+    },
+    "Translate Text" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "テキストを翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "텍스트 번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "翻译文本" } }
+      }
+    },
+    "Translate Typed Text" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "入力したテキストを翻訳" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "입력한 텍스트 번역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "翻译输入文本" } }
       }
     },
     "Copy All" : {
@@ -6522,6 +6592,13 @@
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "ハイライター幅" } },
         "ko" : { "stringUnit" : { "state" : "translated", "value" : "형광펜 너비" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "荧光笔宽度" } }
+      }
+    },
+    "Line" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "線" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "선" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "直线" } }
       }
     },
     "Line Width" : {

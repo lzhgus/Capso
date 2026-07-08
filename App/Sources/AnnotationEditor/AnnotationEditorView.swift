@@ -227,6 +227,7 @@ struct AnnotationEditorView: View {
             canvasArea
             zoomBar
         }
+        .annotationToolShortcuts(currentTool: $currentTool, isEnabled: !isEditingText)
     }
 
     private var toolbar: some View {
