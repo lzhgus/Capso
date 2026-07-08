@@ -457,7 +457,7 @@ final class RecordingCoordinator {
         cameraEnabled: Bool,
         micEnabled: Bool,
         systemAudioEnabled: Bool,
-        restoredCameraPiPFrame: CGRect? = nil
+        restoredCameraPiPState: CameraPiPRestorationState? = nil
     ) {
         currentRecordingFormat = format
         currentCameraEnabled = cameraEnabled
@@ -480,7 +480,7 @@ final class RecordingCoordinator {
         // uses the sync `start()` — at this point we know it's granted.
         if cameraEnabled && cameraPiPWindow == nil {
             try? cameraManager.start()
-            showCameraPiP(restoredFrame: restoredCameraPiPFrame)
+            showCameraPiP(restorationState: restoredCameraPiPState)
         }
 
         let actuallyStart: @MainActor () -> Void = { [weak self] in
@@ -569,7 +569,7 @@ final class RecordingCoordinator {
 
     private func restartRecording() {
         guard let format = currentRecordingFormat else { return }
-        let restoredCameraPiPFrame = currentCameraEnabled ? cameraPiPWindow?.frame : nil
+        let restoredCameraPiPState = currentCameraEnabled ? cameraPiPWindow?.restartRestorationState : nil
 
         Task {
             do {
@@ -583,7 +583,7 @@ final class RecordingCoordinator {
                     cameraEnabled: currentCameraEnabled,
                     micEnabled: currentMicEnabled,
                     systemAudioEnabled: currentSystemAudioEnabled,
-                    restoredCameraPiPFrame: restoredCameraPiPFrame
+                    restoredCameraPiPState: restoredCameraPiPState
                 )
             } catch {
                 print("Failed to restart recording: \(error)")
@@ -936,7 +936,7 @@ final class RecordingCoordinator {
         borderWindow?.show()
     }
 
-    private func showCameraPiP(restoredFrame: CGRect? = nil) {
+    private func showCameraPiP(restorationState: CameraPiPRestorationState? = nil) {
         // Close existing PiP first to prevent duplicates
         cameraPiPWindow?.orderOut(nil)
         cameraPiPWindow?.close()
@@ -957,7 +957,7 @@ final class RecordingCoordinator {
             cameraManager: cameraManager,
             settings: settings,
             recordingFrame: recordingFrame,
-            restoredFrame: restoredFrame
+            restorationState: restorationState
         )
         cameraPiPWindow?.show()
     }

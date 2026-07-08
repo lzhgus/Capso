@@ -1,5 +1,15 @@
 import CoreGraphics
 
+public struct CameraPiPRestorationState: Equatable {
+    public let restoredFrame: CGRect
+    public let presentationModeActive: Bool
+
+    public init(restoredFrame: CGRect, presentationModeActive: Bool) {
+        self.restoredFrame = restoredFrame
+        self.presentationModeActive = presentationModeActive
+    }
+}
+
 public enum CameraPiPPlacement {
     public static let defaultScreenMargin: CGFloat = 32
     public static let recordingBottomOffset: CGFloat = 20
@@ -22,6 +32,35 @@ public enum CameraPiPPlacement {
                 visibleFrame: visibleFrame
             ),
             in: visibleFrame
+        )
+    }
+
+    public static func restorationState(
+        currentFrame: CGRect,
+        storedPiPFrame: CGRect?,
+        presentationModeActive: Bool
+    ) -> CameraPiPRestorationState {
+        CameraPiPRestorationState(
+            restoredFrame: presentationModeActive ? (storedPiPFrame ?? currentFrame) : currentFrame,
+            presentationModeActive: presentationModeActive
+        )
+    }
+
+    public static func initialFrame(
+        restorationState: CameraPiPRestorationState?,
+        defaultSize: CGSize,
+        recordingFrame: CGRect?,
+        visibleFrame: CGRect
+    ) -> CGRect {
+        if restorationState?.presentationModeActive == true, let recordingFrame {
+            return recordingFrame
+        }
+
+        return frame(
+            restoredFrame: restorationState?.restoredFrame,
+            defaultSize: defaultSize,
+            recordingFrame: recordingFrame,
+            visibleFrame: visibleFrame
         )
     }
 

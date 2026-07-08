@@ -76,4 +76,51 @@ struct CameraPiPPlacementTests {
 
         #expect(frame == CGRect(x: 8, y: 8, width: 160, height: 120))
     }
+
+    @Test("Restart restoration keeps the stored PiP frame when presentation is active")
+    func restartRestorationKeepsStoredPiPFrameWhenPresentationIsActive() {
+        let presentationFrame = CGRect(x: 50, y: 50, width: 700, height: 500)
+        let storedPiPFrame = CGRect(x: 120, y: 140, width: 160, height: 120)
+
+        let state = CameraPiPPlacement.restorationState(
+            currentFrame: presentationFrame,
+            storedPiPFrame: storedPiPFrame,
+            presentationModeActive: true
+        )
+
+        #expect(state.restoredFrame == storedPiPFrame)
+        #expect(state.presentationModeActive)
+    }
+
+    @Test("Restart restoration keeps the current frame when presentation is inactive")
+    func restartRestorationKeepsCurrentFrameWhenPresentationIsInactive() {
+        let currentFrame = CGRect(x: 120, y: 140, width: 160, height: 120)
+
+        let state = CameraPiPPlacement.restorationState(
+            currentFrame: currentFrame,
+            storedPiPFrame: CGRect(x: 40, y: 40, width: 700, height: 500),
+            presentationModeActive: false
+        )
+
+        #expect(state.restoredFrame == currentFrame)
+        #expect(!state.presentationModeActive)
+    }
+
+    @Test("Initial frame restores presentation mode to the recording frame")
+    func initialFrameRestoresPresentationModeToRecordingFrame() {
+        let recordingFrame = CGRect(x: 100, y: 80, width: 600, height: 420)
+        let state = CameraPiPRestorationState(
+            restoredFrame: CGRect(x: 120, y: 140, width: 160, height: 120),
+            presentationModeActive: true
+        )
+
+        let frame = CameraPiPPlacement.initialFrame(
+            restorationState: state,
+            defaultSize: defaultSize,
+            recordingFrame: recordingFrame,
+            visibleFrame: visibleFrame
+        )
+
+        #expect(frame == recordingFrame)
+    }
 }

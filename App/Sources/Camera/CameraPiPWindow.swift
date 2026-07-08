@@ -23,11 +23,19 @@ final class CameraPiPWindow: NSPanel {
         isPresentationMode
     }
 
+    var restartRestorationState: CameraPiPRestorationState {
+        CameraPiPPlacement.restorationState(
+            currentFrame: frame,
+            storedPiPFrame: storedPiPFrame,
+            presentationModeActive: isPresentationMode
+        )
+    }
+
     init(
         cameraManager: CameraManager,
         settings: AppSettings,
         recordingFrame: CGRect? = nil,
-        restoredFrame: CGRect? = nil
+        restorationState: CameraPiPRestorationState? = nil
     ) {
         self.cameraManager = cameraManager
         self.settings = settings
@@ -35,13 +43,16 @@ final class CameraPiPWindow: NSPanel {
 
         let initialSize = Self.windowSize(shape: settings.cameraShape, settings: settings)
 
-        let screen = Self.placementScreen(for: restoredFrame) ?? NSScreen.main ?? NSScreen.screens.first!
-        let initialFrame = CameraPiPPlacement.frame(
-            restoredFrame: restoredFrame,
+        let screen = Self.placementScreen(for: restorationState?.restoredFrame ?? recordingFrame)
+            ?? NSScreen.main
+            ?? NSScreen.screens.first!
+        let initialFrame = CameraPiPPlacement.initialFrame(
+            restorationState: restorationState,
             defaultSize: initialSize,
             recordingFrame: recordingFrame,
             visibleFrame: screen.visibleFrame
         )
+        let shouldRestorePresentation = restorationState?.presentationModeActive == true && recordingFrame != nil
 
         super.init(
             contentRect: initialFrame,
@@ -56,6 +67,15 @@ final class CameraPiPWindow: NSPanel {
         self.hasShadow = false
         self.collectionBehavior = [.canJoinAllSpaces, .transient]
         self.isMovableByWindowBackground = true
+        if shouldRestorePresentation {
+            self.isPresentationMode = true
+            self.storedPiPFrame = CameraPiPPlacement.frame(
+                restoredFrame: restorationState?.restoredFrame,
+                defaultSize: initialSize,
+                recordingFrame: recordingFrame,
+                visibleFrame: screen.visibleFrame
+            )
+        }
 
         installContentView()
 
