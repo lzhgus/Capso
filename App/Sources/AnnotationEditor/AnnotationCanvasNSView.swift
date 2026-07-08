@@ -161,8 +161,9 @@ final class AnnotationCanvasNSView: NSView {
     // MARK: - Handle Hit Testing
 
     private func handleHitTest(point: CGPoint, object: any AnnotationObject) -> ResizeHandle? {
-        if let counter = object as? CounterObject {
-            return counterHandleHitTest(point: point, counter: counter)
+        if let counter = object as? CounterObject,
+           let handle = counterHandleHitTest(point: point, counter: counter) {
+            return handle
         }
 
         if let pathObject = object as? any PathEditableAnnotation {
