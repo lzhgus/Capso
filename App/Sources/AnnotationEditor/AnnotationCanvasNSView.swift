@@ -7,6 +7,7 @@ import AnnotationKit
 private enum ResizeHandle {
     case topLeft, topRight, bottomLeft, bottomRight
     case pathStart, pathEnd, pathControl
+    case counterTip
 
     var textResizeHandle: TextResizeHandle? {
         switch self {
@@ -18,10 +19,16 @@ private enum ResizeHandle {
             .bottomLeft
         case .bottomRight:
             .bottomRight
-        case .pathStart, .pathEnd, .pathControl:
+        case .pathStart, .pathEnd, .pathControl, .counterTip:
             nil
         }
     }
+}
+
+private enum SelectionAction {
+    case delete
+    case incrementCounter
+    case decrementCounter
 }
 
 private protocol PathEditableAnnotation: AnnotationObject {
@@ -154,6 +161,10 @@ final class AnnotationCanvasNSView: NSView {
     // MARK: - Handle Hit Testing
 
     private func handleHitTest(point: CGPoint, object: any AnnotationObject) -> ResizeHandle? {
+        if let counter = object as? CounterObject {
+            return counterHandleHitTest(point: point, counter: counter)
+        }
+
         if let pathObject = object as? any PathEditableAnnotation {
             return pathHandleHitTest(point: point, object: pathObject)
         }
@@ -163,6 +174,15 @@ final class AnnotationCanvasNSView: NSView {
             if hypot(point.x - corner.x, point.y - corner.y) <= r {
                 return handle
             }
+        }
+        return nil
+    }
+
+    private func counterHandleHitTest(point: CGPoint, counter: CounterObject) -> ResizeHandle? {
+        let r = max(10 / max(zoomScale, 0.1), handleRadius + 4)
+        let center = counterTipHandleCenter(for: counter)
+        if hypot(point.x - center.x, point.y - center.y) <= r {
+            return .counterTip
         }
         return nil
     }
@@ -243,7 +263,7 @@ final class AnnotationCanvasNSView: NSView {
     private func cursorForHandle(_ handle: ResizeHandle) -> NSCursor {
         let symbolName: String
         switch handle {
-        case .pathStart, .pathEnd, .pathControl:
+        case .pathStart, .pathEnd, .pathControl, .counterTip:
             return NSCursor.openHand
         case .topLeft, .bottomRight:
             // ↖↘ diagonal
@@ -302,6 +322,8 @@ final class AnnotationCanvasNSView: NSView {
             if let selected = doc.selectedObject {
                 if let text = selected as? TextObject, text === editingOriginalObject {
                     // The live inline editor draws matching selection chrome below.
+                } else if let counter = selected as? CounterObject {
+                    drawCounterSelectionChrome(ctx: ctx, counter: counter)
                 } else if let pathObject = selected as? any PathEditableAnnotation {
                     drawPathSelectionHandles(ctx: ctx, object: pathObject)
                 } else {
@@ -311,7 +333,7 @@ final class AnnotationCanvasNSView: NSView {
 
             if let start = dragStart, let current = dragCurrent,
                isDragging, activeResizeHandle == nil,
-               currentTool != .select, currentTool != .freehand, currentTool != .text, currentTool != .counter, currentTool != .highlighter {
+               currentTool != .select, currentTool != .freehand, currentTool != .text, currentTool != .highlighter {
                 drawPreview(ctx: ctx, from: start, to: current)
             }
         }
@@ -418,6 +440,50 @@ final class AnnotationCanvasNSView: NSView {
         ctx.restoreGState()
     }
 
+    private func drawCounterSelectionChrome(ctx: CGContext, counter: CounterObject) {
+        drawSelectionHandles(ctx: ctx, bounds: counter.bounds)
+
+        ctx.saveGState()
+        let scale = max(zoomScale, 0.1)
+        let handleSize: CGFloat = 8 / scale
+        let lw: CGFloat = 1.5 / scale
+        let accent = NSColor.controlAccentColor.withAlphaComponent(0.9).cgColor
+        let fill = NSColor.white.withAlphaComponent(0.92).cgColor
+        let tipCenter = counterTipHandleCenter(for: counter)
+
+        if !counter.hasArrow {
+            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.36).cgColor)
+            ctx.setLineWidth(1 / scale)
+            ctx.setLineDash(phase: 0, lengths: [3 / scale, 4 / scale])
+            ctx.move(to: counter.center)
+            ctx.addLine(to: tipCenter)
+            ctx.strokePath()
+            ctx.setLineDash(phase: 0, lengths: [])
+        }
+
+        let tipRect = CGRect(
+            x: tipCenter.x - handleSize / 2,
+            y: tipCenter.y - handleSize / 2,
+            width: handleSize,
+            height: handleSize
+        )
+        ctx.setFillColor(fill)
+        ctx.fillEllipse(in: tipRect)
+        ctx.setStrokeColor(accent)
+        ctx.setLineWidth(lw)
+        ctx.strokeEllipse(in: tipRect.insetBy(dx: lw / 2, dy: lw / 2))
+
+        drawActionButton(ctx: ctx, rect: counterDeleteButtonRect(for: counter), kind: .xmark)
+        drawActionButton(
+            ctx: ctx,
+            rect: counterStepButtonRect(for: counter, increment: false),
+            kind: .minus,
+            enabled: counter.number > 1
+        )
+        drawActionButton(ctx: ctx, rect: counterStepButtonRect(for: counter, increment: true), kind: .plus)
+        ctx.restoreGState()
+    }
+
     private func pathHandleCenters(for object: any PathEditableAnnotation) -> [(ResizeHandle, CGPoint)] {
         [
             (.pathStart, object.start),
@@ -428,6 +494,14 @@ final class AnnotationCanvasNSView: NSView {
 
     private func pathMidpoint(_ object: any PathEditableAnnotation) -> CGPoint {
         CGPoint(x: (object.start.x + object.end.x) / 2, y: (object.start.y + object.end.y) / 2)
+    }
+
+    private func counterTipHandleCenter(for counter: CounterObject) -> CGPoint {
+        if let tip = counter.tip {
+            return tip
+        }
+        let offset = counter.radius + CounterObject.arrowClearance + 4 / max(zoomScale, 0.1)
+        return CGPoint(x: counter.center.x, y: counter.center.y - offset)
     }
 
     private func drawSelectionHandles(ctx: CGContext, bounds: CGRect) {
@@ -474,6 +548,88 @@ final class AnnotationCanvasNSView: NSView {
         ]
     }
 
+    private func counterDeleteButtonRect(for counter: CounterObject) -> CGRect {
+        let scale = max(zoomScale, 0.1)
+        let size = 22 / scale
+        let frame = selectionFrame(for: counter.bounds)
+        return CGRect(
+            x: frame.maxX + 5 / scale,
+            y: frame.minY - size / 2,
+            width: size,
+            height: size
+        )
+    }
+
+    private func counterStepButtonRect(for counter: CounterObject, increment: Bool) -> CGRect {
+        let scale = max(zoomScale, 0.1)
+        let size = 20 / scale
+        let gap = 4 / scale
+        let centerX = increment
+            ? counter.center.x + gap / 2 + size / 2
+            : counter.center.x - gap / 2 - size / 2
+        let centerY = counter.center.y + counter.radius + 8 / scale + size / 2
+        return CGRect(x: centerX - size / 2, y: centerY - size / 2, width: size, height: size)
+    }
+
+    private enum CounterActionButtonKind {
+        case xmark, plus, minus
+    }
+
+    private func drawActionButton(
+        ctx: CGContext,
+        rect: CGRect,
+        kind: CounterActionButtonKind,
+        enabled: Bool = true
+    ) {
+        let scale = max(zoomScale, 0.1)
+        let alpha: CGFloat = enabled ? 1 : 0.4
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = rect.width / 2
+
+        ctx.saveGState()
+        ctx.setFillColor(NSColor(white: 0.12, alpha: 0.94 * alpha).cgColor)
+        ctx.fillEllipse(in: rect)
+        ctx.setStrokeColor(NSColor.controlAccentColor.withAlphaComponent(0.9 * alpha).cgColor)
+        ctx.setLineWidth(1.4 / scale)
+        ctx.strokeEllipse(in: rect.insetBy(dx: 0.7 / scale, dy: 0.7 / scale))
+        ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.96 * alpha).cgColor)
+        ctx.setLineWidth(1.7 / scale)
+        ctx.setLineCap(.round)
+
+        let glyph = radius * 0.42
+        switch kind {
+        case .xmark:
+            ctx.move(to: CGPoint(x: center.x - glyph, y: center.y - glyph))
+            ctx.addLine(to: CGPoint(x: center.x + glyph, y: center.y + glyph))
+            ctx.move(to: CGPoint(x: center.x + glyph, y: center.y - glyph))
+            ctx.addLine(to: CGPoint(x: center.x - glyph, y: center.y + glyph))
+        case .plus:
+            ctx.move(to: CGPoint(x: center.x - glyph, y: center.y))
+            ctx.addLine(to: CGPoint(x: center.x + glyph, y: center.y))
+            ctx.move(to: CGPoint(x: center.x, y: center.y - glyph))
+            ctx.addLine(to: CGPoint(x: center.x, y: center.y + glyph))
+        case .minus:
+            ctx.move(to: CGPoint(x: center.x - glyph, y: center.y))
+            ctx.addLine(to: CGPoint(x: center.x + glyph, y: center.y))
+        }
+
+        ctx.strokePath()
+        ctx.restoreGState()
+    }
+
+    private func counterSelectionAction(at point: CGPoint, counter: CounterObject) -> SelectionAction? {
+        if counterDeleteButtonRect(for: counter).contains(point) {
+            return .delete
+        }
+        if counterStepButtonRect(for: counter, increment: false).contains(point) {
+            return .decrementCounter
+        }
+        if counterStepButtonRect(for: counter, increment: true).contains(point) {
+            return .incrementCounter
+        }
+        return nil
+    }
+
     private func liveTextHandleCenters(boxFrame: CGRect) -> [(ResizeHandle, CGPoint)] {
         [
             (.topLeft, CGPoint(x: boxFrame.minX, y: boxFrame.minY)),
@@ -508,9 +664,18 @@ final class AnnotationCanvasNSView: NSView {
         case .rectangle: ctx.stroke(rect)
         case .ellipse: ctx.strokeEllipse(in: rect)
         case .pixelate: ctx.setFillColor(CGColor(gray: 0.5, alpha: 0.3)); ctx.fill(rect)
+        case .counter:
+            let tip = counterTip(from: start, to: end, radius: currentStyle.lineWidth)
+            CounterObject(center: start, tip: tip, number: nextCounterNumber(), radius: currentStyle.lineWidth, style: currentStyle)
+                .render(in: ctx)
         default: break
         }
         ctx.restoreGState()
+    }
+
+    private func counterTip(from start: CGPoint, to end: CGPoint, radius: CGFloat) -> CGPoint? {
+        let distance = hypot(end.x - start.x, end.y - start.y)
+        return distance >= radius + CounterObject.arrowClearance ? end : nil
     }
 
     // MARK: - Mouse Handling
@@ -555,6 +720,30 @@ final class AnnotationCanvasNSView: NSView {
         resizeOriginalFreehandPoints = nil
         resizeOriginalEndpoints = nil
         resizeOriginalLineControlPoint = nil
+
+        if let selected = doc.selectedObject as? CounterObject,
+           let action = counterSelectionAction(at: point, counter: selected) {
+            isDragging = false
+            dragStart = nil
+            dragCurrent = nil
+            switch action {
+            case .delete:
+                doc.removeSelected()
+            case .incrementCounter:
+                doc.beginDrag()
+                selected.number += 1
+            case .decrementCounter:
+                guard selected.number > 1 else {
+                    needsDisplay = true
+                    return
+                }
+                doc.beginDrag()
+                selected.number -= 1
+            }
+            needsDisplay = true
+            onDocumentChanged?()
+            return
+        }
 
         if let selected = doc.selectedObject,
            let handle = handleHitTest(point: point, object: selected) {
@@ -674,6 +863,11 @@ final class AnnotationCanvasNSView: NSView {
         let dy = dragCurrent.y - dragStart.y
 
         guard let obj = document?.objects.first(where: { $0.id == id }) else { return }
+        if let counter = obj as? CounterObject, handle == .counterTip {
+            counter.tip = counterTip(from: counter.center, to: dragCurrent, radius: counter.radius)
+            return
+        }
+
         if let pathObject = obj as? any PathEditableAnnotation {
             guard let endpoints = resizeOriginalEndpoints else { return }
             switch handle {
@@ -711,7 +905,7 @@ final class AnnotationCanvasNSView: NSView {
         case .bottomRight:
             newRect.size.width = originalBounds.width + dx
             newRect.size.height = originalBounds.height + dy
-        case .pathStart, .pathEnd, .pathControl:
+        case .pathStart, .pathEnd, .pathControl, .counterTip:
             return
         }
 
@@ -880,7 +1074,8 @@ final class AnnotationCanvasNSView: NSView {
                 }
             case .counter:
                 let number = nextCounterNumber()
-                let counter = CounterObject(center: end, number: number, radius: currentStyle.lineWidth, style: currentStyle)
+                let tip = counterTip(from: start, to: end, radius: currentStyle.lineWidth)
+                let counter = CounterObject(center: start, tip: tip, number: number, radius: currentStyle.lineWidth, style: currentStyle)
                 doc.addObject(counter)
             case .select:
                 break
