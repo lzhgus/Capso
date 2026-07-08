@@ -89,6 +89,11 @@ final class MenuBarController: NSObject {
         captureWindow.setShortcut(for: .captureWindow)
         menu.addItem(captureWindow)
 
+        let editClipboardImage = menuItem(String(localized: "Edit Clipboard Image"), action: #selector(editClipboardImage))
+        editClipboardImage.setShortcut(for: .editClipboardImage)
+        editClipboardImage.toolTip = String(localized: "Open the image currently copied to the clipboard in Annotate")
+        menu.addItem(editClipboardImage)
+
         menu.addItem(.separator())
 
         let captureText = menuItem(String(localized: "Capture Text (OCR)"), action: #selector(captureText))
@@ -102,6 +107,10 @@ final class MenuBarController: NSObject {
         let translateSelectedText = menuItem(String(localized: "Translate Selected Text"), action: #selector(self.translateSelectedText))
         translateSelectedText.setShortcut(for: .translateSelectedText)
         menu.addItem(translateSelectedText)
+
+        let translateTypedText = menuItem(String(localized: "Translate Typed Text"), action: #selector(self.translateTypedText))
+        translateTypedText.setShortcut(for: .translateTypedText)
+        menu.addItem(translateTypedText)
 
         let captureScrolling = menuItem(String(localized: "Scrolling Capture"), action: #selector(captureScrolling))
         captureScrolling.setShortcut(for: .captureScrolling)
@@ -182,6 +191,10 @@ final class MenuBarController: NSObject {
         captureCoordinator.captureWindow()
     }
 
+    @objc private func editClipboardImage() {
+        captureCoordinator.editClipboardImage()
+    }
+
     @objc private func captureText() {
         ocrCoordinator.startInstantOCR()
     }
@@ -192,6 +205,10 @@ final class MenuBarController: NSObject {
 
     @objc private func translateSelectedText() {
         translationCoordinator.translateSelectedText()
+    }
+
+    @objc private func translateTypedText() {
+        translationCoordinator.translateTypedText()
     }
 
     @objc private func captureScrolling() {
@@ -235,9 +252,11 @@ extension MenuBarController: NSMenuDelegate {
             case #selector(captureArea): item.setShortcut(for: .captureArea)
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)
             case #selector(captureWindow): item.setShortcut(for: .captureWindow)
+            case #selector(editClipboardImage): item.setShortcut(for: .editClipboardImage)
             case #selector(captureText): item.setShortcut(for: .captureText)
             case #selector(captureAndTranslate): item.setShortcut(for: .captureAndTranslate)
             case #selector(translateSelectedText): item.setShortcut(for: .translateSelectedText)
+            case #selector(translateTypedText): item.setShortcut(for: .translateTypedText)
             case #selector(recordScreen): item.setShortcut(for: .recordScreen)
             case #selector(captureScrolling): item.setShortcut(for: .captureScrolling)
             case #selector(captureSelfTimer):

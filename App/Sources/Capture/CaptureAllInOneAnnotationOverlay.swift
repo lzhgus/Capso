@@ -592,11 +592,20 @@ private struct AllInOneAnnotationToolbarView: View {
     }
 
     var body: some View {
-        if session.usesMiniToolbar && !session.showsOverflow {
-            miniToolbar
-        } else {
-            adaptiveToolbar
+        Group {
+            if session.usesMiniToolbar && !session.showsOverflow {
+                miniToolbar
+            } else {
+                adaptiveToolbar
+            }
         }
+        .annotationToolShortcuts(
+            currentTool: Binding(
+                get: { session.currentTool },
+                set: { session.switchTool($0) }
+            ),
+            isEnabled: !session.isEditingText
+        )
     }
 
     private var adaptiveToolbar: some View {
@@ -1139,7 +1148,7 @@ private struct AllInOneAnnotationToolbarView: View {
         }
         .buttonStyle(.plain)
         .onHover { hoveredTool = $0 ? tool : nil }
-        .help(helpText(for: tool))
+        .help(tool.localizedShortcutHelpTitle)
     }
 
     private func iconButton(
@@ -1181,21 +1190,6 @@ private struct AllInOneAnnotationToolbarView: View {
         case .pixelate: return "eye.slash.fill"
         case .counter: return "number.circle.fill"
         case .highlighter: return "highlighter"
-        }
-    }
-
-    private func helpText(for tool: AnnotationTool) -> LocalizedStringKey {
-        switch tool {
-        case .select: return "Select"
-        case .arrow: return "Arrow"
-        case .line: return "Line"
-        case .rectangle: return "Rectangle"
-        case .ellipse: return "Ellipse"
-        case .text: return "Text"
-        case .freehand: return "Draw"
-        case .pixelate: return "Pixelate / Blur"
-        case .counter: return "Counter"
-        case .highlighter: return "Highlighter"
         }
     }
 

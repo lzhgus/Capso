@@ -189,23 +189,33 @@ struct TranslationResultView: View {
 
                 if showOriginal {
                     // ORIGINAL (collapsible)
-                    Button(action: toggleOriginal) {
-                        HStack(spacing: 8) {
-                            Text("ORIGINAL")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.tertiary)
-                                .tracking(1.0)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.tertiary)
-                                .rotationEffect(.degrees(originalExpanded ? 90 : 0))
+                    HStack(spacing: 8) {
+                        Button(action: toggleOriginal) {
+                            HStack(spacing: 8) {
+                                Text("ORIGINAL")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .tracking(1.0)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .rotationEffect(.degrees(originalExpanded ? 90 : 0))
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+
+                        Button(action: { copyText(region.original.text) }) {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tertiary)
+                        .help("Copy original")
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
 
                     if originalExpanded {
                         renderedText(
@@ -528,9 +538,13 @@ struct TranslationResultView: View {
 
     private func copyCurrent() {
         guard case .done(let regions) = phase, let region = regions.first else { return }
+        copyText(region.translation)
+    }
+
+    private func copyText(_ text: String) {
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(region.translation, forType: .string)
+        pb.setString(text, forType: .string)
 
         // Show a brief "Copied" feedback so manual copy doesn't feel silent.
         // When `autoCopy` is on, the indicator is already visible; this still

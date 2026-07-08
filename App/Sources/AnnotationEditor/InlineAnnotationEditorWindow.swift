@@ -218,6 +218,7 @@ private struct InlineAnnotationEditorView: View {
         .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }
         .onChange(of: textStrokeEnabled) { _, _ in updateSelectedStyle() }
         .onChange(of: redactionMode) { _, _ in updateSelectedStyle() }
+        .annotationToolShortcuts(currentTool: $currentTool, isEnabled: !isEditingText)
     }
 
     private var dimmingOverlay: some View {
@@ -691,7 +692,7 @@ private struct InlineAnnotationToolbar: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
-        .help(helpText(for: tool))
+        .help(tool.localizedShortcutHelpTitle)
     }
 
     private func iconButton(
@@ -735,21 +736,6 @@ private struct InlineAnnotationToolbar: View {
         case .pixelate: return "eye.slash.fill"
         case .counter: return "number.circle.fill"
         case .highlighter: return "highlighter"
-        }
-    }
-
-    private func helpText(for tool: AnnotationTool) -> LocalizedStringKey {
-        switch tool {
-        case .select: return "Select"
-        case .arrow: return "Arrow"
-        case .line: return "Line"
-        case .rectangle: return "Rectangle"
-        case .ellipse: return "Ellipse"
-        case .text: return "Text"
-        case .freehand: return "Draw"
-        case .pixelate: return "Pixelate / Blur"
-        case .counter: return "Counter"
-        case .highlighter: return "Highlighter"
         }
     }
 
