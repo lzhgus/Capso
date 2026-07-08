@@ -21,6 +21,9 @@ final class HistoryCoordinator {
     var shareCoordinator: ShareCoordinator?
 
     private var historyWindow: HistoryWindow?
+    private var annotationWindow: AnnotationEditorWindow?
+    private var pinnedControllers: [PinnedScreenshotController] = []
+    private let dragFileStore = QuickAccessDragFileStore()
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -321,15 +324,175 @@ final class HistoryCoordinator {
 
     func loadFullImage(for entry: HistoryEntry) -> CGImage? {
         guard let url = fullImageURL(for: entry),
-              let data = try? Data(contentsOf: url),
-              let provider = CGDataProvider(data: data as CFData),
-              let image = CGImage(
-                  pngDataProviderSource: provider,
-                  decode: nil,
-                  shouldInterpolate: true,
-                  intent: .defaultIntent
-              ) else { return nil }
-        return image
+              let image = NSImage(contentsOf: url),
+              let cgImage = ImageUtilities.cgImage(from: image) else { return nil }
+        return cgImage
+    }
+
+    func dragFileURL(for entry: HistoryEntry) -> URL? {
+        guard isScreenshot(entry),
+              let image = loadFullImage(for: entry) else { return nil }
+
+        do {
+            return try dragFileStore.fileURL(
+                for: image,
+                id: UUID(),
+                preset: settings.screenshotOutputPreset,
+                date: entry.createdAt,
+                sourceAppName: entry.sourceAppName,
+                sourceWindowTitle: entry.sourceWindowTitle,
+                template: settings.screenshotFilenameTemplate
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    func editEntry(_ entry: HistoryEntry) {
+        guard isScreenshot(entry),
+              let image = loadFullImage(for: entry) else { return }
+
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
+
+        let window = AnnotationEditorWindow(
+            image: image,
+            anchorScreen: screen,
+            onSave: { [weak self] rendered in
+                self?.replaceImage(for: entry, with: rendered)
+            },
+            onCopy: { [weak self] rendered in
+                self?.copyImageToClipboard(rendered)
+            },
+            onPin: { [weak self] rendered, frame in
+                self?.pinImage(
+                    rendered,
+                    anchor: frame,
+                    sourceAppName: entry.sourceAppName,
+                    sourceWindowTitle: entry.sourceWindowTitle,
+                    date: entry.createdAt
+                )
+            },
+            onClose: {}
+        )
+        annotationWindow = window
+        window.show()
+    }
+
+    private func replaceImage(for entry: HistoryEntry, with image: CGImage) {
+        guard isScreenshot(entry),
+              let store,
+              let fullURL = fullImageURL(for: entry),
+              let thumbnailURL = thumbnailURL(for: entry) else { return }
+
+        Task.detached(priority: .utility) {
+            guard let pngData = ImageUtilities.pngData(from: image) else { return }
+            do {
+                try pngData.write(to: fullURL, options: [.atomic])
+                if let thumbnailData = ThumbnailGenerator.generateThumbnail(from: image) {
+                    try thumbnailData.write(to: thumbnailURL, options: [.atomic])
+                }
+
+                let updated = HistoryEntry(
+                    id: entry.id,
+                    createdAt: entry.createdAt,
+                    captureMode: entry.captureMode,
+                    imageWidth: image.width,
+                    imageHeight: image.height,
+                    sourceAppName: entry.sourceAppName,
+                    sourceAppBundleID: entry.sourceAppBundleID,
+                    sourceWindowTitle: entry.sourceWindowTitle,
+                    thumbnailFileName: entry.thumbnailFileName,
+                    fullImageFileName: entry.fullImageFileName,
+                    annotationFileName: entry.annotationFileName,
+                    fileSize: Int64(pngData.count),
+                    cloudURL: nil
+                )
+                try store.update(updated)
+                await MainActor.run {
+                    self.loadEntries()
+                }
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func isScreenshot(_ entry: HistoryEntry) -> Bool {
+        switch entry.captureMode {
+        case .area, .fullscreen, .window:
+            return true
+        case .recording, .gif:
+            return false
+        }
+    }
+
+    private func copyImageToClipboard(_ image: CGImage) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([ImageUtilities.nsImage(from: image)])
+    }
+
+    private func pinImage(
+        _ image: CGImage,
+        anchor: CGRect?,
+        sourceAppName: String?,
+        sourceWindowTitle: String?,
+        date: Date
+    ) {
+        let controller = PinnedScreenshotController(
+            image: image,
+            anchorRect: anchor,
+            onCopy: { [weak self] in
+                self?.copyImageToClipboard(image)
+            },
+            onSave: { [weak self] in
+                self?.saveImageToExportLocation(
+                    image,
+                    sourceAppName: sourceAppName,
+                    sourceWindowTitle: sourceWindowTitle,
+                    date: date
+                )
+            },
+            onDidClose: { [weak self] controllerID in
+                self?.pinnedControllers.removeAll { $0.id == controllerID }
+            }
+        )
+        pinnedControllers.append(controller)
+        controller.show()
+    }
+
+    private func saveImageToExportLocation(
+        _ image: CGImage,
+        sourceAppName: String?,
+        sourceWindowTitle: String?,
+        date: Date
+    ) {
+        let preset = settings.screenshotOutputPreset
+        let data: Data? = switch preset.fileFormat {
+        case .png:
+            ImageUtilities.pngData(from: image)
+        case .jpeg:
+            ImageUtilities.jpegData(from: image, quality: preset.jpegQuality ?? 0.85)
+        case .mp4, .gif, .mov:
+            nil
+        }
+        guard let data else { return }
+
+        let directory = settings.screenshotMonthlyFolders
+            ? FileNaming.monthlyDirectory(in: settings.exportLocation)
+            : settings.exportLocation
+        let url = FileNaming.generateFileURL(
+            in: directory,
+            type: .screenshot,
+            format: preset.fileFormat,
+            date: date,
+            sourceAppName: sourceAppName,
+            sourceWindowTitle: sourceWindowTitle,
+            template: settings.screenshotFilenameTemplate
+        )
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: url)
     }
 
     func copyToClipboard(_ entry: HistoryEntry) {

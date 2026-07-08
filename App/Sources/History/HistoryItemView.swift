@@ -50,6 +50,15 @@ struct HistoryItemView: View {
         }
     }
 
+    private var isScreenshot: Bool {
+        switch entry.captureMode {
+        case .area, .fullscreen, .window:
+            return true
+        case .recording, .gif:
+            return false
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .topTrailing) {
@@ -72,13 +81,9 @@ struct HistoryItemView: View {
 
                 // Hover action buttons
                 if isHovered {
-                    HStack(spacing: 4) {
-                        actionButton("doc.on.doc") { coordinator.copyToClipboard(entry) }
-                        actionButton("square.and.arrow.down") { coordinator.saveToFile(entry) }
-                        cloudActionButton
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    hoverActionButtons
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 }
 
                 // Cloud upload failure toast overlay
@@ -139,6 +144,9 @@ struct HistoryItemView: View {
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
         .onAppear { loadThumbnail() }
+        .onChange(of: entry.fileSize) { _, _ in loadThumbnail() }
+        .onChange(of: entry.imageWidth) { _, _ in loadThumbnail() }
+        .onChange(of: entry.imageHeight) { _, _ in loadThumbnail() }
         .contextMenu { contextMenu }
         .sheet(isPresented: $showDeleteConfirm) {
             DeleteConfirmSheet(
@@ -157,7 +165,46 @@ struct HistoryItemView: View {
         }
     }
 
-    // MARK: - Cloud Action Button
+    // MARK: - Hover Action Buttons
+
+    private var hoverActionButtons: some View {
+        HStack(spacing: 4) {
+            if isScreenshot, let thumbnailImage {
+                dragActionButton(thumbnail: thumbnailImage)
+            }
+
+            actionButton("doc.on.doc") { coordinator.copyToClipboard(entry) }
+                .help(String(localized: "Copy to Clipboard"))
+
+            actionButton("square.and.arrow.down") { coordinator.saveToFile(entry) }
+                .help(String(localized: "Save to..."))
+
+            if isScreenshot {
+                actionButton("pencil.tip.crop.circle") { coordinator.editEntry(entry) }
+                    .help(String(localized: "Edit"))
+            }
+
+            cloudActionButton
+        }
+    }
+
+    private func dragActionButton(thumbnail: NSImage) -> some View {
+        ZStack {
+            actionButtonFace("arrow.up.left.and.arrow.down.right.circle.fill")
+            QuickAccessDragSourceView(
+                thumbnail: thumbnail,
+                dragImageSize: CGSize(width: 180, height: 112),
+                fileURLProvider: { coordinator.dragFileURL(for: entry) },
+                onDragStarted: {},
+                onDragEnded: {}
+            )
+            .frame(width: 30, height: 30)
+            .accessibilityHidden(true)
+        }
+        .help(String(localized: "Drag Screenshot"))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Drag Screenshot"))
+    }
 
     @ViewBuilder
     private var cloudActionButton: some View {
@@ -267,24 +314,31 @@ struct HistoryItemView: View {
 
     private func actionButton(_ systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-                .frame(width: 30, height: 30)
-                .background(.black.opacity(0.55))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
-                )
+            actionButtonFace(systemImage)
         }
         .buttonStyle(.plain)
+    }
+
+    private func actionButtonFace(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white.opacity(0.9))
+            .frame(width: 30, height: 30)
+            .background(.black.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+            )
     }
 
     @ViewBuilder
     private var contextMenu: some View {
         Button("Copy to Clipboard") { coordinator.copyToClipboard(entry) }
         Button("Save to...") { coordinator.saveToFile(entry) }
+        if isScreenshot {
+            Button("Edit") { coordinator.editEntry(entry) }
+        }
 
         if let cloudURL = entry.cloudURL {
             Button(String(localized: "Copy Cloud Link")) {
