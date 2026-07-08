@@ -10,6 +10,10 @@ struct QuickAccessView: View {
     let captureImage: CGImage           // used for cloud upload (temp-file write)
     let dimensions: String           // e.g. "1920×1080"
     let capturedAt: Date
+    let sourceAppName: String?
+    let sourceWindowTitle: String?
+    let screenshotOutputPreset: ScreenshotOutputPreset
+    let screenshotFilenameTemplate: String
     let targetLanguageDisplay: String?  // e.g. "Simplified Chinese"
     let shareCoordinator: ShareCoordinator?
     /// Called with the public URL string when a cloud upload succeeds.
@@ -22,11 +26,16 @@ struct QuickAccessView: View {
     let onTranslate: () -> Void
     let onPin: () -> Void
     let onPreview: () -> Void
+    let onDragStarted: () -> Void
+    let onDragEnded: () -> Void
     let onClose: () -> Void
 
     @State private var isHovering = false
     @State private var hoveredAction: HoverAction?
     @State private var visualState: PanelUploadState = .idle
+    @State private var dragFileStore = QuickAccessDragFileStore()
+    @State private var dragFileID = UUID()
+    @State private var dragError: QuickAccessDragFileStoreError?
     @FocusState private var isFocused: Bool
 
     private enum PanelUploadState: Equatable {
@@ -37,7 +46,7 @@ struct QuickAccessView: View {
     }
 
     private enum HoverAction: Hashable {
-        case copy, save, annotate, ocr, translate, pin, upload, linkCopied
+        case copy, save, drag, annotate, ocr, translate, pin, upload, linkCopied
     }
 
     private var isRevealed: Bool { isHovering || isFocused }
@@ -212,6 +221,7 @@ struct QuickAccessView: View {
         switch action {
         case .copy:      return "⌘C"
         case .save:      return "⌘S"
+        case .drag:      return nil
         case .annotate:  return "⌘E"
         case .ocr:       return "⌘⇧O"
         case .translate: return "⌘⇧T"
@@ -228,6 +238,7 @@ struct QuickAccessView: View {
 
     private var toolbar: some View {
         HStack(spacing: 2) {
+            dragTool
             toolButton(.copy, icon: "doc.on.doc", action: onCopy)
             toolButton(.save, icon: "square.and.arrow.down", isPrimary: true, action: onSave)
             if shareCoordinator != nil {
@@ -268,6 +279,63 @@ struct QuickAccessView: View {
                     .foregroundStyle(.green)
                     .disabled(true)
             }
+        }
+    }
+
+    private var dragTool: some View {
+        ZStack {
+            dragToolFace
+            QuickAccessDragSourceView(
+                thumbnail: thumbnail,
+                dragImageSize: Self.thumbnailSize,
+                fileURLProvider: dragFileURL,
+                onDragStarted: onDragStarted,
+                onDragEnded: onDragEnded
+            )
+            .frame(width: 29, height: 28)
+            .disabled(dragError != nil)
+            .accessibilityHidden(true)
+        }
+        .onHover { hoveredAction = $0 ? .drag : nil }
+        .help(Text(dragError == nil ? label(.drag) : dragUnavailableHelp))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(label(.drag)))
+        .accessibilityHint(Text(dragError == nil ? hintForAccessibility(.drag) : dragUnavailableHelp))
+    }
+
+    private var dragToolFace: some View {
+        let unavailable = dragError != nil
+        return toolFace(
+            .drag,
+            icon: "arrow.up.left.and.arrow.down.right.circle.fill",
+            isPrimary: false
+        )
+        .opacity(unavailable ? 0.45 : 1)
+    }
+
+    private var dragUnavailableHelp: String {
+        String(localized: "Drag unavailable because the temporary screenshot file could not be created")
+    }
+
+    private func dragFileURL() -> URL? {
+        do {
+            let url = try dragFileStore.fileURL(
+                for: captureImage,
+                id: dragFileID,
+                preset: screenshotOutputPreset,
+                date: capturedAt,
+                sourceAppName: sourceAppName,
+                sourceWindowTitle: sourceWindowTitle,
+                template: screenshotFilenameTemplate
+            )
+            dragError = nil
+            return url
+        } catch let error as QuickAccessDragFileStoreError {
+            dragError = error
+            return nil
+        } catch {
+            dragError = .storageUnavailable
+            return nil
         }
     }
 
@@ -320,15 +388,7 @@ struct QuickAccessView: View {
         action: @escaping () -> Void
     ) -> some View {
         let button = Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(toolForeground(kind, isPrimary: isPrimary))
-                .frame(width: 29, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(toolBackground(kind, isPrimary: isPrimary))
-                )
+            toolFace(kind, icon: icon, isPrimary: isPrimary)
         }
         .buttonStyle(.plain)
         .onHover { hoveredAction = $0 ? kind : nil }
@@ -345,6 +405,18 @@ struct QuickAccessView: View {
         } else {
             button
         }
+    }
+
+    private func toolFace(_ kind: HoverAction, icon: String, isPrimary: Bool) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 14, weight: .medium))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(toolForeground(kind, isPrimary: isPrimary))
+            .frame(width: 29, height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(toolBackground(kind, isPrimary: isPrimary))
+            )
     }
 
     private func toolForeground(_ kind: HoverAction, isPrimary: Bool) -> Color {
@@ -364,6 +436,7 @@ struct QuickAccessView: View {
         switch kind {
         case .copy:      return ("c", [.command])
         case .save:      return ("s", [.command])
+        case .drag:      return nil
         case .annotate:  return ("e", [.command])
         case .ocr:       return ("o", [.command, .shift])
         case .translate: return ("t", [.command, .shift])
@@ -390,6 +463,7 @@ struct QuickAccessView: View {
         switch kind {
         case .copy: return String(localized: "Copy")
         case .save: return String(localized: "Save")
+        case .drag: return String(localized: "Drag Screenshot")
         case .annotate: return String(localized: "Annotate")
         case .ocr: return String(localized: "Extract Text")
         case .translate: return String(localized: "Translate")
@@ -403,6 +477,7 @@ struct QuickAccessView: View {
         switch kind {
         case .copy: return String(localized: "Copy to clipboard")
         case .save: return String(localized: "Save screenshot")
+        case .drag: return String(localized: "Drag this screenshot into another app using your screenshot export settings")
         case .annotate: return String(localized: "Open annotation editor")
         case .ocr: return String(localized: "Extract text from screenshot")
         case .translate: return String(localized: "Translate text in screenshot")

@@ -70,7 +70,7 @@ Capso exists to give back to the macOS community and to show what a modern, modu
 - **Fullscreen capture** — one-click full screen
 - **Window capture** — click any window to capture
 - **Scrolling capture** — capture long webpages, chat threads, and documents into one stitched image
-- **Quick Access** — floating preview with copy, save, annotate, OCR, pin, and drag-and-drop
+- **Quick Access** — floating preview with copy, save, annotate, OCR, pin, and a dedicated drag handle for sending the fresh screenshot to other apps without saving first
 
 ### Screen Recording
 - **Video (MP4)** and **GIF** recording

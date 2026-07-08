@@ -23,6 +23,7 @@ final class QuickAccessWindow: NSPanel {
     var onUploadSucceeded: ((String) -> Void)?
 
     private var autoDismissTimer: Timer?
+    private var alphaValueBeforeDrag: CGFloat?
     private let settings: AppSettings
     /// The screen this preview is anchored to (where the capture originated).
     let targetScreen: NSScreen
@@ -70,7 +71,11 @@ final class QuickAccessWindow: NSPanel {
             thumbnail: nsImage,
             captureImage: result.image,
             dimensions: dimensions,
-            capturedAt: Date(),
+            capturedAt: result.timestamp,
+            sourceAppName: result.appName,
+            sourceWindowTitle: result.windowName,
+            screenshotOutputPreset: settings.screenshotOutputPreset,
+            screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
             targetLanguageDisplay: targetDisplay,
             shareCoordinator: shareCoordinator,
             onUploadSucceeded: { [weak self] url in self?.onUploadSucceeded?(url) },
@@ -81,6 +86,8 @@ final class QuickAccessWindow: NSPanel {
             onTranslate: { [weak self] in self?.onTranslate?() },
             onPin:       { [weak self] in self?.onPin?() },
             onPreview:   { [weak self] in self?.onPreview?() },
+            onDragStarted: { [weak self] in self?.hideDuringExternalDrag() },
+            onDragEnded:   { [weak self] in self?.showAfterExternalDrag() },
             onClose:     { [weak self] in self?.onClose?() }
         )
 
@@ -99,6 +106,19 @@ final class QuickAccessWindow: NSPanel {
     private static func targetLanguageDisplay(settings: AppSettings) -> String? {
         let target = settings.translationTargetLanguage
         return Locale.current.localizedString(forIdentifier: target) ?? target
+    }
+
+    private func hideDuringExternalDrag() {
+        guard alphaValueBeforeDrag == nil else { return }
+        alphaValueBeforeDrag = alphaValue
+        alphaValue = 0
+        ignoresMouseEvents = true
+    }
+
+    private func showAfterExternalDrag() {
+        alphaValue = alphaValueBeforeDrag ?? 1
+        alphaValueBeforeDrag = nil
+        ignoresMouseEvents = false
     }
 
     func show() {
