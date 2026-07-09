@@ -15,9 +15,19 @@ final class CameraPiPWindow: NSPanel {
     private var isResizing = false
     private let recordingFrame: CGRect?
     private var isPresentationMode = false
+    private var isPresentationTransitioning = false
+    private var allowsPresentationFrameOutsideVisibleArea = false
     private var storedPiPFrame: CGRect?
     private var mouseDownPoint: NSPoint?
     private let clickThreshold: CGFloat = 5
+    private let defaultWindowLevel: NSWindow.Level = .floating
+    private let presentationWindowLevel = NSWindow.Level.statusBar + 1
+    private let defaultCollectionBehavior: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .transient]
+    private let presentationCollectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces,
+        .fullScreenAuxiliary,
+        .transient
+    ]
 
     var presentationModeActive: Bool {
         isPresentationMode
@@ -61,11 +71,11 @@ final class CameraPiPWindow: NSPanel {
             defer: false
         )
 
-        self.level = .floating
+        self.level = defaultWindowLevel
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = false
-        self.collectionBehavior = [.canJoinAllSpaces, .transient]
+        self.collectionBehavior = defaultCollectionBehavior
         self.isMovableByWindowBackground = true
         if shouldRestorePresentation {
             self.isPresentationMode = true
@@ -75,6 +85,7 @@ final class CameraPiPWindow: NSPanel {
                 recordingFrame: recordingFrame,
                 visibleFrame: screen.visibleFrame
             )
+            applyPresentationWindowMode()
         }
 
         installContentView()
@@ -91,6 +102,8 @@ final class CameraPiPWindow: NSPanel {
     func show() { makeKeyAndOrderFront(nil) }
 
     func togglePresentationMode() {
+        guard !isPresentationTransitioning else { return }
+
         if isPresentationMode {
             exitPresentationMode()
             return
@@ -100,6 +113,8 @@ final class CameraPiPWindow: NSPanel {
 
         storedPiPFrame = frame
         isPresentationMode = true
+        isPresentationTransitioning = true
+        applyPresentationWindowMode()
 
         // Animate to fill the recording area.
         NSAnimationContext.runAnimationGroup { context in
@@ -108,18 +123,22 @@ final class CameraPiPWindow: NSPanel {
             self.animator().setFrame(targetFrame, display: true)
         } completionHandler: {
             self.installContentView()
+            self.isPresentationTransitioning = false
         }
     }
 
     func exitPresentationMode() {
+        guard !isPresentationTransitioning else { return }
         guard isPresentationMode else { return }
         guard let storedPiPFrame else {
             isPresentationMode = false
             installContentView()
+            restoreDefaultWindowMode()
             return
         }
 
         isPresentationMode = false
+        isPresentationTransitioning = true
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.28
@@ -128,6 +147,8 @@ final class CameraPiPWindow: NSPanel {
         } completionHandler: {
             self.installContentView()
             self.storedPiPFrame = nil
+            self.isPresentationTransitioning = false
+            self.restoreDefaultWindowMode()
         }
     }
 
@@ -229,6 +250,8 @@ final class CameraPiPWindow: NSPanel {
     }
 
     @objc private func handleWindowMoved() {
+        guard !isPresentationMode && !isPresentationTransitioning else { return }
+
         // Skip snap if Cmd is held
         let modifiers = NSEvent.modifierFlags
         if modifiers.contains(.command) { return }
@@ -287,6 +310,14 @@ final class CameraPiPWindow: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        if allowsPresentationFrameOutsideVisibleArea {
+            return frameRect
+        }
+
+        return super.constrainFrameRect(frameRect, to: screen)
+    }
+
     /// Re-read settings and update the window's size + content view.
     func applySettings() {
         let newSize = Self.windowSize(shape: settings.cameraShape, settings: settings)
@@ -327,6 +358,18 @@ final class CameraPiPWindow: NSPanel {
 
     private func presentationFrame() -> CGRect? {
         recordingFrame
+    }
+
+    private func applyPresentationWindowMode() {
+        level = presentationWindowLevel
+        collectionBehavior = presentationCollectionBehavior
+        allowsPresentationFrameOutsideVisibleArea = true
+    }
+
+    private func restoreDefaultWindowMode() {
+        level = defaultWindowLevel
+        collectionBehavior = defaultCollectionBehavior
+        allowsPresentationFrameOutsideVisibleArea = false
     }
 
     private func installContentView() {
