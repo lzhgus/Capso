@@ -23,33 +23,39 @@ final class CameraPiPWindow: NSPanel {
         isPresentationMode
     }
 
-    init(cameraManager: CameraManager, settings: AppSettings, recordingFrame: CGRect? = nil) {
+    var restartRestorationState: CameraPiPRestorationState {
+        CameraPiPPlacement.restorationState(
+            currentFrame: frame,
+            storedPiPFrame: storedPiPFrame,
+            presentationModeActive: isPresentationMode
+        )
+    }
+
+    init(
+        cameraManager: CameraManager,
+        settings: AppSettings,
+        recordingFrame: CGRect? = nil,
+        restorationState: CameraPiPRestorationState? = nil
+    ) {
         self.cameraManager = cameraManager
         self.settings = settings
         self.recordingFrame = recordingFrame
 
         let initialSize = Self.windowSize(shape: settings.cameraShape, settings: settings)
 
-        let screen = NSScreen.main ?? NSScreen.screens.first!
-        let screenFrame = screen.visibleFrame
-
-        var x: CGFloat
-        var y: CGFloat
-
-        if let frame = recordingFrame {
-            x = frame.midX - initialSize.width / 2
-            y = frame.minY + 20
-        } else {
-            x = screenFrame.maxX - initialSize.width - 32
-            y = screenFrame.minY + 32
-        }
-
-        // Clamp to screen bounds
-        x = max(screenFrame.minX + 8, min(x, screenFrame.maxX - initialSize.width - 8))
-        y = max(screenFrame.minY + 8, min(y, screenFrame.maxY - initialSize.height - 8))
+        let screen = Self.placementScreen(for: restorationState?.restoredFrame ?? recordingFrame)
+            ?? NSScreen.main
+            ?? NSScreen.screens.first!
+        let initialFrame = CameraPiPPlacement.initialFrame(
+            restorationState: restorationState,
+            defaultSize: initialSize,
+            recordingFrame: recordingFrame,
+            visibleFrame: screen.visibleFrame
+        )
+        let shouldRestorePresentation = restorationState?.presentationModeActive == true && recordingFrame != nil
 
         super.init(
-            contentRect: NSRect(x: x, y: y, width: initialSize.width, height: initialSize.height),
+            contentRect: initialFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -61,6 +67,15 @@ final class CameraPiPWindow: NSPanel {
         self.hasShadow = false
         self.collectionBehavior = [.canJoinAllSpaces, .transient]
         self.isMovableByWindowBackground = true
+        if shouldRestorePresentation {
+            self.isPresentationMode = true
+            self.storedPiPFrame = CameraPiPPlacement.frame(
+                restoredFrame: restorationState?.restoredFrame,
+                defaultSize: initialSize,
+                recordingFrame: recordingFrame,
+                visibleFrame: screen.visibleFrame
+            )
+        }
 
         installContentView()
 
@@ -296,6 +311,18 @@ final class CameraPiPWindow: NSPanel {
         } else {
             return CGSize(width: shorter, height: shorter / shape.aspectRatio)
         }
+    }
+
+    private static func placementScreen(for restoredFrame: CGRect?) -> NSScreen? {
+        guard let restoredFrame else { return nil }
+        return NSScreen.screens
+            .compactMap { screen -> (screen: NSScreen, area: CGFloat)? in
+                let intersection = restoredFrame.intersection(screen.visibleFrame)
+                guard !intersection.isNull, !intersection.isEmpty else { return nil }
+                return (screen, intersection.width * intersection.height)
+            }
+            .max { $0.area < $1.area }?
+            .screen
     }
 
     private func presentationFrame() -> CGRect? {
