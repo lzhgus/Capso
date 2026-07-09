@@ -110,6 +110,7 @@ final class QuickAccessWindow: NSPanel {
 
     private func hideDuringExternalDrag() {
         guard alphaValueBeforeDrag == nil else { return }
+        stopAutoDismissTimer()
         alphaValueBeforeDrag = alphaValue
         alphaValue = 0
         ignoresMouseEvents = true
@@ -119,6 +120,7 @@ final class QuickAccessWindow: NSPanel {
         alphaValue = alphaValueBeforeDrag ?? 1
         alphaValueBeforeDrag = nil
         ignoresMouseEvents = false
+        scheduleAutoDismissTimerIfNeeded()
     }
 
     func show() {
@@ -137,21 +139,11 @@ final class QuickAccessWindow: NSPanel {
             self.animator().alphaValue = 1
         }
 
-        if settings.quickAccessAutoClose {
-            autoDismissTimer = Timer.scheduledTimer(
-                withTimeInterval: TimeInterval(settings.quickAccessAutoCloseInterval),
-                repeats: false
-            ) { [weak self] _ in
-                Task { @MainActor in
-                    self?.onClose?()
-                }
-            }
-        }
+        scheduleAutoDismissTimerIfNeeded()
     }
 
     override func close() {
-        autoDismissTimer?.invalidate()
-        autoDismissTimer = nil
+        stopAutoDismissTimer()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.2
             self.animator().alphaValue = 0
@@ -162,8 +154,7 @@ final class QuickAccessWindow: NSPanel {
 
     /// Evict this preview off-screen to the left with a slide animation.
     func slideOffLeftAndClose() {
-        autoDismissTimer?.invalidate()
-        autoDismissTimer = nil
+        stopAutoDismissTimer()
         var target = frame
         target.origin.x = -(target.width + 40)
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -201,5 +192,24 @@ final class QuickAccessWindow: NSPanel {
         } else {
             setFrame(newFrame, display: true)
         }
+    }
+
+    private func scheduleAutoDismissTimerIfNeeded() {
+        stopAutoDismissTimer()
+        guard settings.quickAccessAutoClose else { return }
+
+        autoDismissTimer = Timer.scheduledTimer(
+            withTimeInterval: TimeInterval(settings.quickAccessAutoCloseInterval),
+            repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.onClose?()
+            }
+        }
+    }
+
+    private func stopAutoDismissTimer() {
+        autoDismissTimer?.invalidate()
+        autoDismissTimer = nil
     }
 }

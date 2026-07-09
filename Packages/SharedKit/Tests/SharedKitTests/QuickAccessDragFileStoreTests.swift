@@ -153,6 +153,19 @@ struct QuickAccessDragFileStoreTests {
         }
     }
 
+    @Test("removes the cached file for a dismissed drag preview")
+    func removesCachedFileForDismissedPreview() throws {
+        let directory = temporaryDirectory()
+        defer { remove(directory) }
+        let store = QuickAccessDragFileStore(directory: directory)
+        let id = UUID()
+        let url = try store.fileURL(for: try makeImage(), id: id)
+
+        try store.removeFile(for: id)
+
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
     private func temporaryDirectory() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("QuickAccessDragFileStoreTests", isDirectory: true)

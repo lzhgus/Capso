@@ -102,6 +102,13 @@ public final class QuickAccessDragFileStore {
         return removed
     }
 
+    public func removeFile(for id: UUID) throws {
+        guard let fileURL = cachedFileURLs.removeValue(forKey: id),
+              fileManager.fileExists(atPath: fileURL.path) else { return }
+
+        try fileManager.removeItem(at: fileURL)
+    }
+
     private static let prunableExtensions: Set<String> = ["png", "jpg", "jpeg"]
 
     private func encodedData(from image: CGImage, preset: ScreenshotOutputPreset) -> Data? {

@@ -35,8 +35,12 @@ struct QuickAccessView: View {
     @State private var visualState: PanelUploadState = .idle
     @State private var dragFileStore = QuickAccessDragFileStore()
     @State private var dragFileID = UUID()
+    @State private var preparedDragFileURL: URL?
+    @State private var dragPreparationTask: Task<Void, Never>?
     @State private var dragError: QuickAccessDragFileStoreError?
     @FocusState private var isFocused: Bool
+
+    private typealias DragPreparationResult = Result<URL, QuickAccessDragFileStoreError>
 
     private enum PanelUploadState: Equatable {
         case idle
@@ -87,6 +91,8 @@ struct QuickAccessView: View {
         .offset(y: isRevealed ? -2 : 0)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.26), value: isRevealed)
         .onHover { isHovering = $0 }
+        .onAppear { prepareDragFileIfNeeded() }
+        .onDisappear { cleanupPreparedDragFile() }
         .focusable()
         .focused($isFocused)
         .overlay(alignment: .bottom) {
@@ -296,7 +302,12 @@ struct QuickAccessView: View {
             .disabled(dragError != nil)
             .accessibilityHidden(true)
         }
-        .onHover { hoveredAction = $0 ? .drag : nil }
+        .onHover { hovering in
+            hoveredAction = hovering ? .drag : nil
+            if hovering {
+                prepareDragFileIfNeeded()
+            }
+        }
         .help(Text(dragError == nil ? label(.drag) : dragUnavailableHelp))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(label(.drag)))
@@ -307,7 +318,7 @@ struct QuickAccessView: View {
         let unavailable = dragError != nil
         return toolFace(
             .drag,
-            icon: "arrow.up.left.and.arrow.down.right.circle.fill",
+            icon: "hand.draw",
             isPrimary: false
         )
         .opacity(unavailable ? 0.45 : 1)
@@ -318,6 +329,13 @@ struct QuickAccessView: View {
     }
 
     private func dragFileURL() -> URL? {
+        if let preparedDragFileURL,
+           FileManager.default.isReadableFile(atPath: preparedDragFileURL.path) {
+            return preparedDragFileURL
+        }
+
+        prepareDragFileIfNeeded()
+
         do {
             let url = try dragFileStore.fileURL(
                 for: captureImage,
@@ -328,6 +346,7 @@ struct QuickAccessView: View {
                 sourceWindowTitle: sourceWindowTitle,
                 template: screenshotFilenameTemplate
             )
+            preparedDragFileURL = url
             dragError = nil
             return url
         } catch let error as QuickAccessDragFileStoreError {
@@ -337,6 +356,72 @@ struct QuickAccessView: View {
             dragError = .storageUnavailable
             return nil
         }
+    }
+
+    private func prepareDragFileIfNeeded() {
+        guard preparedDragFileURL == nil, dragPreparationTask == nil else { return }
+
+        let image = captureImage
+        let id = dragFileID
+        let preset = screenshotOutputPreset
+        let date = capturedAt
+        let sourceAppName = sourceAppName
+        let sourceWindowTitle = sourceWindowTitle
+        let template = screenshotFilenameTemplate
+
+        dragPreparationTask = Task { @MainActor in
+            let result = await Task.detached(priority: .utility) { () -> DragPreparationResult in
+                let store = QuickAccessDragFileStore()
+                do {
+                    let url = try store.fileURL(
+                        for: image,
+                        id: id,
+                        preset: preset,
+                        date: date,
+                        sourceAppName: sourceAppName,
+                        sourceWindowTitle: sourceWindowTitle,
+                        template: template
+                    )
+                    return .success(url)
+                } catch let error as QuickAccessDragFileStoreError {
+                    return .failure(error)
+                } catch {
+                    return .failure(.storageUnavailable)
+                }
+            }.value
+
+            dragPreparationTask = nil
+            if Task.isCancelled {
+                if case .success(let url) = result {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                return
+            }
+
+            switch result {
+            case .success(let url):
+                if let preparedDragFileURL, preparedDragFileURL != url {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
+                preparedDragFileURL = url
+                dragError = nil
+            case .failure(let error):
+                dragError = error
+            }
+        }
+    }
+
+    private func cleanupPreparedDragFile() {
+        dragPreparationTask?.cancel()
+        dragPreparationTask = nil
+
+        if let preparedDragFileURL {
+            try? FileManager.default.removeItem(at: preparedDragFileURL)
+            self.preparedDragFileURL = nil
+        }
+
+        try? dragFileStore.removeFile(for: dragFileID)
     }
 
     private func performUpload() async {

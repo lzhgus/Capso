@@ -43,6 +43,8 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
 }
 
 final class DragSourceNSView: NSView, NSDraggingSource {
+    private static let dragStartThreshold: CGFloat = 4
+
     var thumbnail: NSImage
     var dragImageSize: CGSize
     var fileURLProvider: () -> URL?
@@ -83,8 +85,9 @@ final class DragSourceNSView: NSView, NSDraggingSource {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let mouseDownEvent,
-              let fileURL = fileURLProvider() else { return }
+        guard let mouseDownEvent else { return }
+        guard dragDistance(from: mouseDownEvent, to: event) >= Self.dragStartThreshold else { return }
+        guard let fileURL = fileURLProvider() else { return }
 
         self.mouseDownEvent = nil
         beginDrag(for: fileURL, from: mouseDownEvent)
@@ -168,5 +171,13 @@ final class DragSourceNSView: NSView, NSDraggingSource {
             width: size.width,
             height: size.height
         )
+    }
+
+    private func dragDistance(from startEvent: NSEvent, to currentEvent: NSEvent) -> CGFloat {
+        let start = startEvent.locationInWindow
+        let current = currentEvent.locationInWindow
+        let dx = current.x - start.x
+        let dy = current.y - start.y
+        return sqrt(dx * dx + dy * dy)
     }
 }
