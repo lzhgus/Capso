@@ -26,6 +26,8 @@ struct AnnotationToolbar: View {
     let onSave: () -> Void
     let onCopy: () -> Void
     let onPin: () -> Void
+    let dragThumbnail: NSImage
+    let onPrepareDrag: () -> Void
     let onDragFileURL: () -> URL?
     let onDragPreviewImage: () -> NSImage?
     let onDragStarted: () -> Void
@@ -288,14 +290,14 @@ struct AnnotationToolbar: View {
     private var dragActionButton: some View {
         ZStack {
             actionButtonFace(
-                icon: "arrow.up.left.and.arrow.down.right.circle.fill",
+                icon: "hand.draw",
                 isPrimary: false,
                 isDestructive: false
             )
             .opacity(isDragDisabled ? 0.45 : 1)
 
             QuickAccessDragSourceView(
-                thumbnail: NSImage(size: NSSize(width: 1, height: 1)),
+                thumbnail: dragThumbnail,
                 dragImageSize: CGSize(width: 240, height: 160),
                 fileURLProvider: onDragFileURL,
                 dragImageProvider: onDragPreviewImage,
@@ -307,6 +309,11 @@ struct AnnotationToolbar: View {
             .accessibilityHidden(true)
         }
         .help(isDragDisabled ? "Finish text editing before dragging" : "Drag Edited Image")
+        .onHover { hovering in
+            if hovering && !isDragDisabled {
+                onPrepareDrag()
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Drag Edited Image")
     }
