@@ -190,7 +190,7 @@ struct HistoryItemView: View {
 
     private func dragActionButton(thumbnail: NSImage) -> some View {
         ZStack {
-            actionButtonFace("arrow.up.left.and.arrow.down.right.circle.fill")
+            actionButtonFace("hand.draw")
             QuickAccessDragSourceView(
                 thumbnail: thumbnail,
                 dragImageSize: CGSize(width: 180, height: 112),
@@ -202,6 +202,7 @@ struct HistoryItemView: View {
             .accessibilityHidden(true)
         }
         .help(String(localized: "Drag Screenshot"))
+        .onAppear { coordinator.prepareDragFile(for: entry) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Drag Screenshot"))
     }
