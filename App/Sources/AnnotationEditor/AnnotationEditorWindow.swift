@@ -2,15 +2,22 @@
 import AppKit
 import SwiftUI
 import AnnotationKit
+import SharedKit
 
 @MainActor
 final class AnnotationEditorWindow: NSPanel {
     private let document: AnnotationDocument
     private let interactionState = AnnotationEditorInteractionState()
+    private var alphaValueBeforeDrag: CGFloat?
 
     init(
         image: CGImage,
         anchorScreen: NSScreen? = nil,
+        sourceAppName: String? = nil,
+        sourceWindowTitle: String? = nil,
+        captureDate: Date = Date(),
+        screenshotOutputPreset: ScreenshotOutputPreset,
+        screenshotFilenameTemplate: String,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage, CGRect?) -> Void,
@@ -69,25 +76,61 @@ final class AnnotationEditorWindow: NSPanel {
             sourceImage: image,
             document: document,
             interactionState: interactionState,
+            sourceAppName: sourceAppName,
+            sourceWindowTitle: sourceWindowTitle,
+            captureDate: captureDate,
+            screenshotOutputPreset: screenshotOutputPreset,
+            screenshotFilenameTemplate: screenshotFilenameTemplate,
             onSave: { [weak self] rendered in
                 onSave(rendered)
-                self?.close()
+                MainActor.assumeIsolated {
+                    self?.close()
+                }
             },
             onCopy: { [weak self] rendered in
                 onCopy(rendered)
-                self?.close()
+                MainActor.assumeIsolated {
+                    self?.close()
+                }
             },
             onPin: { [weak self] rendered in
-                onPin(rendered, self?.frame)
-                self?.close()
+                MainActor.assumeIsolated {
+                    onPin(rendered, self?.frame)
+                    self?.close()
+                }
+            },
+            onDragStarted: { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.hideDuringExternalDrag()
+                }
+            },
+            onDragEnded: { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.showAfterExternalDrag()
+                }
             },
             onCancel: { [weak self] in
                 onClose()
-                self?.close()
+                MainActor.assumeIsolated {
+                    self?.close()
+                }
             }
         )
 
         self.contentView = NSHostingView(rootView: view)
+    }
+
+    private func hideDuringExternalDrag() {
+        guard alphaValueBeforeDrag == nil else { return }
+        alphaValueBeforeDrag = alphaValue
+        alphaValue = 0
+        ignoresMouseEvents = true
+    }
+
+    private func showAfterExternalDrag() {
+        alphaValue = alphaValueBeforeDrag ?? 1
+        alphaValueBeforeDrag = nil
+        ignoresMouseEvents = false
     }
 
     func show() {

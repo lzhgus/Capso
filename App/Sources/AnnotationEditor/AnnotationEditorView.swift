@@ -1,4 +1,5 @@
 // App/Sources/AnnotationEditor/AnnotationEditorView.swift
+import AppKit
 import SwiftUI
 import AnnotationKit
 import OCRKit
@@ -8,9 +9,16 @@ struct AnnotationEditorView: View {
     let initialSourceImage: CGImage
     let document: AnnotationDocument
     let interactionState: AnnotationEditorInteractionState
+    let sourceAppName: String?
+    let sourceWindowTitle: String?
+    let captureDate: Date
+    let screenshotOutputPreset: ScreenshotOutputPreset
+    let screenshotFilenameTemplate: String
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
     let onPin: (CGImage) -> Void
+    let onDragStarted: () -> Void
+    let onDragEnded: () -> Void
     let onCancel: () -> Void
 
     /// The working image shown in the canvas. Starts equal to
@@ -22,17 +30,31 @@ struct AnnotationEditorView: View {
         sourceImage: CGImage,
         document: AnnotationDocument,
         interactionState: AnnotationEditorInteractionState,
+        sourceAppName: String?,
+        sourceWindowTitle: String?,
+        captureDate: Date,
+        screenshotOutputPreset: ScreenshotOutputPreset,
+        screenshotFilenameTemplate: String,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage) -> Void,
+        onDragStarted: @escaping () -> Void,
+        onDragEnded: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.initialSourceImage = sourceImage
         self.document = document
         self.interactionState = interactionState
+        self.sourceAppName = sourceAppName
+        self.sourceWindowTitle = sourceWindowTitle
+        self.captureDate = captureDate
+        self.screenshotOutputPreset = screenshotOutputPreset
+        self.screenshotFilenameTemplate = screenshotFilenameTemplate
         self.onSave = onSave
         self.onCopy = onCopy
         self.onPin = onPin
+        self.onDragStarted = onDragStarted
+        self.onDragEnded = onDragEnded
         self.onCancel = onCancel
         self._sourceImage = State(initialValue: sourceImage)
     }
@@ -71,8 +93,17 @@ struct AnnotationEditorView: View {
     @State private var isCropMode = false
     @State private var outputSize: CGSize?
     @State private var commitEditingTrigger = 0
+    @State private var dragFileStore = QuickAccessDragFileStore()
+    @State private var dragFileID = UUID()
+    @State private var dragRenderCache: DragRenderCache?
     /// Cached text line bounding boxes for smart highlighter snapping.
     @State private var textRegions: [CGRect] = []
+
+    private struct DragRenderCache {
+        let renderedImage: CGImage
+        let previewImage: NSImage
+        var fileURL: URL?
+    }
 
     private var imageWidth: CGFloat { CGFloat(sourceImage.width) }
     private var imageHeight: CGFloat { CGFloat(sourceImage.height) }
@@ -196,11 +227,14 @@ struct AnnotationEditorView: View {
     }
 
     var body: some View {
-        if isCropMode {
-            cropEditor
-        } else {
-            editorContent
+        Group {
+            if isCropMode {
+                cropEditor
+            } else {
+                editorContent
+            }
         }
+        .onDisappear { invalidateDragCache() }
     }
 
     private var cropEditor: some View {
@@ -220,7 +254,7 @@ struct AnnotationEditorView: View {
             Divider()
 
             if showBeautifyPanel {
-                BeautifyPanel(settings: $beautifySettings)
+                BeautifyPanel(settings: beautifySettingsBinding)
                 Divider()
             }
 
@@ -245,11 +279,18 @@ struct AnnotationEditorView: View {
             isEditingText: isEditingText,
             canUndo: document.canUndo,
             canRedo: document.canRedo,
-            onUndo: { document.undo(); refreshTrigger += 1 },
-            onRedo: { document.redo(); refreshTrigger += 1 },
+            onUndo: { document.undo(); handleDocumentChanged() },
+            onRedo: { document.redo(); handleDocumentChanged() },
             onSave: { save() },
             onCopy: { copy() },
             onPin: { pin() },
+            dragThumbnail: dragFallbackImage,
+            onPrepareDrag: prepareDragFile,
+            onDragFileURL: dragFileURL,
+            onDragPreviewImage: dragPreviewImage,
+            onDragStarted: onDragStarted,
+            onDragEnded: onDragEnded,
+            isDragDisabled: isEditingText,
             onCancel: onCancel,
             onCrop: { isCropMode = true }
         )
@@ -305,6 +346,7 @@ struct AnnotationEditorView: View {
             refreshTrigger: refreshTrigger,
             textRegions: textRegions,
             commitEditingTrigger: commitEditingTrigger,
+            onDocumentChanged: handleDocumentChanged,
             onSwitchToSelect: switchToSelectTool,
             onInteractionChanged: handleCanvasInteractionChanged,
             onTextEditingStarted: handleTextEditingStarted,
@@ -369,6 +411,20 @@ struct AnnotationEditorView: View {
         beautifySettings.isEnabled && beautifySettings.shadowEnabled ? 6 * zoomScale : 0
     }
 
+    private var beautifySettingsBinding: Binding<BeautifySettings> {
+        Binding(
+            get: { beautifySettings },
+            set: { newValue in
+                beautifySettings = newValue
+                invalidateDragCache()
+            }
+        )
+    }
+
+    private var dragFallbackImage: NSImage {
+        NSImage(cgImage: sourceImage, size: NSSize(width: sourceImage.width, height: sourceImage.height))
+    }
+
     private func commitCrop(newImage: CGImage?, newRect: CGRect?, newOutputSize: CGSize?) {
         if let newImage {
             sourceImage = newImage
@@ -379,6 +435,7 @@ struct AnnotationEditorView: View {
         }
         outputSize = newOutputSize
         isCropMode = false
+        invalidateDragCache()
     }
 
     private func handleCanvasAppear(size: CGSize) {
@@ -418,6 +475,11 @@ struct AnnotationEditorView: View {
         interactionState.setCanvasInteraction(isInteracting)
     }
 
+    private func handleDocumentChanged() {
+        refreshTrigger += 1
+        invalidateDragCache()
+    }
+
     private func switchToSelectTool() {
         document.clearSelection()
         currentTool = .select
@@ -443,6 +505,7 @@ struct AnnotationEditorView: View {
         isEditingText = false
         interactionState.isEditingText = false
         savedTextFontSize = Double(lineWidth)
+        invalidateDragCache()
     }
 
     private func refitToCurrentWindow() {
@@ -495,6 +558,7 @@ struct AnnotationEditorView: View {
                 obj.style = currentStyle
             }
             refreshTrigger += 1
+            invalidateDragCache()
         }
     }
 
@@ -517,6 +581,59 @@ struct AnnotationEditorView: View {
             return rendered
         }
         return ImageUtilities.resized(rendered, width: width, height: height) ?? rendered
+    }
+
+    private func dragFileURL() -> URL? {
+        guard !isEditingText else {
+            return nil
+        }
+        if let fileURL = dragRenderCache?.fileURL,
+           FileManager.default.isReadableFile(atPath: fileURL.path) {
+            return fileURL
+        }
+        guard var cache = dragRenderCache ?? makeDragRenderCache() else {
+            return nil
+        }
+
+        do {
+            let fileURL = try dragFileStore.fileURL(
+                for: cache.renderedImage,
+                id: dragFileID,
+                preset: screenshotOutputPreset,
+                date: captureDate,
+                sourceAppName: sourceAppName,
+                sourceWindowTitle: sourceWindowTitle,
+                template: screenshotFilenameTemplate
+            )
+            cache.fileURL = fileURL
+            dragRenderCache = cache
+            return fileURL
+        } catch {
+            return nil
+        }
+    }
+
+    private func dragPreviewImage() -> NSImage? {
+        guard !isEditingText else { return nil }
+        return (dragRenderCache ?? makeDragRenderCache())?.previewImage
+    }
+
+    private func prepareDragFile() {
+        _ = dragFileURL()
+    }
+
+    private func makeDragRenderCache() -> DragRenderCache? {
+        guard let rendered = renderedOutputImage() else { return nil }
+        let previewImage = NSImage(cgImage: rendered, size: NSSize(width: rendered.width, height: rendered.height))
+        let cache = DragRenderCache(renderedImage: rendered, previewImage: previewImage)
+        dragRenderCache = cache
+        return cache
+    }
+
+    private func invalidateDragCache() {
+        try? dragFileStore.removeFile(for: dragFileID)
+        dragFileID = UUID()
+        dragRenderCache = nil
     }
 
     private func save() {

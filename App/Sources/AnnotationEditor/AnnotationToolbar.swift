@@ -26,6 +26,13 @@ struct AnnotationToolbar: View {
     let onSave: () -> Void
     let onCopy: () -> Void
     let onPin: () -> Void
+    let dragThumbnail: NSImage
+    let onPrepareDrag: () -> Void
+    let onDragFileURL: () -> URL?
+    let onDragPreviewImage: () -> NSImage?
+    let onDragStarted: () -> Void
+    let onDragEnded: () -> Void
+    let isDragDisabled: Bool
     let onCancel: () -> Void
     let onCrop: () -> Void
 
@@ -268,6 +275,8 @@ struct AnnotationToolbar: View {
             actionButton(icon: "xmark", help: "Close", isDestructive: true, action: onCancel)
                 .keyboardShortcut(.escape, modifiers: [])
 
+            dragActionButton
+
             copyActionButton
 
             actionButton(icon: "pin", help: "Pin", action: onPin)
@@ -276,6 +285,37 @@ struct AnnotationToolbar: View {
             actionButton(icon: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
                 .keyboardShortcut("s", modifiers: .command)
         }
+    }
+
+    private var dragActionButton: some View {
+        ZStack {
+            actionButtonFace(
+                icon: "hand.draw",
+                isPrimary: false,
+                isDestructive: false
+            )
+            .opacity(isDragDisabled ? 0.45 : 1)
+
+            QuickAccessDragSourceView(
+                thumbnail: dragThumbnail,
+                dragImageSize: CGSize(width: 240, height: 160),
+                fileURLProvider: onDragFileURL,
+                dragImageProvider: onDragPreviewImage,
+                onDragStarted: onDragStarted,
+                onDragEnded: onDragEnded
+            )
+            .frame(width: 34, height: 26)
+            .disabled(isDragDisabled)
+            .accessibilityHidden(true)
+        }
+        .help(isDragDisabled ? "Finish text editing before dragging" : "Drag Edited Image")
+        .onHover { hovering in
+            if hovering && !isDragDisabled {
+                onPrepareDrag()
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Drag Edited Image")
     }
 
     @ViewBuilder
@@ -297,16 +337,24 @@ struct AnnotationToolbar: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(actionIconForeground(isPrimary: isPrimary, isDestructive: isDestructive))
-                .frame(width: 34, height: 26)
-                .background(actionButtonBackground(isPrimary: isPrimary, isDestructive: isDestructive))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(actionButtonStroke(isPrimary: isPrimary))
+            actionButtonFace(icon: icon, isPrimary: isPrimary, isDestructive: isDestructive)
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+
+    private func actionButtonFace(
+        icon: String,
+        isPrimary: Bool,
+        isDestructive: Bool
+    ) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(actionIconForeground(isPrimary: isPrimary, isDestructive: isDestructive))
+            .frame(width: 34, height: 26)
+            .background(actionButtonBackground(isPrimary: isPrimary, isDestructive: isDestructive))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(actionButtonStroke(isPrimary: isPrimary))
     }
 
     private var toolbarDivider: some View {
