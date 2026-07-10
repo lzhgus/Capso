@@ -43,6 +43,29 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            SettingGroup(title: "Automation") {
+                SettingCard {
+                    SettingRow(
+                        label: "Automation URLs",
+                        sublabel: "Allow Alfred, Raycast, Shortcuts, and other apps to trigger captures"
+                    ) {
+                        Toggle("", isOn: $viewModel.automationURLsEnabled)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    SettingRow(label: "Supported URLs", showDivider: true) {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(verbatim: "capso://grab/area")
+                            Text(verbatim: "capso://grab/fullscreen")
+                            Text(verbatim: "capso://grab/window")
+                        }
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    }
+                }
+            }
+
             SettingGroup(title: "Sound") {
                 SettingCard {
                     SettingRow(label: "Shutter Sound", sublabel: "Play sound after capture") {

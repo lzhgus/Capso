@@ -68,6 +68,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var automationURLsEnabled: Bool {
+        get {
+            access(keyPath: \.automationURLsEnabled)
+            return settings.automationURLsEnabled
+        }
+        set {
+            withMutation(keyPath: \.automationURLsEnabled) {
+                settings.automationURLsEnabled = newValue
+            }
+        }
+    }
 
     // MARK: Screenshots
     var screenshotShowPreview: Bool {
