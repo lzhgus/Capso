@@ -761,6 +761,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var cloudShareAutoUploadEnabled: Bool {
+        get {
+            access(keyPath: \.cloudShareAutoUploadEnabled)
+            return settings.cloudShareAutoUploadEnabled
+        }
+        set {
+            withMutation(keyPath: \.cloudShareAutoUploadEnabled) {
+                settings.cloudShareAutoUploadEnabled = newValue
+            }
+        }
+    }
 
     // MARK: Version
     // MARK: History

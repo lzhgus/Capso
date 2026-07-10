@@ -27,6 +27,8 @@ final class HistoryCoordinator {
     private let dragFileStore = QuickAccessDragFileStore()
     private var dragFileURLs: [UUID: URL] = [:]
     private var dragPreparationTasks: [UUID: Task<Void, Never>] = [:]
+    private var pendingHistoryEntryIDs: Set<UUID> = []
+    private var pendingCloudURLs: [UUID: String] = [:]
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -69,9 +71,14 @@ final class HistoryCoordinator {
     func setCloudURL(id: UUID, url: String) {
         guard let store else { return }
         do {
-            try store.setCloudURL(id: id, url: url)
-            // Refresh in-memory list so the History UI reflects the change.
-            loadEntries()
+            if try store.setCloudURL(id: id, url: url) {
+                // Refresh in-memory list so the History UI reflects the change.
+                loadEntries()
+            } else if pendingHistoryEntryIDs.contains(id) {
+                // A fast upload can finish before the detached history insert.
+                // Hold the URL until that specific insert completes.
+                pendingCloudURLs[id] = url
+            }
         } catch {
             print("Failed to persist cloud URL: \(error)")
         }
@@ -93,56 +100,77 @@ final class HistoryCoordinator {
             throw ShareError.unknown("Source file not found")
         }
 
-        let uploadURL: URL
-        let contentType: String
-        var tempFileToDelete: URL?
-        defer {
-            if let url = tempFileToDelete {
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
+        let prepared = try await prepareUpload(sourceURL: sourceURL, mode: entry.captureMode)
+        defer { prepared.removeTemporaryFile() }
 
-        switch entry.captureMode {
-        case .recording:
-            let quality = settings.exportQuality
-            let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("mp4")
-            try await Task.detached(priority: .userInitiated) {
-                try await Self.exportVideo(
-                    from: sourceURL,
-                    to: tmp,
-                    format: .mp4,
-                    exportQuality: quality
-                )
-            }.value
-            uploadURL = tmp
-            contentType = "video/mp4"
-            tempFileToDelete = tmp
-        case .gif:
-            let quality = settings.exportQuality
-            let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("gif")
-            try await Task.detached(priority: .userInitiated) {
-                try await Self.exportVideo(
-                    from: sourceURL,
-                    to: tmp,
-                    format: .gif,
-                    exportQuality: quality
-                )
-            }.value
-            uploadURL = tmp
-            contentType = "image/gif"
-            tempFileToDelete = tmp
-        default:
-            uploadURL = sourceURL
-            contentType = "image/png"
-        }
-
-        let cloudURL = try await coord.upload(file: uploadURL, contentType: contentType)
+        let cloudURL = try await coord.upload(file: prepared.url, contentType: prepared.contentType)
         setCloudURL(id: entry.id, url: cloudURL.absoluteString)
         return cloudURL
+    }
+
+    /// Upload a just-completed recording without waiting for its asynchronous
+    /// history insert. The pending-entry bridge above persists the URL once the
+    /// row exists, while history-disabled users still get the share link.
+    func uploadRecording(url: URL, mode: HistoryCaptureMode, entryID: UUID) async throws -> URL {
+        guard let coord = shareCoordinator else {
+            throw ShareError.notConfigured
+        }
+
+        let prepared = try await prepareUpload(sourceURL: url, mode: mode)
+        defer { prepared.removeTemporaryFile() }
+
+        let cloudURL = try await coord.upload(file: prepared.url, contentType: prepared.contentType)
+        setCloudURL(id: entryID, url: cloudURL.absoluteString)
+        return cloudURL
+    }
+
+    private struct PreparedUpload {
+        let url: URL
+        let contentType: String
+        let temporaryURL: URL?
+
+        func removeTemporaryFile() {
+            if let temporaryURL {
+                try? FileManager.default.removeItem(at: temporaryURL)
+            }
+        }
+    }
+
+    private func prepareUpload(sourceURL: URL, mode: HistoryCaptureMode) async throws -> PreparedUpload {
+        let format: ExportFormat
+        let fileExtension: String
+        let contentType: String
+
+        switch mode {
+        case .recording:
+            format = .mp4
+            fileExtension = "mp4"
+            contentType = "video/mp4"
+        case .gif:
+            format = .gif
+            fileExtension = "gif"
+            contentType = "image/gif"
+        case .area, .fullscreen, .window:
+            return PreparedUpload(url: sourceURL, contentType: "image/png", temporaryURL: nil)
+        }
+
+        let quality = settings.exportQuality
+        let temporaryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(fileExtension)
+        try await Task.detached(priority: .userInitiated) {
+            try await Self.exportVideo(
+                from: sourceURL,
+                to: temporaryURL,
+                format: format,
+                exportQuality: quality
+            )
+        }.value
+        return PreparedUpload(
+            url: temporaryURL,
+            contentType: contentType,
+            temporaryURL: temporaryURL
+        )
     }
 
     /// Delete the cloud copy for an entry using the last path component of its cloudURL as the key.
@@ -169,6 +197,7 @@ final class HistoryCoordinator {
     func saveCapture(result: CaptureResult, entryID: UUID = UUID()) -> UUID {
         guard settings.historyEnabled, let store else { return entryID }
 
+        pendingHistoryEntryIDs.insert(entryID)
         let entryDir = store.entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
         let fm = FileManager.default
 
@@ -216,11 +245,10 @@ final class HistoryCoordinator {
 
                 try store.insert(entry)
 
-                await MainActor.run {
-                    self.loadEntries()
-                }
+                await MainActor.run { self.finishPendingHistoryInsert(id: entryID) }
             } catch {
                 print("Failed to save capture to history: \(error)")
+                await MainActor.run { self.cancelPendingHistoryInsert(id: entryID) }
             }
         }
         return entryID
@@ -228,10 +256,11 @@ final class HistoryCoordinator {
 
     // MARK: - Save Recording to History
 
-    func saveRecording(url: URL, mode: HistoryCaptureMode) {
-        guard settings.historyEnabled, let store else { return }
+    @discardableResult
+    func saveRecording(url: URL, mode: HistoryCaptureMode, entryID: UUID = UUID()) -> UUID {
+        guard settings.historyEnabled, let store else { return entryID }
 
-        let entryID = UUID()
+        pendingHistoryEntryIDs.insert(entryID)
         let entryDir = store.entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
         let fm = FileManager.default
 
@@ -265,11 +294,29 @@ final class HistoryCoordinator {
                 )
 
                 try store.insert(entry)
-                await MainActor.run { self.loadEntries() }
+                await MainActor.run { self.finishPendingHistoryInsert(id: entryID) }
             } catch {
-                // Silently fail
+                await MainActor.run { self.cancelPendingHistoryInsert(id: entryID) }
             }
         }
+        return entryID
+    }
+
+    private func finishPendingHistoryInsert(id: UUID) {
+        pendingHistoryEntryIDs.remove(id)
+        if let cloudURL = pendingCloudURLs.removeValue(forKey: id), let store {
+            do {
+                _ = try store.setCloudURL(id: id, url: cloudURL)
+            } catch {
+                print("Failed to persist pending cloud URL: \(error)")
+            }
+        }
+        loadEntries()
+    }
+
+    private func cancelPendingHistoryInsert(id: UUID) {
+        pendingHistoryEntryIDs.remove(id)
+        pendingCloudURLs.removeValue(forKey: id)
     }
 
     private static func extractFirstFrame(from videoURL: URL) async -> CGImage? {

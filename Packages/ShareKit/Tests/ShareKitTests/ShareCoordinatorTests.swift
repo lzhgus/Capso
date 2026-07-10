@@ -25,6 +25,56 @@ struct ShareCoordinatorTests {
         }
     }
 
+    actor BlockingDestination: ShareDestination {
+        private let failFirst: Bool
+        private var started: [String] = []
+        private var firstStarted = false
+        private var firstStartedWaiters: [CheckedContinuation<Void, Never>] = []
+        private var releaseFirstContinuation: CheckedContinuation<Void, Never>?
+
+        init(failFirst: Bool = false) {
+            self.failFirst = failFirst
+        }
+
+        func upload(file: URL, key: String, contentType: String) async throws -> URL {
+            let callIndex = started.count
+            started.append(file.lastPathComponent)
+
+            if callIndex == 0 {
+                firstStarted = true
+                firstStartedWaiters.forEach { $0.resume() }
+                firstStartedWaiters.removeAll()
+                await withCheckedContinuation { continuation in
+                    releaseFirstContinuation = continuation
+                }
+                if failFirst {
+                    throw ShareError.network(underlying: "first failed")
+                }
+            }
+
+            return URL(string: "https://stub/\(file.lastPathComponent)")!
+        }
+
+        func delete(key: String) async throws {}
+        func validateConfig() async throws {}
+
+        func waitUntilFirstStarts() async {
+            if firstStarted { return }
+            await withCheckedContinuation { continuation in
+                firstStartedWaiters.append(continuation)
+            }
+        }
+
+        func releaseFirst() {
+            releaseFirstContinuation?.resume()
+            releaseFirstContinuation = nil
+        }
+
+        func startedFiles() -> [String] {
+            started
+        }
+    }
+
     @Test("starts idle")
     func startsIdle() {
         let coord = ShareCoordinator(destination: StubDestination())
@@ -115,5 +165,65 @@ struct ShareCoordinatorTests {
         _ = try await coord.upload(file: tmp, contentType: "image/png")
         let received = await stub.lastContentType
         #expect(received == "image/png")
+    }
+
+    @Test("concurrent uploads are processed in FIFO order")
+    func concurrentUploadsAreSerialized() async throws {
+        let destination = BlockingDestination()
+        let coord = ShareCoordinator(destination: destination)
+        let firstURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("first-\(UUID().uuidString).png")
+        let secondURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("second-\(UUID().uuidString).png")
+
+        let first = Task { @MainActor in
+            try await coord.upload(file: firstURL, contentType: "image/png")
+        }
+        await destination.waitUntilFirstStarts()
+
+        let second = Task { @MainActor in
+            try await coord.upload(file: secondURL, contentType: "image/png")
+        }
+        await Task.yield()
+
+        #expect(await destination.startedFiles() == [firstURL.lastPathComponent])
+
+        await destination.releaseFirst()
+        _ = try await first.value
+        _ = try await second.value
+
+        #expect(await destination.startedFiles() == [
+            firstURL.lastPathComponent,
+            secondURL.lastPathComponent,
+        ])
+    }
+
+    @Test("a failed upload does not block the next queued upload")
+    func failedUploadDoesNotBlockQueue() async throws {
+        let destination = BlockingDestination(failFirst: true)
+        let coord = ShareCoordinator(destination: destination)
+        let firstURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("first-failure-\(UUID().uuidString).png")
+        let secondURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("second-success-\(UUID().uuidString).png")
+
+        let first = Task { @MainActor in
+            try await coord.upload(file: firstURL, contentType: "image/png")
+        }
+        await destination.waitUntilFirstStarts()
+        let second = Task { @MainActor in
+            try await coord.upload(file: secondURL, contentType: "image/png")
+        }
+
+        await destination.releaseFirst()
+
+        await #expect(throws: ShareError.self) {
+            try await first.value
+        }
+        _ = try await second.value
+        #expect(await destination.startedFiles() == [
+            firstURL.lastPathComponent,
+            secondURL.lastPathComponent,
+        ])
     }
 }

@@ -783,6 +783,11 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "cloudSharePathPrefix") }
     }
 
+    public var cloudShareAutoUploadEnabled: Bool {
+        get { defaults.object(forKey: "cloudShareAutoUploadEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "cloudShareAutoUploadEnabled") }
+    }
+
     public var isCloudShareConfigured: Bool {
         guard
             let provider = cloudShareProvider,

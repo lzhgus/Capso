@@ -1407,7 +1407,6 @@
       }
     },
     "Behavior" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7885,6 +7884,138 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你会得到 `Account ID`、`Access Key ID` 和 `Secret Access Key`。也请记下存储桶名称。密钥不会再次显示。"
+          }
+        }
+      }
+    },
+    "Automatically Upload New Captures" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいキャプチャを自動アップロード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 캡처 자동 업로드"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动上传新捕获内容"
+          }
+        }
+      }
+    },
+    "Enable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활성화"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用"
+          }
+        }
+      }
+    },
+    "Enable Automatic Uploads?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動アップロードを有効にしますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 업로드를 활성화할까요?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用自动上传？"
+          }
+        }
+      }
+    },
+    "Every new screenshot and recording will be uploaded to your configured storage. Each successful share link will replace the current clipboard contents." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいスクリーンショットと録画はすべて、設定済みのストレージにアップロードされます。共有に成功するたびに、現在のクリップボードの内容がリンクで置き換えられます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 스크린샷과 녹화는 모두 설정된 저장소에 업로드됩니다. 공유에 성공할 때마다 현재 클립보드 내용이 링크로 대체됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每张新截图和每段新录屏都会上传到你配置的存储。每次分享成功后，当前剪贴板内容都会被分享链接替换。"
+          }
+        }
+      }
+    },
+    "Upload new screenshots and recordings, then copy the share link" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいスクリーンショットと録画をアップロードし、共有リンクをコピーします"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 스크린샷과 녹화를 업로드한 다음 공유 링크를 복사합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传新的截图和录屏，然后复制分享链接"
+          }
+        }
+      }
+    },
+    "Couldn't prepare recording for upload." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画をアップロード用に準備できませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화를 업로드할 수 있도록 준비하지 못했습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法准备录屏以上传。"
           }
         }
       }

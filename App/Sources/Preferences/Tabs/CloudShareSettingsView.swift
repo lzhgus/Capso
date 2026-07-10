@@ -8,6 +8,7 @@ struct CloudShareSettingsView: View {
     @State private var showWizard = false
     @State private var testing = false
     @State private var testResult: TestResultAlert?
+    @State private var showingAutoUploadConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -31,6 +32,17 @@ struct CloudShareSettingsView: View {
                 message: Text(result.message),
                 dismissButton: .default(Text(String(localized: "OK")))
             )
+        }
+        .alert(
+            String(localized: "Enable Automatic Uploads?"),
+            isPresented: $showingAutoUploadConfirmation
+        ) {
+            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Enable")) {
+                viewModel.cloudShareAutoUploadEnabled = true
+            }
+        } message: {
+            Text(String(localized: "Every new screenshot and recording will be uploaded to your configured storage. Each successful share link will replace the current clipboard contents."))
         }
     }
 
@@ -100,6 +112,19 @@ struct CloudShareSettingsView: View {
                 }
             }
 
+            SettingGroup(title: "Behavior") {
+                SettingCard {
+                    SettingRow(
+                        label: "Automatically Upload New Captures",
+                        sublabel: "Upload new screenshots and recordings, then copy the share link"
+                    ) {
+                        Toggle("", isOn: automaticUploadBinding)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                }
+            }
+
             SettingGroup(title: "Actions") {
                 SettingCard {
                     SettingRow(label: "Change Provider", sublabel: "Update storage provider or credentials") {
@@ -138,6 +163,19 @@ struct CloudShareSettingsView: View {
     private var currentProvider: ShareProvider? {
         guard let raw = viewModel.cloudShareProvider else { return nil }
         return ShareProvider(rawValue: raw)
+    }
+
+    private var automaticUploadBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.cloudShareAutoUploadEnabled },
+            set: { enabled in
+                if enabled {
+                    showingAutoUploadConfirmation = true
+                } else {
+                    viewModel.cloudShareAutoUploadEnabled = false
+                }
+            }
+        )
     }
 
     private func testConnection() async {
@@ -224,7 +262,8 @@ struct CloudShareSettingsView: View {
     }
 
     private func resetConfig() {
-        // 1. Clear AppSettings (4 keys via viewModel for proper @Observable mutations)
+        // 1. Clear AppSettings via viewModel for proper @Observable mutations.
+        viewModel.cloudShareAutoUploadEnabled = false
         viewModel.cloudShareProvider = nil
         viewModel.cloudShareURLPrefix = nil
         viewModel.cloudShareAccountID = nil

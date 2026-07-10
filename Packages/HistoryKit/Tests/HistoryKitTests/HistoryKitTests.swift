@@ -37,15 +37,18 @@ func setCloudURLRoundTrip() throws {
     #expect(initial?.cloudURL == nil)
 
     // Set cloudURL
-    try store.setCloudURL(id: entryID, url: "https://share.example.com/abc.png")
+    let setMatchedEntry = try store.setCloudURL(id: entryID, url: "https://share.example.com/abc.png")
+    #expect(setMatchedEntry == true)
     let afterSet = try store.fetchAll(filter: .all).first { $0.id == entryID }
     #expect(afterSet?.cloudURL == "https://share.example.com/abc.png")
 
     // Clear cloudURL
-    try store.setCloudURL(id: entryID, url: nil)
+    let clearMatchedEntry = try store.setCloudURL(id: entryID, url: nil)
+    #expect(clearMatchedEntry == true)
     let afterClear = try store.fetchAll(filter: .all).first { $0.id == entryID }
     #expect(afterClear?.cloudURL == nil)
 
     // Setting on a non-existent ID is silently a no-op (must not throw)
-    try store.setCloudURL(id: UUID(), url: "https://x.com/none.png")
+    let missingEntryMatched = try store.setCloudURL(id: UUID(), url: "https://x.com/none.png")
+    #expect(missingEntryMatched == false)
 }
