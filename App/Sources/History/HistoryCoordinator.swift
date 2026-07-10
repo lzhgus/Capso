@@ -12,6 +12,10 @@ import SharedKit
 @MainActor
 @Observable
 final class HistoryCoordinator {
+    private enum HistorySaveError: Error {
+        case pngEncodingFailed
+    }
+
     let settings: AppSettings
     private let store: HistoryStore?
     private(set) var entries: [HistoryEntry] = []
@@ -27,8 +31,7 @@ final class HistoryCoordinator {
     private let dragFileStore = QuickAccessDragFileStore()
     private var dragFileURLs: [UUID: URL] = [:]
     private var dragPreparationTasks: [UUID: Task<Void, Never>] = [:]
-    private var pendingHistoryEntryIDs: Set<UUID> = []
-    private var pendingCloudURLs: [UUID: String] = [:]
+    private var pendingCloudURLs = PendingHistoryCloudURLTracker()
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -74,10 +77,9 @@ final class HistoryCoordinator {
             if try store.setCloudURL(id: id, url: url) {
                 // Refresh in-memory list so the History UI reflects the change.
                 loadEntries()
-            } else if pendingHistoryEntryIDs.contains(id) {
+            } else if pendingCloudURLs.hold(url: url, for: id) {
                 // A fast upload can finish before the detached history insert.
                 // Hold the URL until that specific insert completes.
-                pendingCloudURLs[id] = url
             }
         } catch {
             print("Failed to persist cloud URL: \(error)")
@@ -197,7 +199,7 @@ final class HistoryCoordinator {
     func saveCapture(result: CaptureResult, entryID: UUID = UUID()) -> UUID {
         guard settings.historyEnabled, let store else { return entryID }
 
-        pendingHistoryEntryIDs.insert(entryID)
+        pendingCloudURLs.begin(id: entryID)
         let entryDir = store.entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
         let fm = FileManager.default
 
@@ -209,7 +211,9 @@ final class HistoryCoordinator {
                 let fullImageName = "capture.png"
                 let fullImageURL = entryDir.appendingPathComponent(fullImageName)
                 let rep = NSBitmapImageRep(cgImage: result.image)
-                guard let pngData = rep.representation(using: .png, properties: [:]) else { return }
+                guard let pngData = rep.representation(using: .png, properties: [:]) else {
+                    throw HistorySaveError.pngEncodingFailed
+                }
                 try pngData.write(to: fullImageURL)
 
                 // Generate and save thumbnail
@@ -260,7 +264,7 @@ final class HistoryCoordinator {
     func saveRecording(url: URL, mode: HistoryCaptureMode, entryID: UUID = UUID()) -> UUID {
         guard settings.historyEnabled, let store else { return entryID }
 
-        pendingHistoryEntryIDs.insert(entryID)
+        pendingCloudURLs.begin(id: entryID)
         let entryDir = store.entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
         let fm = FileManager.default
 
@@ -303,8 +307,7 @@ final class HistoryCoordinator {
     }
 
     private func finishPendingHistoryInsert(id: UUID) {
-        pendingHistoryEntryIDs.remove(id)
-        if let cloudURL = pendingCloudURLs.removeValue(forKey: id), let store {
+        if let cloudURL = pendingCloudURLs.finish(id: id), let store {
             do {
                 _ = try store.setCloudURL(id: id, url: cloudURL)
             } catch {
@@ -315,8 +318,7 @@ final class HistoryCoordinator {
     }
 
     private func cancelPendingHistoryInsert(id: UUID) {
-        pendingHistoryEntryIDs.remove(id)
-        pendingCloudURLs.removeValue(forKey: id)
+        pendingCloudURLs.cancel(id: id)
     }
 
     private static func extractFirstFrame(from videoURL: URL) async -> CGImage? {

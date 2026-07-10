@@ -52,3 +52,29 @@ func setCloudURLRoundTrip() throws {
     let missingEntryMatched = try store.setCloudURL(id: UUID(), url: "https://x.com/none.png")
     #expect(missingEntryMatched == false)
 }
+
+@Test("holds a fast upload URL until the history insert finishes")
+func pendingHistoryURLFinishesWithInsert() {
+    let entryID = UUID()
+    var tracker = PendingHistoryCloudURLTracker()
+
+    tracker.begin(id: entryID)
+    let heldURL = tracker.hold(url: "https://share.example.com/fast.png", for: entryID)
+    #expect(heldURL)
+    #expect(tracker.finish(id: entryID) == "https://share.example.com/fast.png")
+    #expect(!tracker.contains(entryID))
+}
+
+@Test("cancelling a failed history insert clears pending state and URL")
+func pendingHistoryURLCancelsWithFailedInsert() {
+    let entryID = UUID()
+    var tracker = PendingHistoryCloudURLTracker()
+
+    tracker.begin(id: entryID)
+    let heldURL = tracker.hold(url: "https://share.example.com/orphan.png", for: entryID)
+    #expect(heldURL)
+    tracker.cancel(id: entryID)
+
+    #expect(!tracker.contains(entryID))
+    #expect(tracker.finish(id: entryID) == nil)
+}

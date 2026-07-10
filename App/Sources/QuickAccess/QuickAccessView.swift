@@ -34,6 +34,7 @@ struct QuickAccessView: View {
     @State private var isHovering = false
     @State private var hoveredAction: HoverAction?
     @State private var visualState: PanelUploadState = .idle
+    @State private var uploadAttemptGate = UploadAttemptGate()
     @State private var didStartAutoUpload = false
     @State private var dragFileStore = QuickAccessDragFileStore()
     @State private var dragFileID = UUID()
@@ -431,6 +432,10 @@ struct QuickAccessView: View {
 
     private func performUpload() async {
         guard let coord = shareCoordinator else { return }
+        guard uploadAttemptGate.begin() else { return }
+        visualState = .uploading
+        defer { uploadAttemptGate.finish() }
+
         let image = captureImage  // capture into local for the detached closure
 
         // Encode + write off main actor — large PNGs block UI for hundreds of ms otherwise
@@ -454,7 +459,6 @@ struct QuickAccessView: View {
         }
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
-        visualState = .uploading
         do {
             let cloudURL = try await coord.upload(file: tempURL, contentType: "image/png")
             onUploadSucceeded?(cloudURL.absoluteString)

@@ -226,4 +226,18 @@ struct ShareCoordinatorTests {
             secondURL.lastPathComponent,
         ])
     }
+
+    @Test("upload attempt gate rejects duplicates until the active attempt finishes")
+    func uploadAttemptGateRejectsDuplicates() {
+        var gate = UploadAttemptGate()
+
+        let firstStarted = gate.begin()
+        let duplicateStarted = gate.begin()
+        #expect(firstStarted)
+        #expect(!duplicateStarted)
+
+        gate.finish()
+        let retryStarted = gate.begin()
+        #expect(retryStarted)
+    }
 }
