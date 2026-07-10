@@ -169,6 +169,26 @@ struct AppSettingsTests {
         #expect(second.diagnosticLoggingEnabled == true)
     }
 
+    @Test("Automation URLs are disabled by default")
+    func defaultAutomationURLsEnabled() {
+        let suite = "test.automationURLs.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.automationURLsEnabled == false)
+    }
+
+    @Test("Automation URL preference persists across instances")
+    func automationURLsEnabledPersists() {
+        let suite = "test.automationURLs.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.automationURLsEnabled = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.automationURLsEnabled == true)
+    }
+
     @Test("Menu bar icon is shown by default")
     func defaultShowMenuBarIcon() {
         let suite = "test.showMenuBarIcon.default"

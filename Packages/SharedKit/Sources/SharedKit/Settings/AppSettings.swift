@@ -208,6 +208,11 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "diagnosticLoggingEnabled") }
     }
 
+    public var automationURLsEnabled: Bool {
+        get { defaults.object(forKey: "automationURLsEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "automationURLsEnabled") }
+    }
+
     // MARK: Export
     public var screenshotFormat: ScreenshotFormat {
         get {
