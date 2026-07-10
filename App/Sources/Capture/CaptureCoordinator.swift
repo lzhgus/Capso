@@ -14,6 +14,7 @@ import ShareKit
 final class CaptureCoordinator {
     private let settings: AppSettings
     private var overlayWindows: [CaptureOverlayWindow] = []
+    private var isSelectionFlowStarting = false
     /// Stack of active preview windows:
     /// - `[0]` is the OLDEST preview, anchored at the bottom-left primary slot
     /// - `[N]` is the NEWEST preview, sitting at the top of the visual stack
@@ -34,6 +35,13 @@ final class CaptureCoordinator {
     private var scrollCaptureOverlay: ScrollCaptureOverlay?
     private var selfTimerHUD: SelfTimerHUD?
     private var toastWindow: ToastWindow?
+
+    var isCaptureSelectionActive: Bool {
+        isSelectionFlowStarting
+            || !overlayWindows.isEmpty
+            || allInOneToolbarWindow != nil
+            || selfTimerHUD != nil
+    }
 
     var lastCaptureResult: CaptureResult?
     var ocrCoordinator: OCRCoordinator?
@@ -200,6 +208,7 @@ final class CaptureCoordinator {
     }
 
     func captureAllInOne() {
+        isSelectionFlowStarting = true
         pendingAction = .default
         rememberSourceApplication()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
@@ -208,6 +217,7 @@ final class CaptureCoordinator {
     }
 
     private func startAreaCapture() {
+        isSelectionFlowStarting = true
         rememberSourceApplication()
         // Always freeze the screen first, then show the selection overlay on top
         // of the frozen backdrop. Freezing captures the current frame (including
@@ -265,6 +275,7 @@ final class CaptureCoordinator {
     }
 
     func captureScrolling() {
+        isSelectionFlowStarting = true
         rememberSourceApplication()
         // Freeze first (preserves open dropdowns), then select area on the
         // frozen backdrop. After selection, dismiss the freeze layer and run
@@ -279,6 +290,7 @@ final class CaptureCoordinator {
     /// Self-timer area capture: pick area, show countdown HUD, then capture.
     /// Uses `settings.selfTimerDurationSeconds` as the delay.
     func captureAreaWithSelfTimer() {
+        isSelectionFlowStarting = true
         pendingAction = .default
         rememberSourceApplication()
         let seconds = settings.selfTimerDurationSeconds
@@ -293,6 +305,7 @@ final class CaptureCoordinator {
     }
 
     func captureWindow() {
+        isSelectionFlowStarting = true
         pendingSourceApplication = nil
         // Enumerate windows first (async, no focus change), then freeze the
         // screen and show the window-selection overlay on the frozen backdrop.
@@ -308,12 +321,14 @@ final class CaptureCoordinator {
                     .filter { !overlayIDs.contains($0.id) }
 
                 guard !windows.isEmpty else {
+                    isSelectionFlowStarting = false
                     print("No windows found to capture")
                     return
                 }
 
                 showFrozenOverlay(mode: .windowSelection(windows))
             } catch {
+                isSelectionFlowStarting = false
                 print("Window enumeration failed: \(error)")
             }
         }
@@ -887,6 +902,7 @@ final class CaptureCoordinator {
     }
 
     private func dismissOverlay() {
+        isSelectionFlowStarting = false
         dismissSelectionOverlays()
         dismissFreezeWindows()
     }
