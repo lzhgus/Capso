@@ -54,6 +54,7 @@ final class HistoryCoordinator {
 
     func loadEntries() {
         guard let store else { return }
+        persistHeldCloudURLs(using: store)
         do {
             entries = try store.fetchAll(filter: currentFilter)
             totalSize = try store.totalFileSize()
@@ -75,6 +76,7 @@ final class HistoryCoordinator {
         guard let store else { return }
         do {
             if try store.setCloudURL(id: id, url: url) {
+                pendingCloudURLs.completePersistence(id: id)
                 // Refresh in-memory list so the History UI reflects the change.
                 loadEntries()
             } else if pendingCloudURLs.hold(url: url, for: id) {
@@ -82,6 +84,7 @@ final class HistoryCoordinator {
                 // Hold the URL until that specific insert completes.
             }
         } catch {
+            _ = pendingCloudURLs.hold(url: url, for: id)
             print("Failed to persist cloud URL: \(error)")
         }
     }
@@ -307,18 +310,25 @@ final class HistoryCoordinator {
     }
 
     private func finishPendingHistoryInsert(id: UUID) {
-        if let cloudURL = pendingCloudURLs.finish(id: id), let store {
-            do {
-                _ = try store.setCloudURL(id: id, url: cloudURL)
-            } catch {
-                print("Failed to persist pending cloud URL: \(error)")
-            }
-        }
+        _ = pendingCloudURLs.finish(id: id)
         loadEntries()
     }
 
     private func cancelPendingHistoryInsert(id: UUID) {
         pendingCloudURLs.cancel(id: id)
+    }
+
+    private func persistHeldCloudURLs(using store: HistoryStore) {
+        for (id, cloudURL) in pendingCloudURLs.heldURLsForPersistence {
+            do {
+                if try store.setCloudURL(id: id, url: cloudURL) {
+                    pendingCloudURLs.completePersistence(id: id)
+                }
+            } catch {
+                // Keep the URL in the tracker so a later load can retry.
+                print("Failed to persist pending cloud URL: \(error)")
+            }
+        }
     }
 
     private static func extractFirstFrame(from videoURL: URL) async -> CGImage? {

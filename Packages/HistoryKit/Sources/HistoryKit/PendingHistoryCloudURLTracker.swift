@@ -15,6 +15,14 @@ public struct PendingHistoryCloudURLTracker: Sendable {
         pendingEntryIDs.contains(id)
     }
 
+    public var heldURLsForPersistence: [UUID: String] {
+        heldURLs
+    }
+
+    public func heldURL(for id: UUID) -> String? {
+        heldURLs[id]
+    }
+
     @discardableResult
     public mutating func hold(url: String, for id: UUID) -> Bool {
         guard pendingEntryIDs.contains(id) else { return false }
@@ -24,7 +32,11 @@ public struct PendingHistoryCloudURLTracker: Sendable {
 
     public mutating func finish(id: UUID) -> String? {
         pendingEntryIDs.remove(id)
-        return heldURLs.removeValue(forKey: id)
+        return heldURLs[id]
+    }
+
+    public mutating func completePersistence(id: UUID) {
+        heldURLs.removeValue(forKey: id)
     }
 
     public mutating func cancel(id: UUID) {

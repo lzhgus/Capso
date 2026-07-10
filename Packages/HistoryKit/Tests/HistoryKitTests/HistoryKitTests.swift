@@ -63,6 +63,10 @@ func pendingHistoryURLFinishesWithInsert() {
     #expect(heldURL)
     #expect(tracker.finish(id: entryID) == "https://share.example.com/fast.png")
     #expect(!tracker.contains(entryID))
+    #expect(tracker.heldURL(for: entryID) == "https://share.example.com/fast.png")
+
+    tracker.completePersistence(id: entryID)
+    #expect(tracker.heldURL(for: entryID) == nil)
 }
 
 @Test("cancelling a failed history insert clears pending state and URL")
