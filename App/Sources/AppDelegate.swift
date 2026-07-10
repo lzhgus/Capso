@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var historyCoordinator: HistoryCoordinator?
     private(set) var shareCoordinator: ShareCoordinator?
     private var preferencesWindow: PreferencesWindow?
+    private var automationURLRequestBuffer = AutomationURLRequestBuffer()
+    private var receivedAutomationURLDuringLaunch = false
     /// Sparkle update coordinator used by preferences and manual update checks.
     let updateManager = UpdateManager()
 
@@ -64,13 +66,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onShowPreferences: { [weak self] in self?.showPreferences() }
         )
         registerGlobalShortcuts()
+        performPendingAutomationURLAction()
         historyCoordinator?.runCleanup()
 
         // Safety net: if the menu bar icon is hidden, the user has no obvious
         // way to access settings, so surface Preferences on launch.
         if !settings.showMenuBarIcon {
             DispatchQueue.main.async { [weak self] in
-                self?.showPreferences()
+                guard let self, !receivedAutomationURLDuringLaunch else { return }
+                showPreferences()
             }
         }
 
@@ -183,6 +187,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard settings.automationURLsEnabled else {
+            logAutomationURL("Ignored request because Automation URLs are disabled")
+            return
+        }
+        guard let action = urls.lazy.compactMap(AutomationURLAction.init(url:)).first else {
+            logAutomationURL("Ignored unsupported request")
+            return
+        }
+
+        receivedAutomationURLDuringLaunch = true
+        automationURLRequestBuffer.enqueue(action)
+        performPendingAutomationURLAction()
+    }
+
+    private func performPendingAutomationURLAction() {
+        let selectionIsActive = captureCoordinator?.isCaptureSelectionActive ?? false
+        guard let action = automationURLRequestBuffer.takeIfReady(
+            coordinatorIsReady: captureCoordinator != nil,
+            captureSelectionIsActive: selectionIsActive
+        ), let captureCoordinator else {
+            return
+        }
+
+        switch action {
+        case .captureArea:
+            captureCoordinator.captureArea()
+        case .captureFullscreen:
+            captureCoordinator.captureFullscreen()
+        case .captureWindow:
+            captureCoordinator.captureWindow()
+        }
+        logAutomationURL("Performed action \(String(describing: action))")
+    }
+
+    private func logAutomationURL(_ message: String) {
+        guard settings.diagnosticLoggingEnabled else { return }
+        DiagnosticLogger.append(message, category: "AutomationURL")
     }
 
     /// Called when the user double-clicks the app while it's already running
