@@ -361,6 +361,21 @@ struct AppSettingsTests {
         #expect(settings.cloudShareAccountID == "abc123")
     }
 
+    @Test("Cloud Share automatic upload is opt-in and persists")
+    func cloudShareAutoUploadPreference() {
+        let suite = "test.cloudShare.autoUpload"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+
+        #expect(first.cloudShareAutoUploadEnabled == false)
+
+        first.cloudShareAutoUploadEnabled = true
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.cloudShareAutoUploadEnabled == true)
+    }
+
     // MARK: Self-Timer
 
     @Test("Default self-timer duration is 5 seconds")

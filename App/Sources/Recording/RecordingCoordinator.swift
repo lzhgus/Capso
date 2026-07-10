@@ -16,6 +16,7 @@ import SharedKit
 import ExportKit
 import EffectsKit
 import EditorKit
+import ShareKit
 
 /// Orchestrates recording flow:
 /// 1. Show overlay for area selection (drag, or Space to switch to window selection)
@@ -48,6 +49,7 @@ final class RecordingCoordinator {
     private var escLocalMonitor: Any?
     private var escEventTap: CFMachPort?
     private var escEventTapRunLoopSource: CFRunLoopSource?
+    private var automaticUploadSourceTasks: [URL: Task<URL?, Never>] = [:]
 
     // Selection state
     private var selectedRect: CGRect = .zero
@@ -541,7 +543,9 @@ final class RecordingCoordinator {
 
                 // Save to history immediately (before user decides to Save/discard)
                 let format = result.format as RecordingKit.RecordingFormat
-                saveRecordingToHistory(url: tempURL, format: format)
+                let entryID = UUID()
+                saveRecordingToHistory(url: tempURL, format: format, entryID: entryID)
+                startAutomaticUploadIfNeeded(url: tempURL, format: format, entryID: entryID)
 
                 if settings.openEditorAfterRecording {
                     // Open the full recording editor (trim, zoom, export)
@@ -644,6 +648,9 @@ final class RecordingCoordinator {
         do {
             let result = try await VideoExporter.export(source: tempURL, options: options, progress: progress)
             if deleteSourceOnSuccess {
+                if let sourceTask = automaticUploadSourceTasks[tempURL] {
+                    _ = await sourceTask.value
+                }
                 // Clean up temp file after successful export
                 try? FileManager.default.removeItem(at: tempURL)
             }
@@ -1000,9 +1007,78 @@ final class RecordingCoordinator {
         cameraManager.stop()
     }
 
-    private func saveRecordingToHistory(url: URL, format: RecordingKit.RecordingFormat) {
+    private func saveRecordingToHistory(
+        url: URL,
+        format: RecordingKit.RecordingFormat,
+        entryID: UUID
+    ) {
         guard let historyCoordinator else { return }
         let mode: HistoryCaptureMode = format == .gif ? .gif : .recording
-        historyCoordinator.saveRecording(url: url, mode: mode)
+        historyCoordinator.saveRecording(url: url, mode: mode, entryID: entryID)
+    }
+
+    private func startAutomaticUploadIfNeeded(
+        url: URL,
+        format: RecordingKit.RecordingFormat,
+        entryID: UUID
+    ) {
+        guard settings.cloudShareAutoUploadEnabled,
+              let historyCoordinator,
+              historyCoordinator.shareCoordinator != nil else {
+            return
+        }
+
+        let mode: HistoryCaptureMode = format == .gif ? .gif : .recording
+        let sourceTask = Task.detached(priority: .utility) { () -> URL? in
+            let stagedURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension(url.pathExtension)
+            do {
+                try FileManager.default.linkItem(at: url, to: stagedURL)
+                return stagedURL
+            } catch {
+                do {
+                    try FileManager.default.copyItem(at: url, to: stagedURL)
+                    return stagedURL
+                } catch {
+                    return nil
+                }
+            }
+        }
+        automaticUploadSourceTasks[url] = sourceTask
+
+        Task { [weak self] in
+            defer { self?.automaticUploadSourceTasks[url] = nil }
+            guard let stagedURL = await sourceTask.value else {
+                CaptureCoordinator.postNotification(
+                    title: String(localized: "Cloud share failed"),
+                    body: String(localized: "Couldn't prepare recording for upload.")
+                )
+                return
+            }
+            defer { try? FileManager.default.removeItem(at: stagedURL) }
+
+            do {
+                _ = try await historyCoordinator.uploadRecording(
+                    url: stagedURL,
+                    mode: mode,
+                    entryID: entryID
+                )
+                CaptureCoordinator.postNotification(
+                    title: String(localized: "Cloud share ready"),
+                    body: String(localized: "Link copied to clipboard.")
+                )
+            } catch let error as ShareError {
+                CaptureCoordinator.postNotification(
+                    title: String(localized: "Cloud share failed"),
+                    body: CaptureCoordinator.humanizeShareError(error)
+                )
+            } catch {
+                CaptureCoordinator.postNotification(
+                    title: String(localized: "Cloud share failed"),
+                    body: error.localizedDescription
+                )
+            }
+        }
     }
 }

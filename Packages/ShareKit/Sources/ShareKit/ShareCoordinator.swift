@@ -18,7 +18,14 @@ public enum UploadState: Sendable {
 public final class ShareCoordinator {
     public private(set) var state: UploadState = .idle
     public let destination: ShareDestination
-    private var isInFlight = false
+    private var uploadQueue: [UploadRequest] = []
+    private var isProcessingQueue = false
+
+    private struct UploadRequest {
+        let file: URL
+        let contentType: String
+        let continuation: CheckedContinuation<URL, Error>
+    }
 
     public init(destination: ShareDestination) {
         self.destination = destination
@@ -29,29 +36,47 @@ public final class ShareCoordinator {
     /// Clipboard is **never** written on failure.
     @discardableResult
     public func upload(file: URL, contentType: String) async throws -> URL {
-        guard !isInFlight else {
-            throw ShareError.unknown("Upload already in progress")
+        try await withCheckedThrowingContinuation { continuation in
+            uploadQueue.append(
+                UploadRequest(
+                    file: file,
+                    contentType: contentType,
+                    continuation: continuation
+                )
+            )
+            guard !isProcessingQueue else { return }
+            isProcessingQueue = true
+            Task { await processUploadQueue() }
         }
-        isInFlight = true
-        defer { isInFlight = false }
+    }
 
-        state = .uploading
-        let id = IDGenerator.shortID()
-        let ext = file.pathExtension
-        let key = ext.isEmpty ? id : "\(id).\(ext)"
+    private func processUploadQueue() async {
+        defer { isProcessingQueue = false }
 
-        do {
-            let url = try await destination.upload(file: file, key: key, contentType: contentType)
-            state = .succeeded(url)
-            copyToClipboard(url)
-            return url
-        } catch let err as ShareError {
-            state = .failed(err)
-            throw err
-        } catch {
-            let mapped = ShareError.unknown(error.localizedDescription)
-            state = .failed(mapped)
-            throw mapped
+        while !uploadQueue.isEmpty {
+            let request = uploadQueue.removeFirst()
+            state = .uploading
+            let id = IDGenerator.shortID()
+            let ext = request.file.pathExtension
+            let key = ext.isEmpty ? id : "\(id).\(ext)"
+
+            do {
+                let url = try await destination.upload(
+                    file: request.file,
+                    key: key,
+                    contentType: request.contentType
+                )
+                state = .succeeded(url)
+                copyToClipboard(url)
+                request.continuation.resume(returning: url)
+            } catch let error as ShareError {
+                state = .failed(error)
+                request.continuation.resume(throwing: error)
+            } catch {
+                let mapped = ShareError.unknown(error.localizedDescription)
+                state = .failed(mapped)
+                request.continuation.resume(throwing: mapped)
+            }
         }
     }
 

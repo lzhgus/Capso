@@ -108,14 +108,14 @@ public final class HistoryStore: Sendable {
     }
 
     /// Set or clear the cloud share URL for a capture.
-    /// Silently no-ops if no row matches `id` — by design: if the user deletes a
-    /// capture while an upload is in flight, the URL has nowhere to land but the
-    /// upload itself already succeeded; this is not an error condition.
-    public func setCloudURL(id: UUID, url: String?) throws {
+    /// Returns whether a row matched `id`. Callers can use a `false` result to
+    /// defer an update while an asynchronous history insert is still pending.
+    @discardableResult
+    public func setCloudURL(id: UUID, url: String?) throws -> Bool {
         try dbQueue.write { db in
-            _ = try HistoryEntry
+            try HistoryEntry
                 .filter(id: id)
-                .updateAll(db, Column("cloudURL").set(to: url))
+                .updateAll(db, Column("cloudURL").set(to: url)) > 0
         }
     }
 

@@ -16,6 +16,7 @@ struct QuickAccessView: View {
     let screenshotFilenameTemplate: String
     let targetLanguageDisplay: String?  // e.g. "Simplified Chinese"
     let shareCoordinator: ShareCoordinator?
+    let autoUpload: Bool
     /// Called with the public URL string when a cloud upload succeeds.
     /// Use this to persist the URL to the history entry.
     let onUploadSucceeded: ((String) -> Void)?
@@ -33,6 +34,8 @@ struct QuickAccessView: View {
     @State private var isHovering = false
     @State private var hoveredAction: HoverAction?
     @State private var visualState: PanelUploadState = .idle
+    @State private var uploadAttemptGate = UploadAttemptGate()
+    @State private var didStartAutoUpload = false
     @State private var dragFileStore = QuickAccessDragFileStore()
     @State private var dragFileID = UUID()
     @State private var preparedDragFileURL: URL?
@@ -91,7 +94,10 @@ struct QuickAccessView: View {
         .offset(y: isRevealed ? -2 : 0)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.26), value: isRevealed)
         .onHover { isHovering = $0 }
-        .onAppear { prepareDragFileIfNeeded() }
+        .onAppear {
+            prepareDragFileIfNeeded()
+            startAutoUploadIfNeeded()
+        }
         .onDisappear { cleanupPreparedDragFile() }
         .focusable()
         .focused($isFocused)
@@ -426,6 +432,10 @@ struct QuickAccessView: View {
 
     private func performUpload() async {
         guard let coord = shareCoordinator else { return }
+        guard uploadAttemptGate.begin() else { return }
+        visualState = .uploading
+        defer { uploadAttemptGate.finish() }
+
         let image = captureImage  // capture into local for the detached closure
 
         // Encode + write off main actor — large PNGs block UI for hundreds of ms otherwise
@@ -449,7 +459,6 @@ struct QuickAccessView: View {
         }
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
-        visualState = .uploading
         do {
             let cloudURL = try await coord.upload(file: tempURL, contentType: "image/png")
             onUploadSucceeded?(cloudURL.absoluteString)
@@ -463,6 +472,12 @@ struct QuickAccessView: View {
         } catch {
             visualState = .failed(.unknown(error.localizedDescription))
         }
+    }
+
+    private func startAutoUploadIfNeeded() {
+        guard autoUpload, !didStartAutoUpload, shareCoordinator != nil else { return }
+        didStartAutoUpload = true
+        Task { await performUpload() }
     }
 
     @ViewBuilder

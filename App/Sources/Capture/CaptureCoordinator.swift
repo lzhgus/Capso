@@ -184,7 +184,7 @@ final class CaptureCoordinator {
         // Gate: Cloud Share not configured → ask AppDelegate (via notification) to
         // open Preferences → Cloud Share tab. We avoid `NSApp.delegate as? AppDelegate`
         // because the cast fails under SwiftUI's @NSApplicationDelegateAdaptor proxying.
-        guard let coord = shareCoordinator else {
+        guard shareCoordinator != nil else {
             logDiagnostic("Cloud Share shortcut blocked: coordinator not configured")
             NotificationCenter.default.post(
                 name: .openScreenshotSettings,
@@ -193,17 +193,8 @@ final class CaptureCoordinator {
             return
         }
 
-        // Gate: upload already in flight → notify and bail
-        if case .uploading = coord.state {
-            logDiagnostic("Cloud Share shortcut blocked: upload already in progress")
-            Self.postNotification(
-                title: String(localized: "Cloud Share busy"),
-                body: String(localized: "Previous upload still in progress — try again in a moment.")
-            )
-            return
-        }
-
-        // All clear: run area selection, upload on success
+        // Upload requests are serialized by ShareCoordinator, so a capture made
+        // during another upload waits in FIFO order instead of being dropped.
         pendingAction = .share
         startAreaCapture()
     }
@@ -1228,6 +1219,7 @@ final class CaptureCoordinator {
             }
             return  // history already saved above; skip the call below
         case .default:
+            let shouldAutoUpload = settings.cloudShareAutoUploadEnabled && shareCoordinator != nil
             if settings.screenshotAutoCopy {
                 copyImageToClipboard(outputResult.image)
             }
@@ -1235,7 +1227,19 @@ final class CaptureCoordinator {
                 saveImageToFile(outputResult)
             }
             if settings.screenshotShowPreview {
-                showQuickAccess(for: outputResult, entryID: entryID)
+                showQuickAccess(
+                    for: outputResult,
+                    entryID: entryID,
+                    autoUpload: shouldAutoUpload
+                )
+            } else if shouldAutoUpload, let coord = shareCoordinator {
+                Task {
+                    await self.performShareAfterCapture(
+                        result: outputResult,
+                        entryID: entryID,
+                        coord: coord
+                    )
+                }
             }
         }
 
@@ -1258,7 +1262,7 @@ final class CaptureCoordinator {
         return NSSound(named: "Pop")
     }()
 
-    private func showQuickAccess(for result: CaptureResult, entryID: UUID) {
+    private func showQuickAccess(for result: CaptureResult, entryID: UUID, autoUpload: Bool) {
         // If the stack is full, evict the oldest (the one anchored at the
         // bottom slot) with a slide-off-left animation. The remaining
         // previews will slide down one slot as part of the restack below.
@@ -1268,7 +1272,13 @@ final class CaptureCoordinator {
         }
 
         let captureScreen = NSScreen.screens.first { $0.displayID == result.displayID }
-        let window = QuickAccessWindow(result: result, settings: settings, screen: captureScreen, shareCoordinator: shareCoordinator)
+        let window = QuickAccessWindow(
+            result: result,
+            settings: settings,
+            screen: captureScreen,
+            shareCoordinator: shareCoordinator,
+            autoUpload: autoUpload
+        )
 
         // Persist the cloud URL to history when an upload succeeds from Quick Access.
         window.onUploadSucceeded = { [weak self] urlString in
@@ -1710,7 +1720,7 @@ final class CaptureCoordinator {
         DiagnosticLogger.append(message, category: "Capture")
     }
 
-    private static func humanizeShareError(_ err: ShareError) -> String {
+    static func humanizeShareError(_ err: ShareError) -> String {
         switch err {
         case .invalidCredentials:
             return String(localized: "Cloud credentials are invalid.")
@@ -1730,7 +1740,7 @@ final class CaptureCoordinator {
     }
 
     /// Post a macOS user notification. Requests authorization on the first call.
-    private static func postNotification(title: String, body: String) {
+    static func postNotification(title: String, body: String) {
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
         content.title = title

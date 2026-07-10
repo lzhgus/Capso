@@ -28,7 +28,13 @@ final class QuickAccessWindow: NSPanel {
     /// The screen this preview is anchored to (where the capture originated).
     let targetScreen: NSScreen
 
-    init(result: CaptureResult, settings: AppSettings, screen: NSScreen?, shareCoordinator: ShareCoordinator?) {
+    init(
+        result: CaptureResult,
+        settings: AppSettings,
+        screen: NSScreen?,
+        shareCoordinator: ShareCoordinator?,
+        autoUpload: Bool
+    ) {
         self.settings = settings
         self.targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
 
@@ -78,6 +84,7 @@ final class QuickAccessWindow: NSPanel {
             screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
             targetLanguageDisplay: targetDisplay,
             shareCoordinator: shareCoordinator,
+            autoUpload: autoUpload,
             onUploadSucceeded: { [weak self] url in self?.onUploadSucceeded?(url) },
             onCopy:      { [weak self] in self?.onCopy?() },
             onSave:      { [weak self] in self?.onSave?() },
