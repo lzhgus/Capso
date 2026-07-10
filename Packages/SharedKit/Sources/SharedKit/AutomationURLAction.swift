@@ -6,23 +6,21 @@ public enum AutomationURLAction: Equatable, Sendable {
     case captureWindow
 
     public init?(url: URL) {
-        guard url.scheme?.caseInsensitiveCompare("capso") == .orderedSame,
-              url.host?.caseInsensitiveCompare("grab") == .orderedSame,
-              url.user == nil,
-              url.password == nil,
-              url.port == nil,
-              url.query == nil,
-              url.fragment == nil else {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme?.caseInsensitiveCompare("capso") == .orderedSame,
+              components.host?.caseInsensitiveCompare("grab") == .orderedSame,
+              components.user == nil,
+              components.password == nil,
+              components.port == nil,
+              components.percentEncodedQuery == nil,
+              components.fragment == nil else {
             return nil
         }
 
-        let pathComponents = url.pathComponents.filter { $0 != "/" }
-        guard pathComponents.count == 1 else { return nil }
-
-        switch pathComponents[0] {
-        case "area": self = .captureArea
-        case "fullscreen": self = .captureFullscreen
-        case "window": self = .captureWindow
+        switch components.percentEncodedPath {
+        case "/area": self = .captureArea
+        case "/fullscreen": self = .captureFullscreen
+        case "/window": self = .captureWindow
         default: return nil
         }
     }
