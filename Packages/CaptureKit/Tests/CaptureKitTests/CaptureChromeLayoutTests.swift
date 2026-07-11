@@ -20,7 +20,7 @@ struct CaptureChromeLayoutTests {
     func densityBoundaries() {
         #expect(CaptureChromeLayout.annotationDensity(for: 479) == .mini)
         #expect(CaptureChromeLayout.annotationDensity(for: 480) == .compact)
-        #expect(CaptureChromeLayout.annotationDensity(for: 839) == .compact)
-        #expect(CaptureChromeLayout.annotationDensity(for: 840) == .regular)
+        #expect(CaptureChromeLayout.annotationDensity(for: 999) == .compact)
+        #expect(CaptureChromeLayout.annotationDensity(for: 1_000) == .regular)
     }
 }

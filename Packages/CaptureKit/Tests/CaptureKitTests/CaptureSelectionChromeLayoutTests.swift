@@ -18,6 +18,18 @@ struct CaptureSelectionChromeLayoutTests {
             for: CGSize(width: 79, height: 180),
             isFixedSize: false
         ) == [.topLeft, .topRight, .bottomRight, .bottomLeft])
+        #expect(CaptureSelectionChromeLayout.visibleHandles(
+            for: CGSize(width: 180, height: 79),
+            isFixedSize: false
+        ) == [.topLeft, .topRight, .bottomRight, .bottomLeft])
+    }
+
+    @Test("The 80-by-80 boundary exposes all eight resize handles")
+    func handleThresholdBoundary() {
+        #expect(CaptureSelectionChromeLayout.visibleHandles(
+            for: CGSize(width: 80, height: 80),
+            isFixedSize: false
+        ) == [.topLeft, .top, .topRight, .right, .bottomRight, .bottom, .bottomLeft, .left])
     }
 
     @Test("Fixed-size selections hide resize handles")
@@ -35,7 +47,7 @@ struct CaptureSelectionChromeLayoutTests {
         ) == "1140 × 564")
     }
 
-    @Test("HUD prefers above and falls back inside near the top edge")
+    @Test("HUD prefers above and falls below near the top edge")
     func hudPlacement() {
         let bounds = CGRect(x: 0, y: 0, width: 1_200, height: 800)
         let hud = CGSize(width: 92, height: 24)
@@ -48,6 +60,30 @@ struct CaptureSelectionChromeLayoutTests {
             selectionRect: CGRect(x: 100, y: 500, width: 500, height: 290),
             hudSize: hud,
             in: bounds
-        ) == CGPoint(x: 110, y: 756))
+        ) == CGPoint(x: 100, y: 468))
+    }
+
+    @Test("Tiny selections at the top edge place the HUD below without overlap")
+    func tinyTopEdgeHUDPlacement() {
+        let bounds = CGRect(x: 0, y: 0, width: 1_200, height: 800)
+        let hud = CGSize(width: 92, height: 24)
+        let selection = CGRect(x: 100, y: 776, width: 120, height: 24)
+        let origin = CaptureSelectionChromeLayout.dimensionHUDOrigin(
+            selectionRect: selection,
+            hudSize: hud,
+            in: bounds
+        )
+
+        #expect(origin == CGPoint(x: 100, y: 744))
+        #expect(CGRect(origin: origin, size: hud).maxY <= selection.minY)
+    }
+
+    @Test("HUD falls inside when neither outside placement fits")
+    func insideHUDPlacement() {
+        #expect(CaptureSelectionChromeLayout.dimensionHUDOrigin(
+            selectionRect: CGRect(x: 100, y: 4, width: 500, height: 792),
+            hudSize: CGSize(width: 92, height: 24),
+            in: CGRect(x: 0, y: 0, width: 1_200, height: 800)
+        ) == CGPoint(x: 110, y: 762))
     }
 }

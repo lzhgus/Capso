@@ -13,7 +13,7 @@ public enum CaptureChromeLayout {
         if availableWidth < 480 {
             return .mini
         }
-        if availableWidth < 840 {
+        if availableWidth < 1_000 {
             return .compact
         }
         return .regular

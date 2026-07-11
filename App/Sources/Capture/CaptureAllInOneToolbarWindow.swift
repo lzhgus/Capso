@@ -1143,6 +1143,7 @@ private final class AllInOneSelectionOverlayView: NSView {
         didSet {
             needsDisplay = true
             window?.invalidateCursorRects(for: self)
+            updateAccessibilityValue(postNotification: true)
         }
     }
     private let minSelectionSize: CGSize
@@ -1161,6 +1162,10 @@ private final class AllInOneSelectionOverlayView: NSView {
         self.minSelectionSize = minSelectionSize
         self.activePreset = activePreset
         super.init(frame: frame)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Selection size")
+        updateAccessibilityValue(postNotification: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1184,6 +1189,13 @@ private final class AllInOneSelectionOverlayView: NSView {
 
     func setSelectionRect(_ selectionRect: CGRect) {
         self.selectionRect = selectionRect.standardized
+    }
+
+    private func updateAccessibilityValue(postNotification: Bool) {
+        setAccessibilityValue(CaptureSelectionChromeLayout.dimensionText(for: selectionRect.size))
+        if postNotification {
+            NSAccessibility.post(element: self, notification: .valueChanged)
+        }
     }
 
     func setActivePreset(_ preset: CapturePreset) {

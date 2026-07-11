@@ -28,7 +28,7 @@ Selection polish is the best next step because it is high-frequency, self-contai
 
 - Move the dimensions out of the narrow right rail and into a compact floating HUD attached to the selection.
 - Use a single-line monospaced label such as `1140 × 564`.
-- Prefer placement eight points above the selection's top-left corner. If there is not enough room, place it just inside the top-left corner.
+- Prefer placement eight points above the selection's top-left corner. If there is not enough room above, place it eight points below the selection. Use the inside top-left fallback only when neither outside placement fits.
 - Keep the HUD visible while the All-in-One selection is active so size feedback remains discoverable before and during resizing.
 
 ### Side Rail
@@ -50,7 +50,7 @@ This keeps visual thresholds testable without moving drawing code out of the App
 ## Testing
 
 - Unit-test the 80-point handle threshold on both axes.
-- Unit-test HUD placement above the selection and its inside fallback near the top screen edge.
+- Unit-test HUD placement above the selection, below it when the top edge blocks the preferred placement, and inside only when neither outside placement fits.
 - Run the full CaptureKit and SharedKit test suites.
 - Build the macOS app with Swift 6 strict concurrency checks.
 - Manually verify small, medium, and large selections in the running app and capture screenshots for review.

@@ -197,7 +197,7 @@ final class CaptureAllInOneAnnotationOverlay {
             }
             height = (showsOverflow ? 102 : 58) + (showsTextOptions ? 42 : 0)
         } else {
-            width = min(max(840, globalRect.width), min(900, maxToolbarWidth))
+            width = min(max(1_000, globalRect.width), min(1_000, maxToolbarWidth))
             height = 58
         }
 
