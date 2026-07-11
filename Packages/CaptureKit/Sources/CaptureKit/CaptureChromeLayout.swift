@@ -18,4 +18,20 @@ public enum CaptureChromeLayout {
         }
         return .regular
     }
+
+    public static func annotationToolbarHeight(
+        density: CaptureChromeDensity,
+        showsOverflow: Bool
+    ) -> CGFloat {
+        switch density {
+        case .mini, .compact:
+            return showsOverflow ? 102 : 58
+        case .regular:
+            return 58
+        }
+    }
+
+    public static func showsInlineTextEffects(for density: CaptureChromeDensity) -> Bool {
+        density == .regular
+    }
 }
