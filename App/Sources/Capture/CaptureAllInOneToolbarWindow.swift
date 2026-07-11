@@ -1417,8 +1417,9 @@ private final class AllInOneSelectionOverlayView: NSView {
         context.fill(rect)
         context.restoreGState()
 
+        drawSelectionBorder(in: context, rect: rect)
         drawDimensionHUD(in: context, selectionRect: rect)
-        drawSelectionChrome(in: context, rect: rect)
+        drawSelectionHandles(in: context, rect: rect)
     }
 
     private func updateCursor(for point: CGPoint) {
@@ -1481,7 +1482,7 @@ private final class AllInOneSelectionOverlayView: NSView {
         }
     }
 
-    private func drawSelectionChrome(in context: CGContext, rect: CGRect) {
+    private func drawSelectionBorder(in context: CGContext, rect: CGRect) {
         context.saveGState()
         context.setStrokeColor(NSColor.black.withAlphaComponent(0.55).cgColor)
         context.setLineWidth(3)
@@ -1490,7 +1491,9 @@ private final class AllInOneSelectionOverlayView: NSView {
         context.setLineWidth(1.5)
         context.stroke(rect)
         context.restoreGState()
+    }
 
+    private func drawSelectionHandles(in context: CGContext, rect: CGRect) {
         let handles = CaptureSelectionChromeLayout.visibleHandles(
             for: rect.size,
             isFixedSize: activePreset.isFixedSize
