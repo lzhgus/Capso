@@ -596,21 +596,18 @@ private final class CaptureAllInOneToolbarState {
         let verticalPadding: CGFloat = 20
         let rowHeight: CGFloat = 38
         let presetHeight: CGFloat = 42
-        let dimensionHeight: CGFloat = 54
         let dividerHeight: CGFloat = 5
 
-        let itemHeights: [CGFloat]
-        if isCompact && !showsOverflow {
-            itemHeights = [dimensionHeight, rowHeight, rowHeight, rowHeight, dividerHeight, rowHeight]
-        } else {
-            itemHeights = [
-                rowHeight, rowHeight, rowHeight, rowHeight, rowHeight, rowHeight, rowHeight,
-                dividerHeight,
-                dimensionHeight,
-                presetHeight,
-                rowHeight, rowHeight,
-                rowHeight
-            ]
+        var itemHeights: [CGFloat] = []
+        if !isCompact || showsOverflow {
+            itemHeights += Array(repeating: rowHeight, count: 7)
+            itemHeights.append(dividerHeight)
+            itemHeights.append(presetHeight)
+        }
+        itemHeights += Array(repeating: rowHeight, count: 4)
+        if isCompact {
+            itemHeights.append(dividerHeight)
+            itemHeights.append(rowHeight)
         }
 
         return verticalPadding
@@ -716,8 +713,6 @@ private struct CaptureAllInOneToolbarView: View {
 
                 railDivider
             }
-
-            railDimensionPill
 
             if !state.isCompact || state.showsOverflow {
                 railPresetMenu
@@ -917,27 +912,6 @@ private struct CaptureAllInOneToolbarView: View {
         .background(Color.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
-        )
-        .help("Selected area size")
-    }
-
-    private var railDimensionPill: some View {
-        VStack(spacing: 1) {
-            Text("\(state.width)")
-            Text("x")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.58))
-            Text("\(state.height)")
-        }
-        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-        .foregroundStyle(.white)
-        .lineLimit(1)
-        .minimumScaleFactor(0.68)
-        .frame(width: 60, height: 54)
-        .background(Color.white.opacity(0.11), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
         )
         .help("Selected area size")
@@ -1425,13 +1399,14 @@ private final class AllInOneSelectionOverlayView: NSView {
         let rect = selectionRect.standardized
 
         context.saveGState()
-        context.setFillColor(NSColor.black.withAlphaComponent(0.38).cgColor)
+        context.setFillColor(NSColor.black.withAlphaComponent(0.32).cgColor)
         context.fill(bounds)
         context.setBlendMode(.clear)
         context.fill(rect)
         context.restoreGState()
 
         drawSelectionChrome(in: context, rect: rect)
+        drawDimensionHUD(in: context, selectionRect: rect)
     }
 
     private func updateCursor(for point: CGPoint) {
@@ -1496,53 +1471,99 @@ private final class AllInOneSelectionOverlayView: NSView {
 
     private func drawSelectionChrome(in context: CGContext, rect: CGRect) {
         context.saveGState()
-        context.setStrokeColor(NSColor.white.withAlphaComponent(0.35).cgColor)
-        context.setLineWidth(1)
+        context.setStrokeColor(NSColor.black.withAlphaComponent(0.55).cgColor)
+        context.setLineWidth(3)
+        context.stroke(rect)
+        context.setStrokeColor(NSColor.white.cgColor)
+        context.setLineWidth(1.5)
         context.stroke(rect)
         context.restoreGState()
 
-        context.saveGState()
-        context.setShadow(
-            offset: .zero,
-            blur: 7,
-            color: NSColor.black.withAlphaComponent(0.55).cgColor
+        let handles = CaptureSelectionChromeLayout.visibleHandles(
+            for: rect.size,
+            isFixedSize: activePreset.isFixedSize
         )
-        context.setStrokeColor(NSColor.white.withAlphaComponent(0.95).cgColor)
-        context.setLineWidth(3)
-        context.setLineCap(.round)
+        for handle in handles {
+            let center = point(for: handle, in: rect)
+            let handleRect = CGRect(x: center.x - 3.5, y: center.y - 3.5, width: 7, height: 7)
 
-        let cornerLength = min(24, max(8, min(rect.width, rect.height) / 3))
-        let midLength = min(14, max(8, min(rect.width, rect.height) / 4))
-        let minX = rect.minX
-        let maxX = rect.maxX
-        let minY = rect.minY
-        let maxY = rect.maxY
-        let midX = rect.midX
-        let midY = rect.midY
-
-        drawCorner(context, x: minX, y: maxY, dx: cornerLength, dy: -cornerLength)
-        drawCorner(context, x: maxX, y: maxY, dx: -cornerLength, dy: -cornerLength)
-        drawCorner(context, x: minX, y: minY, dx: cornerLength, dy: cornerLength)
-        drawCorner(context, x: maxX, y: minY, dx: -cornerLength, dy: cornerLength)
-
-        context.move(to: CGPoint(x: midX - midLength / 2, y: maxY))
-        context.addLine(to: CGPoint(x: midX + midLength / 2, y: maxY))
-        context.move(to: CGPoint(x: midX - midLength / 2, y: minY))
-        context.addLine(to: CGPoint(x: midX + midLength / 2, y: minY))
-        context.move(to: CGPoint(x: minX, y: midY - midLength / 2))
-        context.addLine(to: CGPoint(x: minX, y: midY + midLength / 2))
-        context.move(to: CGPoint(x: maxX, y: midY - midLength / 2))
-        context.addLine(to: CGPoint(x: maxX, y: midY + midLength / 2))
-        context.strokePath()
-        context.restoreGState()
+            context.saveGState()
+            context.setShadow(
+                offset: .zero,
+                blur: 4,
+                color: NSColor.black.withAlphaComponent(0.55).cgColor
+            )
+            context.setFillColor(NSColor.white.cgColor)
+            context.setStrokeColor(NSColor.black.withAlphaComponent(0.65).cgColor)
+            context.setLineWidth(1)
+            context.addEllipse(in: handleRect)
+            context.drawPath(using: .fillStroke)
+            context.restoreGState()
+        }
     }
 
-    private func drawCorner(_ context: CGContext, x: CGFloat, y: CGFloat, dx: CGFloat, dy: CGFloat) {
-        context.move(to: CGPoint(x: x, y: y))
-        context.addLine(to: CGPoint(x: x + dx, y: y))
-        context.move(to: CGPoint(x: x, y: y))
-        context.addLine(to: CGPoint(x: x, y: y + dy))
+    private func point(for handle: CaptureSelectionResizeHandle, in rect: CGRect) -> CGPoint {
+        switch handle {
+        case .topLeft:
+            return CGPoint(x: rect.minX, y: rect.maxY)
+        case .top:
+            return CGPoint(x: rect.midX, y: rect.maxY)
+        case .topRight:
+            return CGPoint(x: rect.maxX, y: rect.maxY)
+        case .right:
+            return CGPoint(x: rect.maxX, y: rect.midY)
+        case .bottomRight:
+            return CGPoint(x: rect.maxX, y: rect.minY)
+        case .bottom:
+            return CGPoint(x: rect.midX, y: rect.minY)
+        case .bottomLeft:
+            return CGPoint(x: rect.minX, y: rect.minY)
+        case .left:
+            return CGPoint(x: rect.minX, y: rect.midY)
+        }
+    }
+
+    private func drawDimensionHUD(in context: CGContext, selectionRect: CGRect) {
+        let text = CaptureSelectionChromeLayout.dimensionText(for: selectionRect.size) as NSString
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.white,
+        ]
+        let textSize = text.size(withAttributes: attributes)
+        let horizontalPadding: CGFloat = 8
+        let verticalPadding: CGFloat = 5
+        let hudSize = CGSize(
+            width: textSize.width + horizontalPadding * 2,
+            height: textSize.height + verticalPadding * 2
+        )
+        let origin = CaptureSelectionChromeLayout.dimensionHUDOrigin(
+            selectionRect: selectionRect,
+            hudSize: hudSize,
+            in: bounds
+        )
+        let hudRect = CGRect(origin: origin, size: hudSize)
+        let hudPath = CGPath(
+            roundedRect: hudRect,
+            cornerWidth: 6,
+            cornerHeight: 6,
+            transform: nil
+        )
+
+        context.saveGState()
+        context.setFillColor(NSColor.black.withAlphaComponent(0.72).cgColor)
+        context.addPath(hudPath)
+        context.fillPath()
+        context.setStrokeColor(NSColor.white.withAlphaComponent(0.18).cgColor)
+        context.setLineWidth(0.5)
+        context.addPath(hudPath)
         context.strokePath()
+        context.restoreGState()
+
+        text.draw(
+            at: CGPoint(x: origin.x + horizontalPadding, y: origin.y + verticalPadding),
+            withAttributes: attributes
+        )
     }
 }
 
