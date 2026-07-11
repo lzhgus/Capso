@@ -7,7 +7,7 @@ import SwiftUI
 @MainActor
 final class CaptureAllInOneToolbarWindow {
     private static let minimumSelectionSize = CGSize(width: 24, height: 24)
-    private static let toolbarCornerRadius: CGFloat = 14
+    private static let toolbarCornerRadius: CGFloat = 16
 
     private var selectionOverlayWindow: NSPanel?
     private weak var selectionOverlayView: AllInOneSelectionOverlayView?
@@ -156,7 +156,7 @@ final class CaptureAllInOneToolbarWindow {
         panel.level = frozenImage == nil ? .screenSaver + 1 : .screenSaver + 3
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
@@ -301,7 +301,7 @@ final class CaptureAllInOneToolbarWindow {
         toolbarState.width = max(1, Int(screenLocalSelectionRect.width.rounded()))
         toolbarState.height = max(1, Int(screenLocalSelectionRect.height.rounded()))
         let shouldCompact = frozenImage != nil
-            && screenLocalSelectionRect.height < 520
+            && CaptureChromeLayout.startsWithCompactSideRail
         if toolbarState.isCompact != shouldCompact {
             toolbarState.isCompact = shouldCompact
             toolbarState.showsOverflow = false
@@ -690,10 +690,10 @@ private struct CaptureAllInOneToolbarView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
         .onHover { hovering in
@@ -743,10 +743,10 @@ private struct CaptureAllInOneToolbarView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
         .animation(.spring(response: 0.20, dampingFraction: 0.88), value: state.showsOverflow)
@@ -758,10 +758,8 @@ private struct CaptureAllInOneToolbarView: View {
     }
 
     private var toolbarBackground: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(.regularMaterial)
-            .shadow(color: .black.opacity(0.30), radius: 18, y: 8)
-            .shadow(color: .black.opacity(0.14), radius: 3, y: 1)
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(.thinMaterial)
     }
 
     private var divider: some View {

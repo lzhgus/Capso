@@ -53,19 +53,19 @@ struct QuickAccessView: View {
     }
 
     private enum HoverAction: Hashable {
-        case copy, save, drag, annotate, ocr, translate, pin, upload, linkCopied
+        case copy, save, drag, annotate, ocr, translate, pin, upload, linkCopied, overflow
     }
 
     private var isRevealed: Bool { isHovering || isFocused }
     private static let panelCornerRadius: CGFloat = 14
-    private static let thumbnailSize = CGSize(width: 268, height: 116)
+    private static let thumbnailSize = CGSize(width: 268, height: 142)
 
     private var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
     var body: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: 8) {
             thumbnailFrame
 
             // Caption at rest / chrome on hover share the same slot so the
@@ -76,7 +76,7 @@ struct QuickAccessView: View {
                 chromeStrip
                     .opacity(isRevealed ? 1 : 0)
             }
-            .frame(height: 50)
+            .frame(height: 34)
         }
         .padding(8)
         .background(hiddenEscapeButton)
@@ -100,6 +100,7 @@ struct QuickAccessView: View {
         }
         .onDisappear { cleanupPreparedDragFile() }
         .focusable()
+        .focusEffectDisabled()
         .focused($isFocused)
         .overlay(alignment: .bottom) {
             if case .failed(let err) = visualState {
@@ -123,7 +124,7 @@ struct QuickAccessView: View {
         ZStack(alignment: .topTrailing) {
             Image(nsImage: thumbnail)
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .aspectRatio(contentMode: .fill)
                 .frame(width: Self.thumbnailSize.width, height: Self.thumbnailSize.height)
                 .background(Color.black.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
@@ -188,88 +189,98 @@ struct QuickAccessView: View {
     // MARK: - Chrome (revealed on hover/focus)
 
     private var chromeStrip: some View {
-        VStack(spacing: 4) {
-            contextLine
-            toolbar
-        }
-    }
-
-    private var contextLine: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text(contextTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
-            Spacer()
-            contextHintView
-        }
-        .padding(.horizontal, 4)
-        .frame(height: 20)
-    }
-
-    private var contextTitle: String {
-        guard let action = hoveredAction else { return "Quick Access" }
-        return label(action)
-    }
-
-    /// Right-aligned hint for the hovered action: a keycap-style pill
-    /// showing the shortcut (⌘S, ⌘⇧T, …) plus — for Translate — a subtle
-    /// suffix naming the target language.
-    @ViewBuilder
-    private var contextHintView: some View {
-        HStack(spacing: 5) {
-            if let key = hoveredShortcutKey {
-                ShortcutKeyPill(text: key)
-            }
-            if let suffix = hoveredHintSuffix {
-                Text(suffix)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var hoveredShortcutKey: String? {
-        guard let action = hoveredAction else { return nil }
-        switch action {
-        case .copy:      return "⌘C"
-        case .save:      return "⌘S"
-        case .drag:      return nil
-        case .annotate:  return "⌘E"
-        case .ocr:       return "⌘⇧O"
-        case .translate: return "⌘⇧T"
-        case .pin:       return "⌘P"
-        case .upload, .linkCopied: return nil
-        }
-    }
-
-    private var hoveredHintSuffix: String? {
-        guard hoveredAction == .translate,
-              let lang = targetLanguageDisplay, !lang.isEmpty else { return nil }
-        return "→ \(lang)"
+        toolbar
     }
 
     private var toolbar: some View {
         HStack(spacing: 2) {
-            dragTool
-            toolButton(.copy, icon: "doc.on.doc", action: onCopy)
-            toolButton(.save, icon: "square.and.arrow.down", isPrimary: true, action: onSave)
-            if shareCoordinator != nil {
-                toolDivider
-                uploadButton
+            ForEach(visibleActions, id: \.self) { action in
+                if startsNewGroup(action) {
+                    toolDivider
+                }
+                visibleTool(action)
             }
             toolDivider
-            toolButton(.annotate, icon: "pencil.tip.crop.circle", action: onAnnotate)
-            toolDivider
-            toolButton(.ocr, icon: "text.viewfinder", action: onOCR)
-            toolButton(.translate, icon: "character.bubble", action: onTranslate)
-            toolDivider
-            toolButton(.pin, icon: "pin", action: onPin)
+            overflowMenu
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Quick Access actions"))
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var visibleActions: [QuickAccessActionKind] {
+        QuickAccessActionLayout.visibleActions(sharingAvailable: shareCoordinator != nil)
+    }
+
+    private func startsNewGroup(_ action: QuickAccessActionKind) -> Bool {
+        switch action {
+        case .upload, .annotate, .pin:
+            return true
+        case .drag, .copy, .save, .ocr, .translate:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private func visibleTool(_ action: QuickAccessActionKind) -> some View {
+        switch action {
+        case .drag:
+            dragTool
+        case .copy:
+            toolButton(.copy, icon: "doc.on.doc", action: onCopy)
+        case .save:
+            toolButton(.save, icon: "square.and.arrow.down", isPrimary: true, action: onSave)
+        case .upload:
+            if shareCoordinator != nil {
+                uploadButton
+            }
+        case .annotate:
+            toolButton(.annotate, icon: "pencil.tip.crop.circle", action: onAnnotate)
+        case .pin:
+            toolButton(.pin, icon: "pin", action: onPin)
+        case .ocr, .translate:
+            EmptyView()
+        }
+    }
+
+    private var overflowMenu: some View {
+        Menu {
+            ForEach(QuickAccessActionLayout.overflowActions, id: \.rawValue) { action in
+                overflowTool(action)
+            }
+        } label: {
+            toolFace(.overflow, icon: "ellipsis", isPrimary: false)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hoveredAction = $0 ? .overflow : nil }
+        .help("More actions")
+        .accessibilityLabel(Text("More actions"))
+    }
+
+    @ViewBuilder
+    private func overflowTool(_ action: QuickAccessActionKind) -> some View {
+        switch action {
+        case .ocr:
+            Button(action: onOCR) {
+                Label("Extract Text", systemImage: "text.viewfinder")
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+        case .translate:
+            Button(action: onTranslate) {
+                if let targetLanguageDisplay, !targetLanguageDisplay.isEmpty {
+                    Label("Translate to \(targetLanguageDisplay)", systemImage: "character.bubble")
+                } else {
+                    Label("Translate", systemImage: "character.bubble")
+                }
+            }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
+        case .drag, .copy, .save, .upload, .annotate, .pin:
+            EmptyView()
+        }
     }
 
     @ViewBuilder
@@ -541,7 +552,7 @@ struct QuickAccessView: View {
         case .ocr:       return ("o", [.command, .shift])
         case .translate: return ("t", [.command, .shift])
         case .pin:       return ("p", [.command])
-        case .upload, .linkCopied: return nil
+        case .upload, .linkCopied, .overflow: return nil
         }
     }
 
@@ -570,6 +581,7 @@ struct QuickAccessView: View {
         case .pin: return String(localized: "Pin")
         case .upload: return String(localized: "Upload to Cloud")
         case .linkCopied: return String(localized: "Link Copied!")
+        case .overflow: return String(localized: "More actions")
         }
     }
 
@@ -584,6 +596,7 @@ struct QuickAccessView: View {
         case .pin: return String(localized: "Pin to screen")
         case .upload: return String(localized: "Upload screenshot to cloud and copy link")
         case .linkCopied: return String(localized: "Link has been copied to clipboard")
+        case .overflow: return String(localized: "Show extract text and translation actions")
         }
     }
 }
@@ -632,30 +645,5 @@ private struct FailureToast: View {
         case .unknown(let detail):
             return String(localized: "Upload failed: \(detail)")
         }
-    }
-}
-
-// MARK: - Shortcut keycap pill
-
-/// Renders a keyboard shortcut (e.g. "⌘S", "⌘⇧T") as a compact, slightly
-/// tinted pill — visually distinct from surrounding secondary text, which at
-/// 9pt/secondary on ultraThinMaterial was too dim to read at a glance.
-private struct ShortcutKeyPill: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
-            .foregroundStyle(.primary.opacity(0.85))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1.5)
-            .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.primary.opacity(0.10))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-            )
     }
 }

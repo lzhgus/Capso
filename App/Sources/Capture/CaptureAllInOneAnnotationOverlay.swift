@@ -125,7 +125,7 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.level = .screenSaver + 3
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
@@ -133,7 +133,7 @@ final class CaptureAllInOneAnnotationOverlay {
         let hostingView = AllInOneAnnotationToolbarHostingView(rootView: AllInOneAnnotationToolbarView(session: session))
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-        hostingView.layer?.cornerRadius = 14
+        hostingView.layer?.cornerRadius = 16
         hostingView.layer?.cornerCurve = .continuous
         hostingView.layer?.masksToBounds = true
         panel.contentView = hostingView
@@ -179,8 +179,9 @@ final class CaptureAllInOneAnnotationOverlay {
             height: selectionRect.height
         )
         let session = session
-        let usesCompact = session?.usesCompactToolbar ?? (globalRect.width < 760)
-        let usesMini = session?.usesMiniToolbar ?? (globalRect.width < 420)
+        let density = session?.toolbarDensity ?? CaptureChromeLayout.annotationDensity(for: globalRect.width)
+        let usesCompact = density != .regular
+        let usesMini = density == .mini
         let showsOverflow = session?.showsOverflow ?? false
         let showsTextOptions = session.map { $0.currentTool == .text || $0.isEditingText } ?? false
         let width: CGFloat
@@ -188,15 +189,15 @@ final class CaptureAllInOneAnnotationOverlay {
         let maxToolbarWidth = screen.visibleFrame.width - margin * 2
         if usesCompact {
             if usesMini && !showsOverflow {
-                width = min(268, maxToolbarWidth)
+                width = min(300, maxToolbarWidth)
             } else if showsOverflow {
-                width = min(760, maxToolbarWidth)
+                width = min(840, maxToolbarWidth)
             } else {
-                width = min(max(420, globalRect.width), min(760, maxToolbarWidth))
+                width = min(max(480, globalRect.width), min(840, maxToolbarWidth))
             }
             height = (showsOverflow ? 102 : 58) + (showsTextOptions ? 42 : 0)
         } else {
-            width = min(max(760, globalRect.width), min(960, maxToolbarWidth))
+            width = min(max(840, globalRect.width), min(900, maxToolbarWidth))
             height = 58
         }
 
@@ -396,12 +397,16 @@ final class AllInOneAnnotationSession: ObservableObject {
         textStrokeEnabled ? .white : nil
     }
 
+    var toolbarDensity: CaptureChromeDensity {
+        CaptureChromeLayout.annotationDensity(for: availableWidth)
+    }
+
     var usesCompactToolbar: Bool {
-        availableWidth < 760
+        toolbarDensity != .regular
     }
 
     var usesMiniToolbar: Bool {
-        availableWidth < 420
+        toolbarDensity == .mini
     }
 
     func replaceSourceImage(_ image: CGImage, displayScale: CGFloat, objectOffset: CGSize = .zero) {
@@ -679,10 +684,10 @@ private struct AllInOneAnnotationToolbarView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
         .animation(.spring(response: 0.20, dampingFraction: 0.88), value: session.showsOverflow)
@@ -720,18 +725,17 @@ private struct AllInOneAnnotationToolbarView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
     }
 
     private var toolbarBackground: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(.regularMaterial)
-            .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(.thinMaterial)
     }
 
     private var primaryTools: [AnnotationTool] {
