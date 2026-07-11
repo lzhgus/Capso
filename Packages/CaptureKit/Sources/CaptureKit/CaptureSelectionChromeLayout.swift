@@ -33,10 +33,6 @@ public enum CaptureSelectionChromeLayout {
         if aboveY + hudSize.height <= bounds.maxY {
             return CGPoint(x: clampedX, y: aboveY)
         }
-        let belowY = selectionRect.minY - gap - hudSize.height
-        if belowY >= bounds.minY {
-            return CGPoint(x: clampedX, y: belowY)
-        }
         return CGPoint(
             x: min(max(selectionRect.minX + insideInset, bounds.minX), bounds.maxX - hudSize.width),
             y: min(max(selectionRect.maxY - hudSize.height - insideInset, bounds.minY), bounds.maxY - hudSize.height)

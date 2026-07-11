@@ -26,7 +26,7 @@
 **Interfaces:**
 - Produces: `CaptureSelectionChromeLayout.visibleHandles(for:isFixedSize:) -> [CaptureSelectionResizeHandle]`
 - Produces: `CaptureSelectionChromeLayout.dimensionText(for:) -> String`
-- Produces: `CaptureSelectionChromeLayout.dimensionHUDOrigin(selectionRect:hudSize:in:gap:insideInset:) -> CGPoint`, which tries above, then below, then inside the selection.
+- Produces: `CaptureSelectionChromeLayout.dimensionHUDOrigin(selectionRect:hudSize:in:gap:insideInset:) -> CGPoint`, which tries above and otherwise falls back inside the selection.
 
 - [ ] **Step 1: Write failing policy tests**
 
@@ -68,7 +68,7 @@ struct CaptureSelectionChromeLayoutTests {
         ) == "1140 × 564")
     }
 
-    @Test("HUD prefers above and falls below near the top edge")
+    @Test("HUD prefers above and falls inside near the top edge")
     func hudPlacement() {
         let bounds = CGRect(x: 0, y: 0, width: 1_200, height: 800)
         let hud = CGSize(width: 92, height: 24)
@@ -81,10 +81,10 @@ struct CaptureSelectionChromeLayoutTests {
             selectionRect: CGRect(x: 100, y: 500, width: 500, height: 290),
             hudSize: hud,
             in: bounds
-        ) == CGPoint(x: 100, y: 468))
+        ) == CGPoint(x: 110, y: 756))
     }
 
-    @Test("Tiny selections at the top edge place the HUD below without overlap")
+    @Test("Tiny selections at the top edge use the inside top-left fallback")
     func tinyTopEdgeHUDPlacement() {
         let bounds = CGRect(x: 0, y: 0, width: 1_200, height: 800)
         let hud = CGSize(width: 92, height: 24)
@@ -95,11 +95,10 @@ struct CaptureSelectionChromeLayoutTests {
             in: bounds
         )
 
-        #expect(origin == CGPoint(x: 100, y: 744))
-        #expect(CGRect(origin: origin, size: hud).maxY <= selection.minY)
+        #expect(origin == CGPoint(x: 110, y: 766))
     }
 
-    @Test("HUD falls inside when neither outside placement fits")
+    @Test("HUD falls inside when above does not fit")
     func insideHUDPlacement() {
         #expect(CaptureSelectionChromeLayout.dimensionHUDOrigin(
             selectionRect: CGRect(x: 100, y: 4, width: 500, height: 792),
@@ -154,10 +153,6 @@ public enum CaptureSelectionChromeLayout {
         if aboveY + hudSize.height <= bounds.maxY {
             return CGPoint(x: clampedX, y: aboveY)
         }
-        let belowY = selectionRect.minY - gap - hudSize.height
-        if belowY >= bounds.minY {
-            return CGPoint(x: clampedX, y: belowY)
-        }
         return CGPoint(
             x: min(max(selectionRect.minX + insideInset, bounds.minX), bounds.maxX - hudSize.width),
             y: min(max(selectionRect.maxY - hudSize.height - insideInset, bounds.minY), bounds.maxY - hudSize.height)
@@ -207,11 +202,11 @@ if isCompact {
 
 - [ ] **Step 2: Replace bracket drawing with the new border and handles**
 
-In `drawSelectionChrome`, draw a subtle dark under-stroke, a 1.5-point white border, and one circular handle for each value returned by `visibleHandles`. Use a private `point(for:in:)` switch to map handles to corners and edge midpoints. Each handle is a 7-point white circle with a 1-point dark stroke and a soft black shadow.
+In `drawSelectionChrome`, draw a subtle dark under-stroke, a 1.5-point white border, and one circular handle for each value returned by `visibleHandles`. Use a private `point(for:in:)` switch to map handles to corners and edge midpoints. Each handle is a 7-point white circle with a 1-point dark stroke and a soft black shadow. Call this after drawing the HUD so the handles render above an inside HUD on tiny selections.
 
 - [ ] **Step 3: Draw the dimension HUD**
 
-Add `drawDimensionHUD(in:selectionRect:)`. Measure `CaptureSelectionChromeLayout.dimensionText(for:)` with `NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)`, add 8-point horizontal and 5-point vertical padding, obtain the origin from `dimensionHUDOrigin`, then draw a rounded black 72%-opacity background, a 0.5-point white 18%-opacity stroke, and white text.
+Add `drawDimensionHUD(in:selectionRect:)`. Measure `CaptureSelectionChromeLayout.dimensionText(for:)` with `NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)`, add 8-point horizontal and 5-point vertical padding, obtain the origin from `dimensionHUDOrigin`, then draw a rounded black 72%-opacity background, a 0.5-point white 18%-opacity stroke, and white text. In `draw(_:)`, render the HUD before `drawSelectionChrome`.
 
 - [ ] **Step 4: Reduce backdrop opacity**
 

@@ -47,7 +47,7 @@ struct CaptureSelectionChromeLayoutTests {
         ) == "1140 × 564")
     }
 
-    @Test("HUD prefers above and falls below near the top edge")
+    @Test("HUD prefers above and falls inside near the top edge")
     func hudPlacement() {
         let bounds = CGRect(x: 0, y: 0, width: 1_200, height: 800)
         let hud = CGSize(width: 92, height: 24)
@@ -60,10 +60,10 @@ struct CaptureSelectionChromeLayoutTests {
             selectionRect: CGRect(x: 100, y: 500, width: 500, height: 290),
             hudSize: hud,
             in: bounds
-        ) == CGPoint(x: 100, y: 468))
+        ) == CGPoint(x: 110, y: 756))
     }
 
-    @Test("Tiny selections at the top edge place the HUD below without overlap")
+    @Test("Tiny selections at the top edge use the inside top-left fallback")
     func tinyTopEdgeHUDPlacement() {
         let bounds = CGRect(x: 0, y: 0, width: 1_200, height: 800)
         let hud = CGSize(width: 92, height: 24)
@@ -74,11 +74,10 @@ struct CaptureSelectionChromeLayoutTests {
             in: bounds
         )
 
-        #expect(origin == CGPoint(x: 100, y: 744))
-        #expect(CGRect(origin: origin, size: hud).maxY <= selection.minY)
+        #expect(origin == CGPoint(x: 110, y: 766))
     }
 
-    @Test("HUD falls inside when neither outside placement fits")
+    @Test("HUD falls inside when above does not fit")
     func insideHUDPlacement() {
         #expect(CaptureSelectionChromeLayout.dimensionHUDOrigin(
             selectionRect: CGRect(x: 100, y: 4, width: 500, height: 792),

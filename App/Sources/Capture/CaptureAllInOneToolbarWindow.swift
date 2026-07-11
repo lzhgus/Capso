@@ -1417,8 +1417,8 @@ private final class AllInOneSelectionOverlayView: NSView {
         context.fill(rect)
         context.restoreGState()
 
-        drawSelectionChrome(in: context, rect: rect)
         drawDimensionHUD(in: context, selectionRect: rect)
+        drawSelectionChrome(in: context, rect: rect)
     }
 
     private func updateCursor(for point: CGPoint) {
