@@ -125,7 +125,7 @@ final class CaptureAllInOneAnnotationOverlay {
         panel.level = .screenSaver + 3
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
@@ -133,7 +133,7 @@ final class CaptureAllInOneAnnotationOverlay {
         let hostingView = AllInOneAnnotationToolbarHostingView(rootView: AllInOneAnnotationToolbarView(session: session))
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-        hostingView.layer?.cornerRadius = 14
+        hostingView.layer?.cornerRadius = 16
         hostingView.layer?.cornerCurve = .continuous
         hostingView.layer?.masksToBounds = true
         panel.contentView = hostingView
@@ -179,25 +179,26 @@ final class CaptureAllInOneAnnotationOverlay {
             height: selectionRect.height
         )
         let session = session
-        let usesCompact = session?.usesCompactToolbar ?? (globalRect.width < 760)
-        let usesMini = session?.usesMiniToolbar ?? (globalRect.width < 420)
+        let density = session?.toolbarDensity ?? CaptureChromeLayout.annotationDensity(for: globalRect.width)
+        let usesCompact = density != .regular
+        let usesMini = density == .mini
         let showsOverflow = session?.showsOverflow ?? false
-        let showsTextOptions = session.map { $0.currentTool == .text || $0.isEditingText } ?? false
+        let height = CaptureChromeLayout.annotationToolbarHeight(
+            density: density,
+            showsOverflow: showsOverflow
+        )
         let width: CGFloat
-        let height: CGFloat
         let maxToolbarWidth = screen.visibleFrame.width - margin * 2
         if usesCompact {
             if usesMini && !showsOverflow {
-                width = min(268, maxToolbarWidth)
+                width = min(300, maxToolbarWidth)
             } else if showsOverflow {
-                width = min(760, maxToolbarWidth)
+                width = min(840, maxToolbarWidth)
             } else {
-                width = min(max(420, globalRect.width), min(760, maxToolbarWidth))
+                width = min(max(480, globalRect.width), min(840, maxToolbarWidth))
             }
-            height = (showsOverflow ? 102 : 58) + (showsTextOptions ? 42 : 0)
         } else {
-            width = min(max(760, globalRect.width), min(960, maxToolbarWidth))
-            height = 58
+            width = min(max(1_000, globalRect.width), min(1_000, maxToolbarWidth))
         }
 
         func clampedX(width: CGFloat) -> CGFloat {
@@ -396,12 +397,16 @@ final class AllInOneAnnotationSession: ObservableObject {
         textStrokeEnabled ? .white : nil
     }
 
+    var toolbarDensity: CaptureChromeDensity {
+        CaptureChromeLayout.annotationDensity(for: availableWidth)
+    }
+
     var usesCompactToolbar: Bool {
-        availableWidth < 760
+        toolbarDensity != .regular
     }
 
     var usesMiniToolbar: Bool {
-        availableWidth < 420
+        toolbarDensity == .mini
     }
 
     func replaceSourceImage(_ image: CGImage, displayScale: CGFloat, objectOffset: CGSize = .zero) {
@@ -586,9 +591,14 @@ private struct AllInOneAnnotationToolbarView: View {
     @ObservedObject var session: AllInOneAnnotationSession
     @State private var hoveredTool: AnnotationTool?
     @State private var hoveredTextEffect: TextEffectAction?
+    @State private var showsTextStylePopover = false
 
     private var isFontSizeMode: Bool {
         session.currentTool == .text || session.isEditingText
+    }
+
+    private var hasActiveTextEffect: Bool {
+        session.textFillEnabled || session.textOutlineEnabled || session.textStrokeEnabled
     }
 
     var body: some View {
@@ -606,6 +616,11 @@ private struct AllInOneAnnotationToolbarView: View {
             ),
             isEnabled: !session.isEditingText
         )
+        .onChange(of: isFontSizeMode) { _, isTextMode in
+            if !isTextMode {
+                showsTextStylePopover = false
+            }
+        }
     }
 
     private var adaptiveToolbar: some View {
@@ -633,6 +648,10 @@ private struct AllInOneAnnotationToolbarView: View {
                     primaryControls
                 } else {
                     compactStatus
+                }
+
+                if isFontSizeMode && session.usesCompactToolbar {
+                    textStyleButton
                 }
 
                 if session.usesCompactToolbar {
@@ -670,19 +689,15 @@ private struct AllInOneAnnotationToolbarView: View {
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
-
-            if isFontSizeMode && session.usesCompactToolbar {
-                textEffectsRow
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
         .animation(.spring(response: 0.20, dampingFraction: 0.88), value: session.showsOverflow)
@@ -705,33 +720,32 @@ private struct AllInOneAnnotationToolbarView: View {
                     .foregroundStyle(.white.opacity(0.86))
                     .frame(minWidth: 34)
 
+                if isFontSizeMode {
+                    textStyleButton
+                }
+
                 iconButton(
                     systemName: "ellipsis",
                     help: "More tools",
                     action: { session.toggleOverflow() }
                 )
             }
-
-            if isFontSizeMode {
-                textEffectsRow
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
         )
         .environment(\.colorScheme, .dark)
     }
 
     private var toolbarBackground: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(.regularMaterial)
-            .shadow(color: .black.opacity(0.32), radius: 18, y: 8)
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(.thinMaterial)
     }
 
     private var primaryTools: [AnnotationTool] {
@@ -781,7 +795,8 @@ private struct AllInOneAnnotationToolbarView: View {
                 strokePatternControl
             }
 
-            if isFontSizeMode && !session.usesCompactToolbar {
+            if isFontSizeMode
+                && CaptureChromeLayout.showsInlineTextEffects(for: session.toolbarDensity) {
                 textEffectsInlineControls
             }
 
@@ -843,36 +858,89 @@ private struct AllInOneAnnotationToolbarView: View {
         }
     }
 
-    private var textEffectsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                textEffectButton(
-                    title: "Fill",
-                    isActive: session.textFillEnabled,
-                    defaultsKey: "annotationTextFillEnabled"
-                ) {
-                    session.textFillEnabled.toggle()
-                    return session.textFillEnabled
-                }
-                textEffectButton(
-                    title: "Outline",
-                    isActive: session.textOutlineEnabled,
-                    defaultsKey: "annotationTextOutlineEnabled"
-                ) {
-                    session.textOutlineEnabled.toggle()
-                    return session.textOutlineEnabled
-                }
-                textEffectButton(
-                    title: "Trace",
-                    isActive: session.textStrokeEnabled,
-                    defaultsKey: "annotationTextStrokeEnabled"
-                ) {
-                    session.textStrokeEnabled.toggle()
-                    return session.textStrokeEnabled
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var textStyleButton: some View {
+        Button {
+            showsTextStylePopover.toggle()
+        } label: {
+            Image(systemName: "textformat")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(buttonBackground(isActive: hasActiveTextEffect, isEnabled: true))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .help("Text Style")
+        .accessibilityLabel(Text("Text Style"))
+        .accessibilityValue(Text(hasActiveTextEffect ? "On" : "Off"))
+        .popover(isPresented: $showsTextStylePopover, arrowEdge: .top) {
+            textStylePopover
+        }
+    }
+
+    private var textStylePopover: some View {
+        HStack(spacing: 6) {
+            textStylePopoverButton(
+                systemName: "rectangle.fill",
+                label: "Background",
+                isActive: session.textFillEnabled,
+                defaultsKey: "annotationTextFillEnabled"
+            ) {
+                session.textFillEnabled.toggle()
+                return session.textFillEnabled
+            }
+            textStylePopoverButton(
+                systemName: "rectangle",
+                label: "Box",
+                isActive: session.textOutlineEnabled,
+                defaultsKey: "annotationTextOutlineEnabled"
+            ) {
+                session.textOutlineEnabled.toggle()
+                return session.textOutlineEnabled
+            }
+            textStylePopoverButton(
+                systemName: "textformat",
+                label: "Stroke",
+                isActive: session.textStrokeEnabled,
+                defaultsKey: "annotationTextStrokeEnabled"
+            ) {
+                session.textStrokeEnabled.toggle()
+                return session.textStrokeEnabled
+            }
+        }
+        .padding(10)
+        .environment(\.colorScheme, .dark)
+    }
+
+    private func textStylePopoverButton(
+        systemName: String,
+        label: LocalizedStringKey,
+        isActive: Bool,
+        defaultsKey: String,
+        toggle: @escaping () -> Bool
+    ) -> some View {
+        Button {
+            let newValue = toggle()
+            UserDefaults.standard.set(newValue, forKey: defaultsKey)
+            session.updateSelectedStyle()
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: systemName)
+                    .font(.system(size: 14, weight: .semibold))
+
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(.white)
+            .frame(width: 72, height: 48)
+            .background(buttonBackground(isActive: isActive, isEnabled: true))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityValue(Text(isActive ? "On" : "Off"))
     }
 
     private func textEffectIconButton(
@@ -947,28 +1015,6 @@ private struct AllInOneAnnotationToolbarView: View {
         .buttonStyle(.plain)
         .onHover { hoveredTextEffect = $0 ? kind : nil }
         .help(help)
-    }
-
-    private func textEffectButton(
-        title: LocalizedStringKey,
-        isActive: Bool,
-        defaultsKey: String,
-        toggle: @escaping () -> Bool
-    ) -> some View {
-        Button {
-            let newValue = toggle()
-            UserDefaults.standard.set(newValue, forKey: defaultsKey)
-            session.updateSelectedStyle()
-        } label: {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(minWidth: 54, minHeight: 26)
-                .background(optionBackground(isActive: isActive))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .help(title)
     }
 
     private var undoRedoControls: some View {
