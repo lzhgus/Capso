@@ -30,15 +30,17 @@ final class RecordingPreviewWindow: NSPanel {
         let windowHeight: CGFloat = 140
 
         let screen = NSScreen.main ?? NSScreen.screens.first!
-        let screenFrame = screen.visibleFrame
-        let x: CGFloat = switch settings.quickAccessPosition {
-        case .bottomLeft: screenFrame.minX + 16
-        case .bottomRight: screenFrame.maxX - windowWidth - 16
-        }
-        let y = screenFrame.minY + 16
+        let contentRect = QuickAccessStackGeometry.frame(
+            position: settings.quickAccessPosition,
+            screenFrame: screen.frame,
+            visibleFrame: screen.visibleFrame,
+            windowSize: CGSize(width: windowWidth, height: windowHeight),
+            stackIndex: 0,
+            stackCount: 1
+        )
 
         super.init(
-            contentRect: NSRect(x: x, y: y, width: windowWidth, height: windowHeight),
+            contentRect: contentRect,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false

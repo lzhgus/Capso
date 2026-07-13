@@ -143,6 +143,19 @@ struct AppSettingsTests {
         #expect(settings.quickAccessPosition == .bottomLeft)
     }
 
+    @Test("Center-screen Quick Access position persists across instances")
+    func centerScreenQuickAccessPositionPersists() {
+        let suite = "test.quickAccessPosition.centerScreen"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+
+        first.quickAccessPosition = .centerScreen
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.quickAccessPosition == .centerScreen)
+    }
+
     @Test("Default shutter sound is enabled")
     func defaultShutterSound() {
         let settings = AppSettings()
