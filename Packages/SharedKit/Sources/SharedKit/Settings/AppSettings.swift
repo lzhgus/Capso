@@ -36,6 +36,7 @@ public enum ScreenshotOutputPreset: String, CaseIterable, Sendable {
 
 public enum QuickAccessPosition: String, CaseIterable, Sendable {
     case bottomLeft
+    case centerScreen
     case bottomRight
 }
 

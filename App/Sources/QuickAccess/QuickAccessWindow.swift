@@ -41,14 +41,14 @@ final class QuickAccessWindow: NSPanel {
         let windowWidth: CGFloat = 288
         let windowHeight: CGFloat = 200
 
-        let screenFrame = targetScreen.visibleFrame
-        let x: CGFloat = switch settings.quickAccessPosition {
-        case .bottomLeft: screenFrame.minX + 16
-        case .bottomRight: screenFrame.maxX - windowWidth - 16
-        }
-        let y = screenFrame.minY + 16
-
-        let contentRect = NSRect(x: x, y: y, width: windowWidth, height: windowHeight)
+        let contentRect = QuickAccessStackGeometry.frame(
+            position: settings.quickAccessPosition,
+            screenFrame: targetScreen.frame,
+            visibleFrame: targetScreen.visibleFrame,
+            windowSize: CGSize(width: windowWidth, height: windowHeight),
+            stackIndex: 0,
+            stackCount: 1
+        )
 
         super.init(
             contentRect: contentRect,
@@ -174,21 +174,16 @@ final class QuickAccessWindow: NSPanel {
         })
     }
 
-    /// Spacing between stacked preview windows.
-    private static let stackSpacing: CGFloat = 12
-
-    /// Animate this window's y-position to occupy a given slot in the preview stack.
-    func repositionForStackIndex(_ index: Int, animated: Bool = true) {
-        let screenFrame = targetScreen.visibleFrame
-        let windowWidth = frame.width
-        let windowHeight = frame.height
-        let x: CGFloat = switch settings.quickAccessPosition {
-        case .bottomLeft: screenFrame.minX + 16
-        case .bottomRight: screenFrame.maxX - windowWidth - 16
-        }
-        let baseY = screenFrame.minY + 16
-        let y = baseY + CGFloat(index) * (windowHeight + Self.stackSpacing)
-        let newFrame = NSRect(x: x, y: y, width: windowWidth, height: windowHeight)
+    /// Reposition this window within a stack, centering the group when requested.
+    func repositionForStack(index: Int, count: Int, animated: Bool = true) {
+        let newFrame = QuickAccessStackGeometry.frame(
+            position: settings.quickAccessPosition,
+            screenFrame: targetScreen.frame,
+            visibleFrame: targetScreen.visibleFrame,
+            windowSize: frame.size,
+            stackIndex: index,
+            stackCount: count
+        )
 
         if animated {
             NSAnimationContext.runAnimationGroup { ctx in

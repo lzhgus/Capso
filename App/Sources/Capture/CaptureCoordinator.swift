@@ -1391,7 +1391,7 @@ final class CaptureCoordinator {
         for (_, windows) in perScreen {
             for (i, win) in windows.enumerated() {
                 let animated = (win !== skipAnimation)
-                win.repositionForStackIndex(i, animated: animated)
+                win.repositionForStack(index: i, count: windows.count, animated: animated)
             }
         }
     }
