@@ -42,7 +42,12 @@ final class OCRCoordinator {
     private func showOverlayForOCR() {
         dismissOverlay()
         for screen in NSScreen.screens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings, presetsDisabled: true)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty,
+                presetsDisabled: true
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
                 self?.performInstantOCR(rect: rect, screen: screen)

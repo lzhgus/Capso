@@ -119,6 +119,101 @@ public enum ScreenCaptureManager {
         )
     }
 
+    // MARK: - Multi-Window Capture
+
+    /// Capture multiple windows and composite them onto a transparent canvas at
+    /// their screen positions. `windowIDs` should be front-to-back (index 0 =
+    /// frontmost) so overlapping windows stack correctly.
+    ///
+    /// Uses desktop-independent capture with shadows stripped so each layer
+    /// keeps the WindowServer alpha silhouette (rounded corners). The
+    /// display-based `includeShadow: false` path is intentionally avoided —
+    /// it bakes an opaque rectangle and leaves white/jagged corner fringes.
+    public static func captureWindows(
+        windowIDs: [CGWindowID],
+        showsCursor: Bool = false
+    ) async throws -> CaptureResult {
+        guard !windowIDs.isEmpty else {
+            throw CaptureError.captureFailed("No windows selected")
+        }
+
+        var layers: [MultiWindowCompositor.Layer] = []
+        layers.reserveCapacity(windowIDs.count)
+        var displayID = CGMainDisplayID()
+
+        for windowID in windowIDs {
+            let result = try await captureWindowForMultiComposite(
+                windowID: windowID,
+                showsCursor: showsCursor
+            )
+            layers.append(MultiWindowCompositor.Layer(image: result.image, frame: result.captureRect))
+            displayID = result.displayID
+        }
+
+        guard let union = MultiWindowCompositor.unionBounds(of: layers.map(\.frame)),
+              let image = MultiWindowCompositor.composite(layers: layers) else {
+            throw CaptureError.captureFailed("Failed to composite selected windows")
+        }
+
+        return CaptureResult(
+            image: image,
+            mode: .window,
+            captureRect: union,
+            windowName: "\(windowIDs.count) windows",
+            appName: nil,
+            appBundleIdentifier: nil,
+            displayID: displayID
+        )
+    }
+
+    /// Single-window capture tuned for multi-window compositing: transparent
+    /// backdrop, real window alpha, no drop shadow (so frames stay aligned to
+    /// `SCWindow.frame` for layout).
+    private static func captureWindowForMultiComposite(
+        windowID: CGWindowID,
+        showsCursor: Bool
+    ) async throws -> CaptureResult {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+
+        guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
+            throw CaptureError.windowNotFound(windowID)
+        }
+
+        let windowCenter = CGPoint(x: scWindow.frame.midX, y: scWindow.frame.midY)
+        guard let display = content.displays.first(where: { $0.frame.contains(windowCenter) })
+            ?? content.displays.first else {
+            throw CaptureError.noDisplayFound
+        }
+
+        let filter = SCContentFilter(desktopIndependentWindow: scWindow)
+        let config = SCStreamConfiguration()
+        config.captureResolution = .best
+        config.showsCursor = showsCursor
+        // Keep the WindowServer alpha mask (rounded corners) but drop the
+        // shadow so the bitmap lines up with `scWindow.frame` for compositing.
+        config.ignoreShadowsSingleWindow = true
+        // Size to the window frame (not contentRect) so the bitmap aspect
+        // matches layout and we avoid stretch-induced edge fringe.
+        let scaleFactor = CGFloat(filter.pointPixelScale)
+        config.width = max(1, Int((scWindow.frame.width * scaleFactor).rounded()))
+        config.height = max(1, Int((scWindow.frame.height * scaleFactor).rounded()))
+
+        let image = try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: config
+        )
+
+        return CaptureResult(
+            image: image,
+            mode: .window,
+            captureRect: scWindow.frame,
+            windowName: scWindow.title,
+            appName: scWindow.owningApplication?.applicationName,
+            appBundleIdentifier: scWindow.owningApplication?.bundleIdentifier,
+            displayID: display.displayID
+        )
+    }
+
     // MARK: - Desktop Background Capture (for window shadow compositing)
 
     /// Capture the desktop behind a window (excluding the window itself),

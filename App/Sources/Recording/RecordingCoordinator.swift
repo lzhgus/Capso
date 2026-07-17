@@ -122,7 +122,13 @@ final class RecordingCoordinator {
         dismissOverlay()
 
         for screen in NSScreen.screens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings, presetsDisabled: true)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty,
+                presetsDisabled: true,
+                allowsMultiWindowSelection: false
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
                 self?.handleAreaSelected(rect: rect, screen: screen)

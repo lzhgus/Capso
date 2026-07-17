@@ -98,3 +98,30 @@ targets:
         com.apple.security.device.camera: true
         com.apple.security.device.audio-input: true
         com.apple.security.network.client: true
+
+  CapsoTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: App/Tests
+    dependencies:
+      - target: Capso
+      - package: SharedKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.awesomemacapps.capso.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Capso.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Capso"
+
+schemes:
+  Capso:
+    build:
+      targets:
+        Capso: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CapsoTests

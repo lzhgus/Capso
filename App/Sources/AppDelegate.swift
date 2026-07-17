@@ -28,6 +28,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let updateManager = UpdateManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A hosted unit-test bundle only needs the AppKit run loop. Avoid
+        // registering global shortcuts, touching real settings, or starting
+        // coordinators in the separate test-host process.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return
+        }
+
         Self.shared = self
         DiagnosticLogger.installUncaughtExceptionHandler()
 

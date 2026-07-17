@@ -378,7 +378,11 @@ final class CaptureCoordinator {
         dismissOverlay()
         dismissAllInOneToolbar()
         for screen in NSScreen.screens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
                 if let areaSelected {
@@ -401,6 +405,10 @@ final class CaptureCoordinator {
                 // Window captures are intentionally not persisted for replay;
                 // see `StoredCaptureSelection` docs for the rationale.
                 self?.performWindowCapture(windowID: windowID)
+            }
+            overlay.onWindowsSelected = { [weak self] windowIDs in
+                self?.dismissOverlay()
+                self?.performMultiWindowCapture(windowIDs: windowIDs)
             }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
@@ -426,7 +434,11 @@ final class CaptureCoordinator {
         )
 
         for (screen, _) in frozenScreens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 guard let self else { return }
                 self.dismissSelectionOverlays()
@@ -440,6 +452,10 @@ final class CaptureCoordinator {
             overlay.onWindowSelected = { [weak self] windowID in
                 self?.dismissOverlay()
                 self?.performWindowCapture(windowID: windowID)
+            }
+            overlay.onWindowsSelected = { [weak self] windowIDs in
+                self?.dismissOverlay()
+                self?.performMultiWindowCapture(windowIDs: windowIDs)
             }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
@@ -690,7 +706,11 @@ final class CaptureCoordinator {
 
         // Step 2: Create transparent overlay windows (top layer) for selection
         for (screen, frozenImage) in frozenScreens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 guard let self else { return }
                 self.dismissOverlay()
@@ -704,6 +724,10 @@ final class CaptureCoordinator {
             overlay.onWindowSelected = { [weak self] windowID in
                 self?.dismissOverlay()
                 self?.performWindowCapture(windowID: windowID)
+            }
+            overlay.onWindowsSelected = { [weak self] windowIDs in
+                self?.dismissOverlay()
+                self?.performMultiWindowCapture(windowIDs: windowIDs)
             }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
@@ -787,6 +811,22 @@ final class CaptureCoordinator {
                 handleCaptureResult(result)
             } catch {
                 print("Window capture failed: \(error)")
+            }
+        }
+    }
+
+    /// Capture multiple windows and composite them at their screen positions.
+    /// Skips the single-window frosted-glass treatment — it doesn't apply to a scene.
+    private func performMultiWindowCapture(windowIDs: [CGWindowID]) {
+        Task {
+            do {
+                let result = try await ScreenCaptureManager.captureWindows(
+                    windowIDs: windowIDs,
+                    showsCursor: settings.screenshotShowsCursor
+                )
+                handleCaptureResult(result)
+            } catch {
+                print("Multi-window capture failed: \(error)")
             }
         }
     }

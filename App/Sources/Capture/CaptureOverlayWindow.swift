@@ -7,16 +7,29 @@ import SharedKit
 final class CaptureOverlayWindow: NSPanel {
     var onAreaSelected: ((CGRect, NSScreen) -> Void)?
     var onWindowSelected: ((CGWindowID) -> Void)?
+    var onWindowsSelected: (([CGWindowID]) -> Void)?
     var onCancelled: (() -> Void)?
     var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
+    private let handlesGlobalKeyEvents: Bool
+    private let allowsMultiWindowSelection: Bool
     private var overlayView: CaptureOverlayView!
     private var globalEscMonitor: Any?
+    private var globalFlagsMonitor: Any?
     private var localEscMonitor: Any?
+    private var localFlagsMonitor: Any?
 
-    init(screen: NSScreen, settings: AppSettings, presetsDisabled: Bool = false) {
+    init(
+        screen: NSScreen,
+        settings: AppSettings,
+        handlesGlobalKeyEvents: Bool,
+        presetsDisabled: Bool = false,
+        allowsMultiWindowSelection: Bool = true
+    ) {
         self.settings = settings
+        self.handlesGlobalKeyEvents = handlesGlobalKeyEvents
+        self.allowsMultiWindowSelection = allowsMultiWindowSelection
         super.init(
             contentRect: screen.frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -44,7 +57,8 @@ final class CaptureOverlayWindow: NSPanel {
             frame: NSRect(origin: .zero, size: screen.frame.size),
             settings: settings,
             safeAreaTopInset: screen.safeAreaInsets.top,
-            presetsDisabled: presetsDisabled
+            presetsDisabled: presetsDisabled,
+            allowsMultiWindowSelection: allowsMultiWindowSelection
         )
         overlayView.onSelectionComplete = { [weak self] rect in
             guard let self, let screen = self.screen else { return }
@@ -52,6 +66,9 @@ final class CaptureOverlayWindow: NSPanel {
         }
         overlayView.onWindowSelected = { [weak self] windowID in
             self?.onWindowSelected?(windowID)
+        }
+        overlayView.onWindowsSelected = { [weak self] windowIDs in
+            self?.onWindowsSelected?(windowIDs)
         }
         overlayView.onCancel = { [weak self] in
             self?.onCancelled?()
@@ -102,33 +119,75 @@ final class CaptureOverlayWindow: NSPanel {
     }
 
     private func installKeyMonitor() {
-        // Global monitor: catches ESC/Space even when another app is frontmost.
-        globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            switch event.keyCode {
-            case 53:
+        // A single display overlay owns the global monitor so app-wide events
+        // are handled once, including when another app is frontmost and no
+        // capture overlay is key.
+        if handlesGlobalKeyEvents {
+            globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 DispatchQueue.main.async {
-                    self?.onCancelled?()
+                    self?.handleGlobalKeyEvent(event)
                 }
-            case 49:
-                DispatchQueue.main.async {
-                    self?.overlayView.requestSpaceToggle()
+            }
+            if allowsMultiWindowSelection {
+                globalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+                    DispatchQueue.main.async {
+                        self?.handleGlobalFlagsChanged(event)
+                    }
                 }
-            default:
-                break
             }
         }
         // Local monitor: catches ESC/Space when our window is key.
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            switch event.keyCode {
-            case 53:
-                self?.onCancelled?()
-                return nil
-            case 49:
-                self?.overlayView.requestSpaceToggle()
-                return nil
-            default:
+            self?.handleLocalKeyEvent(event) ?? event
+        }
+        // Ensure Shift release confirms multi-window capture even if the view
+        // is not first responder (e.g. after clicking across screens).
+        if allowsMultiWindowSelection {
+            localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+                self?.overlayView.handleFlagsChanged(event)
                 return event
             }
+        }
+    }
+
+    func handleGlobalFlagsChanged(_ event: NSEvent) {
+        let isShiftKey = event.keyCode == 56 || event.keyCode == 60
+        guard handlesGlobalKeyEvents,
+              allowsMultiWindowSelection,
+              isShiftKey,
+              !event.modifierFlags.contains(.shift) else { return }
+        overlayView.handleFlagsChanged(event, allowsNonKeyConfirmation: true)
+    }
+
+    func handleGlobalKeyEvent(_ event: NSEvent) {
+        guard handlesGlobalKeyEvents else { return }
+        switch event.keyCode {
+        case 53:
+            if overlayView.handleEscapeKey() { return }
+            onCancelled?()
+        case 49:
+            overlayView.requestSpaceToggle()
+        default:
+            break
+        }
+    }
+
+    /// Local monitors are app-wide. Leave events for other display overlays
+    /// untouched so one key press is handled exactly once.
+    func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
+        guard event.windowNumber == windowNumber else { return event }
+        switch event.keyCode {
+        case 53:
+            if overlayView.handleEscapeKey() {
+                return nil
+            }
+            onCancelled?()
+            return nil
+        case 49:
+            overlayView.requestSpaceToggle()
+            return nil
+        default:
+            return event
         }
     }
 
@@ -137,9 +196,17 @@ final class CaptureOverlayWindow: NSPanel {
             NSEvent.removeMonitor(globalEscMonitor)
             self.globalEscMonitor = nil
         }
+        if let globalFlagsMonitor {
+            NSEvent.removeMonitor(globalFlagsMonitor)
+            self.globalFlagsMonitor = nil
+        }
         if let localEscMonitor {
             NSEvent.removeMonitor(localEscMonitor)
             self.localEscMonitor = nil
+        }
+        if let localFlagsMonitor {
+            NSEvent.removeMonitor(localFlagsMonitor)
+            self.localFlagsMonitor = nil
         }
     }
 }

@@ -9,6 +9,9 @@ extension Notification.Name {
     static let openPreferencesTab = Notification.Name("openPreferencesTab")
     static let openScreenshotSettings = Notification.Name("openScreenshotSettings")
     static let capturePresetChanged = Notification.Name("capturePresetChanged")
+    /// Syncs multi-window selection across per-screen capture overlays.
+    /// `userInfo["windowIDs"]` is `[NSNumber]` of `CGWindowID` values.
+    static let multiWindowSelectionChanged = Notification.Name("multiWindowSelectionChanged")
     /// Posted by PreferencesWindow when the window is already open and the
     /// caller wants the visible Preferences UI to switch to a specific tab.
     /// Only PreferencesView observes this — NOT AppDelegate (which would cause
@@ -25,6 +28,8 @@ enum CaptureOverlayMode {
 final class CaptureOverlayView: NSView {
     var onSelectionComplete: ((CGRect) -> Void)?
     var onWindowSelected: ((CGWindowID) -> Void)?
+    /// Fired when Shift is released with two or more windows selected.
+    var onWindowsSelected: (([CGWindowID]) -> Void)?
     var onCancel: (() -> Void)?
     var onSpaceToggle: (() -> Void)?
 
@@ -33,6 +38,9 @@ final class CaptureOverlayView: NSView {
     /// When true, preset features (badge, R-key, right-click menu, ratio lock) are disabled.
     /// Used by OCR and Recording overlays which always use freeform selection.
     private let presetsDisabled: Bool
+    /// Screenshot window capture supports Shift multi-select; recording keeps
+    /// its existing single-window behavior even though it shares this view.
+    private let allowsMultiWindowSelection: Bool
 
     private var mode: CaptureOverlayMode = .area
     private var isDragging = false
@@ -49,6 +57,9 @@ final class CaptureOverlayView: NSView {
     private var hoveredWindowFrame: CGRect = .zero
     private var hoveredWindowName: String = ""
     private var availableWindows: [WindowInfo] = []
+    /// Ordered by selection time; capture reorders to front-to-back z-order.
+    private var selectedWindowIDs: [CGWindowID] = []
+    private var isShiftHeld = false
 
     private var cursorHidden = false
 
@@ -76,18 +87,21 @@ final class CaptureOverlayView: NSView {
     private var presetMenuMap: [Int: CapturePreset] = [:]
 
     nonisolated(unsafe) private var presetObserver: Any?
+    nonisolated(unsafe) private var multiWindowSelectionObserver: Any?
 
     init(
         frame: NSRect,
         settings: AppSettings,
         safeAreaTopInset: CGFloat,
-        presetsDisabled: Bool = false
+        presetsDisabled: Bool = false,
+        allowsMultiWindowSelection: Bool = true
     ) {
         self.settings = settings
         self.safeAreaTopInset = safeAreaTopInset
         // Presets are disabled when explicitly requested (OCR/Recording) or when
         // the user has turned off the feature in Settings.
         self.presetsDisabled = presetsDisabled || !settings.capturePresetsEnabled
+        self.allowsMultiWindowSelection = allowsMultiWindowSelection
         self.activePreset = self.presetsDisabled ? .freeform : settings.capturePreset
         super.init(frame: frame)
         addTrackingArea(NSTrackingArea(
@@ -96,6 +110,23 @@ final class CaptureOverlayView: NSView {
             owner: self,
             userInfo: nil
         ))
+
+        if allowsMultiWindowSelection {
+            multiWindowSelectionObserver = NotificationCenter.default.addObserver(
+                forName: .multiWindowSelectionChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                let ids: [CGWindowID] = (note.userInfo?["windowIDs"] as? [NSNumber])?
+                    .map { CGWindowID(truncating: $0) } ?? []
+                let isFromSelf = note.object as AnyObject? === self
+                MainActor.assumeIsolated {
+                    guard let self, !isFromSelf else { return }
+                    self.selectedWindowIDs = ids
+                    self.needsDisplay = true
+                }
+            }
+        }
 
         // Listen for preset changes from other overlay views (multi-screen sync)
         guard !self.presetsDisabled else { return }
@@ -127,6 +158,9 @@ final class CaptureOverlayView: NSView {
         if let presetObserver {
             NotificationCenter.default.removeObserver(presetObserver)
         }
+        if let multiWindowSelectionObserver {
+            NotificationCenter.default.removeObserver(multiWindowSelectionObserver)
+        }
     }
 
     @available(*, unavailable)
@@ -138,6 +172,8 @@ final class CaptureOverlayView: NSView {
         dragEnd = .zero
         hoveredWindowID = nil
         currentMouseLocation = nil
+        selectedWindowIDs = []
+        isShiftHeld = false
         needsDisplay = true
     }
 
@@ -409,33 +445,124 @@ final class CaptureOverlayView: NSView {
         context.setFillColor(overlayColor.cgColor)
         context.fill(bounds)
 
-        // If a window is hovered, clear it and highlight with rounded corners
-        if hoveredWindowID != nil {
-            let viewRect = screenRectToViewRect(hoveredWindowFrame)
-            let cornerRadius: CGFloat = 10 // macOS window corner radius
+        let selectedSet = Set(selectedWindowIDs)
 
-            let roundedPath = CGPath(roundedRect: viewRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-
-            // Clear the window area (rounded)
-            context.setBlendMode(.clear)
-            context.addPath(roundedPath)
-            context.fillPath()
-            context.setBlendMode(.normal)
-
-            // Highlight border (rounded)
-            context.setStrokeColor(windowBorderColor.cgColor)
-            context.setLineWidth(3.0)
-            context.addPath(roundedPath)
-            context.strokePath()
-
-            // Subtle fill (rounded)
-            context.setFillColor(windowHighlightColor.cgColor)
-            context.addPath(roundedPath)
-            context.fillPath()
-
-            // Window name label
-            drawWindowLabel(name: hoveredWindowName, for: viewRect, in: context)
+        // Keep multi-selected windows punched out and highlighted.
+        for window in availableWindows where selectedSet.contains(window.id) {
+            highlightWindow(
+                frame: window.frame,
+                name: displayName(for: window),
+                showLabel: false,
+                in: context
+            )
         }
+
+        // Hover highlight (and label) for the window under the cursor.
+        if let hoveredID = hoveredWindowID {
+            if selectedSet.contains(hoveredID) {
+                let viewRect = screenRectToViewRect(hoveredWindowFrame)
+                drawWindowLabel(name: hoveredWindowName, for: viewRect, in: context)
+            } else {
+                highlightWindow(
+                    frame: hoveredWindowFrame,
+                    name: hoveredWindowName,
+                    showLabel: true,
+                    in: context
+                )
+            }
+        }
+
+        if allowsMultiWindowSelection {
+            if selectedWindowIDs.count >= 1 {
+                drawMultiWindowCountBadge(count: selectedWindowIDs.count, in: context)
+            } else {
+                drawWindowSelectionHintBadge(in: context)
+            }
+        }
+    }
+
+    private func highlightWindow(
+        frame: CGRect,
+        name: String,
+        showLabel: Bool,
+        in context: CGContext
+    ) {
+        let viewRect = screenRectToViewRect(frame)
+        let cornerRadius: CGFloat = 10
+        let roundedPath = CGPath(
+            roundedRect: viewRect,
+            cornerWidth: cornerRadius,
+            cornerHeight: cornerRadius,
+            transform: nil
+        )
+
+        context.setBlendMode(.clear)
+        context.addPath(roundedPath)
+        context.fillPath()
+        context.setBlendMode(.normal)
+
+        context.setStrokeColor(windowBorderColor.cgColor)
+        context.setLineWidth(3.0)
+        context.addPath(roundedPath)
+        context.strokePath()
+
+        context.setFillColor(windowHighlightColor.cgColor)
+        context.addPath(roundedPath)
+        context.fillPath()
+
+        if showLabel {
+            drawWindowLabel(name: name, for: viewRect, in: context)
+        }
+    }
+
+    private func displayName(for window: WindowInfo) -> String {
+        if window.appName.isEmpty || window.title == window.appName {
+            return window.title
+        }
+        return "\(window.appName) — \(window.title)"
+    }
+
+    private func drawWindowSelectionHintBadge(in context: CGContext) {
+        drawBottomHintBadge(
+            text: String(localized: "Hold ⇧ and click to select multiple windows"),
+            in: context
+        )
+    }
+
+    private func drawMultiWindowCountBadge(count: Int, in context: CGContext) {
+        drawBottomHintBadge(
+            text: String(localized: "\(count) windows selected — release ⇧ to capture"),
+            in: context
+        )
+    }
+
+    private func drawBottomHintBadge(text: String, in context: CGContext) {
+        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: dimensionTextColor
+        ]
+        let size = (text as NSString).size(withAttributes: attributes)
+        let paddingH: CGFloat = 12
+        let paddingV: CGFloat = 8
+        let badgeWidth = size.width + paddingH * 2
+        let badgeHeight = size.height + paddingV * 2
+
+        let visibleRect = visibleScreenRectInViewCoordinates()
+        let badgeX = visibleRect.midX - badgeWidth / 2
+        let badgeY = visibleRect.minY + 24
+        let bgRect = CGRect(x: badgeX, y: badgeY, width: badgeWidth, height: badgeHeight)
+
+        context.setFillColor(dimensionBgColor.cgColor)
+        let path = CGPath(roundedRect: bgRect, cornerWidth: 8, cornerHeight: 8, transform: nil)
+        context.addPath(path)
+        context.fillPath()
+
+        let textPoint = NSPoint(
+            x: badgeX + paddingH,
+            y: badgeY + (badgeHeight - size.height) / 2
+        )
+        (text as NSString).draw(at: textPoint, withAttributes: attributes)
     }
 
     private func drawWindowLabel(name: String, for rect: CGRect, in context: CGContext) {
@@ -689,9 +816,20 @@ final class CaptureOverlayView: NSView {
 
         case .windowSelection:
             if let windowID = hoveredWindowID {
-                restoreCursor()
-                onWindowSelected?(windowID)
+                handleWindowClick(windowID, modifierFlags: event.modifierFlags)
             }
+        }
+    }
+
+    func handleWindowClick(
+        _ windowID: CGWindowID,
+        modifierFlags: NSEvent.ModifierFlags
+    ) {
+        if allowsMultiWindowSelection, modifierFlags.contains(.shift) {
+            toggleWindowSelection(windowID)
+        } else {
+            restoreCursor()
+            onWindowSelected?(windowID)
         }
     }
 
@@ -832,7 +970,9 @@ final class CaptureOverlayView: NSView {
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // ESC
-            cancelOverlay()
+            if !handleEscapeKey() {
+                cancelOverlay()
+            }
         } else if event.keyCode == 49 { // Space
             requestSpaceToggle()
         } else if event.keyCode == 15 { // R key
@@ -843,6 +983,22 @@ final class CaptureOverlayView: NSView {
         }
     }
 
+    override func flagsChanged(with event: NSEvent) {
+        handleFlagsChanged(event)
+        super.flagsChanged(with: event)
+    }
+
+    /// Shared entry for both the view's `flagsChanged` and the window's local
+    /// flags monitor so Shift-release confirmation stays reliable.
+    func handleFlagsChanged(_ event: NSEvent, allowsNonKeyConfirmation: Bool = false) {
+        guard allowsMultiWindowSelection else { return }
+        let shiftNow = event.modifierFlags.contains(.shift)
+        if (isShiftHeld || allowsNonKeyConfirmation) && !shiftNow {
+            confirmMultiWindowSelectionIfNeeded(allowsNonKeyConfirmation: allowsNonKeyConfirmation)
+        }
+        isShiftHeld = shiftNow
+    }
+
     override var acceptsFirstResponder: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -850,6 +1006,73 @@ final class CaptureOverlayView: NSView {
     func requestSpaceToggle() {
         guard !isDragging, onSpaceToggle != nil else { return }
         onSpaceToggle?()
+    }
+
+    /// Returns `true` when Esc cleared a multi-window selection instead of cancelling.
+    @discardableResult
+    func handleEscapeKey() -> Bool {
+        guard allowsMultiWindowSelection,
+              case .windowSelection = mode,
+              !selectedWindowIDs.isEmpty else {
+            return false
+        }
+        clearMultiWindowSelection()
+        return true
+    }
+
+    private func toggleWindowSelection(_ windowID: CGWindowID) {
+        if let index = selectedWindowIDs.firstIndex(of: windowID) {
+            selectedWindowIDs.remove(at: index)
+        } else {
+            selectedWindowIDs.append(windowID)
+        }
+        // Keep Shift-held tracking in sync even if flagsChanged hasn't fired yet.
+        isShiftHeld = true
+        broadcastMultiWindowSelection()
+        needsDisplay = true
+    }
+
+    private func clearMultiWindowSelection() {
+        guard !selectedWindowIDs.isEmpty else { return }
+        selectedWindowIDs = []
+        broadcastMultiWindowSelection()
+        needsDisplay = true
+    }
+
+    private func broadcastMultiWindowSelection() {
+        NotificationCenter.default.post(
+            name: .multiWindowSelectionChanged,
+            object: self,
+            userInfo: [
+                "windowIDs": selectedWindowIDs.map { NSNumber(value: $0) }
+            ]
+        )
+    }
+
+    /// Confirm multi-window capture when Shift is released with a non-empty set.
+    /// IDs are reordered to match `availableWindows` front-to-back z-order.
+    private func confirmMultiWindowSelectionIfNeeded(allowsNonKeyConfirmation: Bool = false) {
+        guard case .windowSelection = mode, !selectedWindowIDs.isEmpty else { return }
+        // Multi-screen overlays each install a flags monitor; only the key
+        // window should fire the local callback. The single global monitor
+        // owner may confirm when the app is frontmost elsewhere and none is key.
+        if !allowsNonKeyConfirmation, let window, !window.isKeyWindow { return }
+
+        let selectedSet = Set(selectedWindowIDs)
+        var ordered = availableWindows.map(\.id).filter { selectedSet.contains($0) }
+        for id in selectedWindowIDs where !ordered.contains(id) {
+            ordered.append(id)
+        }
+
+        // Clear first so a second flags delivery (view + monitor) is a no-op.
+        selectedWindowIDs = []
+        broadcastMultiWindowSelection()
+        restoreCursor()
+        if ordered.count == 1, let windowID = ordered.first {
+            onWindowSelected?(windowID)
+        } else {
+            onWindowsSelected?(ordered)
+        }
     }
 
     private func cancelCurrentSelection() {
