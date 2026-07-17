@@ -88,6 +88,56 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         XCTAssertEqual(cancellationCount, 1)
     }
 
+    func testGlobalShiftReleaseConfirmsSelectionWhenNoOverlayIsKey() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let screen = try XCTUnwrap(NSScreen.main)
+        let firstWindow = CaptureOverlayWindow(
+            screen: screen,
+            settings: settings,
+            handlesGlobalKeyEvents: true
+        )
+        let secondWindow = CaptureOverlayWindow(
+            screen: screen,
+            settings: settings,
+            handlesGlobalKeyEvents: false
+        )
+        let firstView = try XCTUnwrap(firstWindow.contentView as? CaptureOverlayView)
+        let secondView = try XCTUnwrap(secondWindow.contentView as? CaptureOverlayView)
+
+        firstView.setMode(.windowSelection([]))
+        secondView.setMode(.windowSelection([]))
+        NotificationCenter.default.post(
+            name: .multiWindowSelectionChanged,
+            object: self,
+            userInfo: [
+                "windowIDs": [
+                    NSNumber(value: CGWindowID(42)),
+                    NSNumber(value: CGWindowID(43))
+                ]
+            ]
+        )
+
+        var capturedSelections: [[CGWindowID]] = []
+        firstWindow.onWindowsSelected = { capturedSelections.append($0) }
+        secondWindow.onWindowsSelected = { capturedSelections.append($0) }
+
+        XCTAssertFalse(firstWindow.isKeyWindow)
+        XCTAssertFalse(secondWindow.isKeyWindow)
+
+        let commandChanged = try makeFlagsChangedEvent(modifierFlags: .command, keyCode: 55)
+        firstWindow.handleGlobalFlagsChanged(commandChanged)
+        secondWindow.handleGlobalFlagsChanged(commandChanged)
+        XCTAssertTrue(capturedSelections.isEmpty)
+
+        let shiftReleased = try makeFlagsChangedEvent(modifierFlags: [])
+        firstWindow.handleGlobalFlagsChanged(shiftReleased)
+        secondWindow.handleGlobalFlagsChanged(shiftReleased)
+
+        XCTAssertEqual(capturedSelections, [[42, 43]])
+    }
+
     func testRecordingWindowSelectionTreatsShiftClickAsSingleSelection() throws {
         let (settings, defaultsSuiteName) = makeSettings()
         defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
@@ -160,7 +210,10 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         ))
     }
 
-    private func makeFlagsChangedEvent(modifierFlags: NSEvent.ModifierFlags) throws -> NSEvent {
+    private func makeFlagsChangedEvent(
+        modifierFlags: NSEvent.ModifierFlags,
+        keyCode: UInt16 = 56
+    ) throws -> NSEvent {
         try XCTUnwrap(NSEvent.keyEvent(
             with: .flagsChanged,
             location: .zero,
@@ -171,7 +224,7 @@ final class CaptureOverlayInteractionTests: XCTestCase {
             characters: "",
             charactersIgnoringModifiers: "",
             isARepeat: false,
-            keyCode: 56
+            keyCode: keyCode
         ))
     }
 }

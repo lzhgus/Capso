@@ -990,11 +990,11 @@ final class CaptureOverlayView: NSView {
 
     /// Shared entry for both the view's `flagsChanged` and the window's local
     /// flags monitor so Shift-release confirmation stays reliable.
-    func handleFlagsChanged(_ event: NSEvent) {
+    func handleFlagsChanged(_ event: NSEvent, allowsNonKeyConfirmation: Bool = false) {
         guard allowsMultiWindowSelection else { return }
         let shiftNow = event.modifierFlags.contains(.shift)
-        if isShiftHeld && !shiftNow {
-            confirmMultiWindowSelectionIfNeeded()
+        if (isShiftHeld || allowsNonKeyConfirmation) && !shiftNow {
+            confirmMultiWindowSelectionIfNeeded(allowsNonKeyConfirmation: allowsNonKeyConfirmation)
         }
         isShiftHeld = shiftNow
     }
@@ -1051,11 +1051,12 @@ final class CaptureOverlayView: NSView {
 
     /// Confirm multi-window capture when Shift is released with a non-empty set.
     /// IDs are reordered to match `availableWindows` front-to-back z-order.
-    private func confirmMultiWindowSelectionIfNeeded() {
+    private func confirmMultiWindowSelectionIfNeeded(allowsNonKeyConfirmation: Bool = false) {
         guard case .windowSelection = mode, !selectedWindowIDs.isEmpty else { return }
         // Multi-screen overlays each install a flags monitor; only the key
-        // window should fire the capture callback.
-        if let window, !window.isKeyWindow { return }
+        // window should fire the local callback. The single global monitor
+        // owner may confirm when the app is frontmost elsewhere and none is key.
+        if !allowsNonKeyConfirmation, let window, !window.isKeyWindow { return }
 
         let selectedSet = Set(selectedWindowIDs)
         var ordered = availableWindows.map(\.id).filter { selectedSet.contains($0) }

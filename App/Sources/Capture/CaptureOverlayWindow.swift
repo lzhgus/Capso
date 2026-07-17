@@ -16,6 +16,7 @@ final class CaptureOverlayWindow: NSPanel {
     private let allowsMultiWindowSelection: Bool
     private var overlayView: CaptureOverlayView!
     private var globalEscMonitor: Any?
+    private var globalFlagsMonitor: Any?
     private var localEscMonitor: Any?
     private var localFlagsMonitor: Any?
 
@@ -127,6 +128,13 @@ final class CaptureOverlayWindow: NSPanel {
                     self?.handleGlobalKeyEvent(event)
                 }
             }
+            if allowsMultiWindowSelection {
+                globalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+                    DispatchQueue.main.async {
+                        self?.handleGlobalFlagsChanged(event)
+                    }
+                }
+            }
         }
         // Local monitor: catches ESC/Space when our window is key.
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -140,6 +148,15 @@ final class CaptureOverlayWindow: NSPanel {
                 return event
             }
         }
+    }
+
+    func handleGlobalFlagsChanged(_ event: NSEvent) {
+        let isShiftKey = event.keyCode == 56 || event.keyCode == 60
+        guard handlesGlobalKeyEvents,
+              allowsMultiWindowSelection,
+              isShiftKey,
+              !event.modifierFlags.contains(.shift) else { return }
+        overlayView.handleFlagsChanged(event, allowsNonKeyConfirmation: true)
     }
 
     func handleGlobalKeyEvent(_ event: NSEvent) {
@@ -178,6 +195,10 @@ final class CaptureOverlayWindow: NSPanel {
         if let globalEscMonitor {
             NSEvent.removeMonitor(globalEscMonitor)
             self.globalEscMonitor = nil
+        }
+        if let globalFlagsMonitor {
+            NSEvent.removeMonitor(globalFlagsMonitor)
+            self.globalFlagsMonitor = nil
         }
         if let localEscMonitor {
             NSEvent.removeMonitor(localEscMonitor)
