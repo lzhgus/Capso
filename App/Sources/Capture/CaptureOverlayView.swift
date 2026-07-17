@@ -28,7 +28,7 @@ enum CaptureOverlayMode {
 final class CaptureOverlayView: NSView {
     var onSelectionComplete: ((CGRect) -> Void)?
     var onWindowSelected: ((CGWindowID) -> Void)?
-    /// Fired when Shift is released with one or more windows multi-selected.
+    /// Fired when Shift is released with two or more windows selected.
     var onWindowsSelected: (([CGWindowID]) -> Void)?
     var onCancel: (() -> Void)?
     var onSpaceToggle: (() -> Void)?
@@ -1067,7 +1067,11 @@ final class CaptureOverlayView: NSView {
         selectedWindowIDs = []
         broadcastMultiWindowSelection()
         restoreCursor()
-        onWindowsSelected?(ordered)
+        if ordered.count == 1, let windowID = ordered.first {
+            onWindowSelected?(windowID)
+        } else {
+            onWindowsSelected?(ordered)
+        }
     }
 
     private func cancelCurrentSelection() {

@@ -12,6 +12,7 @@ final class CaptureOverlayWindow: NSPanel {
     var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
+    private let handlesGlobalKeyEvents: Bool
     private let allowsMultiWindowSelection: Bool
     private var overlayView: CaptureOverlayView!
     private var globalEscMonitor: Any?
@@ -21,10 +22,12 @@ final class CaptureOverlayWindow: NSPanel {
     init(
         screen: NSScreen,
         settings: AppSettings,
+        handlesGlobalKeyEvents: Bool,
         presetsDisabled: Bool = false,
         allowsMultiWindowSelection: Bool = true
     ) {
         self.settings = settings
+        self.handlesGlobalKeyEvents = handlesGlobalKeyEvents
         self.allowsMultiWindowSelection = allowsMultiWindowSelection
         super.init(
             contentRect: screen.frame,
@@ -115,23 +118,14 @@ final class CaptureOverlayWindow: NSPanel {
     }
 
     private func installKeyMonitor() {
-        // Global monitor: catches ESC/Space even when another app is frontmost.
-        globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            switch event.keyCode {
-            case 53:
+        // A single display overlay owns the global monitor so app-wide events
+        // are handled once, including when another app is frontmost and no
+        // capture overlay is key.
+        if handlesGlobalKeyEvents {
+            globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 DispatchQueue.main.async {
-                    // Global monitors are app-wide, so every display overlay
-                    // receives this event. Only the key overlay may act on it.
-                    guard let self, self.isKeyWindow else { return }
-                    if self.overlayView.handleEscapeKey() { return }
-                    self.onCancelled?()
+                    self?.handleGlobalKeyEvent(event)
                 }
-            case 49:
-                DispatchQueue.main.async {
-                    self?.overlayView.requestSpaceToggle()
-                }
-            default:
-                break
             }
         }
         // Local monitor: catches ESC/Space when our window is key.
@@ -145,6 +139,19 @@ final class CaptureOverlayWindow: NSPanel {
                 self?.overlayView.handleFlagsChanged(event)
                 return event
             }
+        }
+    }
+
+    func handleGlobalKeyEvent(_ event: NSEvent) {
+        guard handlesGlobalKeyEvents else { return }
+        switch event.keyCode {
+        case 53:
+            if overlayView.handleEscapeKey() { return }
+            onCancelled?()
+        case 49:
+            overlayView.requestSpaceToggle()
+        default:
+            break
         }
     }
 

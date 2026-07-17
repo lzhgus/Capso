@@ -125,6 +125,7 @@ final class RecordingCoordinator {
             let overlay = CaptureOverlayWindow(
                 screen: screen,
                 settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty,
                 presetsDisabled: true,
                 allowsMultiWindowSelection: false
             )

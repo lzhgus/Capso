@@ -378,7 +378,11 @@ final class CaptureCoordinator {
         dismissOverlay()
         dismissAllInOneToolbar()
         for screen in NSScreen.screens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 self?.dismissOverlay()
                 if let areaSelected {
@@ -430,7 +434,11 @@ final class CaptureCoordinator {
         )
 
         for (screen, _) in frozenScreens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 guard let self else { return }
                 self.dismissSelectionOverlays()
@@ -698,7 +706,11 @@ final class CaptureCoordinator {
 
         // Step 2: Create transparent overlay windows (top layer) for selection
         for (screen, frozenImage) in frozenScreens {
-            let overlay = CaptureOverlayWindow(screen: screen, settings: settings)
+            let overlay = CaptureOverlayWindow(
+                screen: screen,
+                settings: settings,
+                handlesGlobalKeyEvents: overlayWindows.isEmpty
+            )
             overlay.onAreaSelected = { [weak self] rect, screen in
                 guard let self else { return }
                 self.dismissOverlay()
