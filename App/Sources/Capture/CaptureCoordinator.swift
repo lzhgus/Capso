@@ -402,6 +402,10 @@ final class CaptureCoordinator {
                 // see `StoredCaptureSelection` docs for the rationale.
                 self?.performWindowCapture(windowID: windowID)
             }
+            overlay.onWindowsSelected = { [weak self] windowIDs in
+                self?.dismissOverlay()
+                self?.performMultiWindowCapture(windowIDs: windowIDs)
+            }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
                 self?.dismissOverlay()
@@ -440,6 +444,10 @@ final class CaptureCoordinator {
             overlay.onWindowSelected = { [weak self] windowID in
                 self?.dismissOverlay()
                 self?.performWindowCapture(windowID: windowID)
+            }
+            overlay.onWindowsSelected = { [weak self] windowIDs in
+                self?.dismissOverlay()
+                self?.performMultiWindowCapture(windowIDs: windowIDs)
             }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
@@ -705,6 +713,10 @@ final class CaptureCoordinator {
                 self?.dismissOverlay()
                 self?.performWindowCapture(windowID: windowID)
             }
+            overlay.onWindowsSelected = { [weak self] windowIDs in
+                self?.dismissOverlay()
+                self?.performMultiWindowCapture(windowIDs: windowIDs)
+            }
             overlay.onCancelled = { [weak self] in
                 self?.pendingSourceApplication = nil
                 self?.dismissOverlay()
@@ -787,6 +799,22 @@ final class CaptureCoordinator {
                 handleCaptureResult(result)
             } catch {
                 print("Window capture failed: \(error)")
+            }
+        }
+    }
+
+    /// Capture multiple windows and composite them at their screen positions.
+    /// Skips the single-window frosted-glass treatment — it doesn't apply to a scene.
+    private func performMultiWindowCapture(windowIDs: [CGWindowID]) {
+        Task {
+            do {
+                let result = try await ScreenCaptureManager.captureWindows(
+                    windowIDs: windowIDs,
+                    showsCursor: settings.screenshotShowsCursor
+                )
+                handleCaptureResult(result)
+            } catch {
+                print("Multi-window capture failed: \(error)")
             }
         }
     }

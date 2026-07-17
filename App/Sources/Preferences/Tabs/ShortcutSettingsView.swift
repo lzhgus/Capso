@@ -40,6 +40,8 @@ struct ShortcutSettingsView: View {
         ContextualShortcut(id: "all-in-one-save", scope: "All-in-One", action: "Save selected area", shortcut: "⌘S"),
         ContextualShortcut(id: "all-in-one-pin", scope: "All-in-One", action: "Pin selected area", shortcut: "⌘P"),
         ContextualShortcut(id: "all-in-one-cancel", scope: "All-in-One", action: "Cancel", shortcut: "Esc"),
+        ContextualShortcut(id: "window-multi-select", scope: "Window Capture", action: "Select multiple windows", shortcut: "⇧ + click"),
+        ContextualShortcut(id: "window-multi-confirm", scope: "Window Capture", action: "Capture selected windows", shortcut: "Release ⇧"),
         ContextualShortcut(id: "quick-access-copy", scope: "Quick Access", action: "Copy", shortcut: "⌘C"),
         ContextualShortcut(id: "quick-access-save", scope: "Quick Access", action: "Save", shortcut: "⌘S"),
         ContextualShortcut(id: "quick-access-annotate", scope: "Quick Access", action: "Annotate", shortcut: "⌘E"),
