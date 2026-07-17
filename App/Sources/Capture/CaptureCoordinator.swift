@@ -25,7 +25,7 @@ final class CaptureCoordinator {
     /// Maximum previews kept on-screen. Oldest is evicted when exceeded.
     private let maxQuickAccessStackSize = 5
     private var quickAccessPreviewWindow: QuickAccessPreviewWindow?
-    private var annotationWindow: AnnotationEditorWindow?
+    private(set) var annotationWindow: AnnotationEditorWindow?
     private var inlineAnnotationWindow: InlineAnnotationEditorWindow?
     private var allInOneToolbarWindow: CaptureAllInOneToolbarWindow?
     private var pinnedControllers: [PinnedScreenshotController] = []
@@ -57,6 +57,14 @@ final class CaptureCoordinator {
     private struct SourceApplication: Sendable {
         let name: String?
         let bundleIdentifier: String?
+    }
+
+    /// User's answer to the "Overwrite Original" / "Save as New Copy" prompt
+    /// shown when saving a file opened from disk (see `handleOpenedFileSave`).
+    enum OpenedImageSaveChoice {
+        case overwrite
+        case saveAsCopy
+        case cancel
     }
 
     enum PostCaptureAction {
@@ -185,6 +193,139 @@ final class CaptureCoordinator {
             displayID: screen?.displayID ?? CGMainDisplayID()
         )
         openAnnotationEditor(result, anchorScreen: screen)
+    }
+
+    /// Test seam — injected by tests so no real NSOpenPanel appears.
+    var openPanelURLsProvider: (() -> [URL])?
+
+    @discardableResult
+    func openImageFiles(_ urls: [URL]) -> Bool {
+        let candidates = urls.filter(ImageFileReader.isSupported)
+        guard let (url, image) = candidates.lazy
+            .compactMap({ candidateURL in ImageFileReader.image(at: candidateURL).map { (candidateURL, $0) } })
+            .first
+        else {
+            if !urls.isEmpty {
+                showToast(
+                    String(localized: "Couldn't open image"),
+                    icon: "photo.on.rectangle.angled",
+                    iconColor: .systemYellow
+                )
+            }
+            return false
+        }
+
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
+        let result = CaptureResult(
+            image: image,
+            mode: .area,
+            captureRect: CGRect(x: 0, y: 0, width: image.width, height: image.height),
+            appName: url.deletingPathExtension().lastPathComponent,
+            displayID: screen?.displayID ?? CGMainDisplayID()
+        )
+
+        if candidates.count > 1 {
+            showToast(
+                String(localized: "Opened 1 of \(candidates.count) images"),
+                icon: "photo.on.rectangle.angled",
+                iconColor: .systemYellow
+            )
+        }
+
+        openAnnotationEditor(result, anchorScreen: screen, openedFileURL: url)
+        return true
+    }
+
+    func openImageFilesWithPanel() {
+        let urls = openPanelURLsProvider?() ?? runImageOpenPanel()
+        guard !urls.isEmpty else { return }
+        openImageFiles(urls)
+    }
+
+    private func runImageOpenPanel() -> [URL] {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = ImageFileReader.supportedContentTypes
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        // LSUIElement app — the panel needs explicit activation to come to the front.
+        NSApp.activate(ignoringOtherApps: true)
+        return panel.runModal() == .OK ? panel.urls : []
+    }
+
+    /// Test seam — injected by tests so no real NSAlert appears.
+    var saveChoicePrompt: ((URL) -> OpenedImageSaveChoice)?
+
+    /// Save handler for a file opened from disk (vs. a fresh capture).
+    /// Returns `false` when the user cancels (window should stay open).
+    @discardableResult
+    func handleOpenedFileSave(
+        _ rendered: CGImage,
+        originalURL: URL,
+        sourceAppName: String?,
+        sourceWindowTitle: String?,
+        date: Date
+    ) -> Bool {
+        switch settings.openedImageSaveBehavior {
+        case .overwrite:
+            overwriteOriginalFile(rendered, at: originalURL)
+            return true
+        case .copy:
+            saveRenderedImage(rendered, sourceAppName: sourceAppName, sourceWindowTitle: sourceWindowTitle, date: date)
+            return true
+        case .ask:
+            let choice = saveChoicePrompt?(originalURL) ?? promptSaveChoice(for: originalURL)
+            switch choice {
+            case .overwrite:
+                overwriteOriginalFile(rendered, at: originalURL)
+                return true
+            case .saveAsCopy:
+                saveRenderedImage(rendered, sourceAppName: sourceAppName, sourceWindowTitle: sourceWindowTitle, date: date)
+                return true
+            case .cancel:
+                return false
+            }
+        }
+    }
+
+    private func promptSaveChoice(for url: URL) -> OpenedImageSaveChoice {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = String(localized: "Save changes to \"\(url.lastPathComponent)\"?")
+        alert.informativeText = String(localized: "You can overwrite the original file or save your annotations as a new file.")
+        alert.addButton(withTitle: String(localized: "Save as New Copy"))
+        alert.addButton(withTitle: String(localized: "Overwrite Original"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+
+        NSApp.activate(ignoringOtherApps: true)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return .saveAsCopy
+        case .alertSecondButtonReturn:
+            return .overwrite
+        default:
+            return .cancel
+        }
+    }
+
+    private func overwriteOriginalFile(_ rendered: CGImage, at url: URL) {
+        guard let data = ImageFileWriter.data(from: rendered, matchingFormatOf: url) else {
+            showToast(
+                String(localized: "Couldn't overwrite file"),
+                icon: "exclamationmark.triangle",
+                iconColor: .systemRed
+            )
+            return
+        }
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            showToast(
+                String(localized: "Couldn't overwrite file"),
+                icon: "exclamationmark.triangle",
+                iconColor: .systemRed
+            )
+        }
     }
 
     func captureAreaAndShare() {
@@ -1436,7 +1577,11 @@ final class CaptureCoordinator {
         }
     }
 
-    private func openAnnotationEditor(_ result: CaptureResult, anchorScreen: NSScreen? = nil) {
+    private func openAnnotationEditor(
+        _ result: CaptureResult,
+        anchorScreen: NSScreen? = nil,
+        openedFileURL: URL? = nil
+    ) {
         let screen = anchorScreen ?? screenFor(result: result)
 
         inlineAnnotationWindow?.close()
@@ -1449,14 +1594,30 @@ final class CaptureCoordinator {
             captureDate: result.timestamp,
             screenshotOutputPreset: settings.screenshotOutputPreset,
             screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
-            onSave: { [weak self] (rendered: CGImage) in
-                self?.saveRenderedImage(
-                    rendered,
-                    sourceAppName: result.appName,
-                    sourceWindowTitle: result.windowName,
-                    date: result.timestamp
-                )
-                self?.annotationWindow = nil
+            onSave: { [weak self] (rendered: CGImage) -> Bool in
+                guard let self else { return false }
+                if let openedFileURL {
+                    let didSave = self.handleOpenedFileSave(
+                        rendered,
+                        originalURL: openedFileURL,
+                        sourceAppName: result.appName,
+                        sourceWindowTitle: result.windowName,
+                        date: result.timestamp
+                    )
+                    if didSave {
+                        self.annotationWindow = nil
+                    }
+                    return didSave
+                } else {
+                    self.saveRenderedImage(
+                        rendered,
+                        sourceAppName: result.appName,
+                        sourceWindowTitle: result.windowName,
+                        date: result.timestamp
+                    )
+                    self.annotationWindow = nil
+                    return true
+                }
             },
             onCopy: { [weak self] (rendered: CGImage) in
                 self?.copyRenderedImage(rendered)

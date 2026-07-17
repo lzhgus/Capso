@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferencesWindow: PreferencesWindow?
     private var automationURLRequestBuffer = AutomationURLRequestBuffer()
     private var receivedAutomationURLDuringLaunch = false
+    private var imageFileOpenBuffer = ImageFileOpenBuffer()
     /// Sparkle update coordinator used by preferences and manual update checks.
     let updateManager = UpdateManager()
 
@@ -74,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         registerGlobalShortcuts()
         performPendingAutomationURLAction()
+        performPendingImageFileOpen()
         historyCoordinator?.runCleanup()
 
         // Safety net: if the menu bar icon is hidden, the user has no obvious
@@ -197,11 +199,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
+        let (imageFiles, remainder) = ImageFileOpenRequest.partition(urls: urls)
+
+        // Opening image files is never gated by the Automation URLs toggle —
+        // that setting only governs the `capso://` automation scheme.
+        if !imageFiles.isEmpty {
+            imageFileOpenBuffer.enqueue(imageFiles)
+            performPendingImageFileOpen()
+        }
+
+        guard !remainder.isEmpty else { return }
+
         guard settings.automationURLsEnabled else {
             logAutomationURL("Ignored request because Automation URLs are disabled")
             return
         }
-        guard let action = urls.lazy.compactMap(AutomationURLAction.init(url:)).first else {
+        guard let action = remainder.lazy.compactMap(AutomationURLAction.init(url:)).first else {
             logAutomationURL("Ignored unsupported request")
             return
         }
@@ -209,6 +222,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         receivedAutomationURLDuringLaunch = true
         automationURLRequestBuffer.enqueue(action)
         performPendingAutomationURLAction()
+    }
+
+    private func performPendingImageFileOpen() {
+        guard let urls = imageFileOpenBuffer.takeIfReady(coordinatorIsReady: captureCoordinator != nil) else {
+            return
+        }
+        captureCoordinator?.openImageFiles(urls)
     }
 
     private func performPendingAutomationURLAction() {

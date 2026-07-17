@@ -63,6 +63,23 @@ struct ExportSettingsView: View {
                     filenameTemplateEditor
                 }
             }
+
+            SettingGroup(title: "Opened Images") {
+                SettingCard {
+                    SettingRow(
+                        label: "When Saving an Opened Image",
+                        sublabel: "Applies to images opened from Finder or the Open Image panel"
+                    ) {
+                        Picker("", selection: $viewModel.openedImageSaveBehavior) {
+                            Text("Ask Every Time").tag(OpenedImageSaveBehavior.ask)
+                            Text("Overwrite Original").tag(OpenedImageSaveBehavior.overwrite)
+                            Text("Save New Copy").tag(OpenedImageSaveBehavior.copy)
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 180)
+                    }
+                }
+            }
         }
         .onAppear {
             filenameTemplateDraft = viewModel.screenshotFilenameTemplate

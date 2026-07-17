@@ -45,6 +45,16 @@ public enum RecordingFormat: String, CaseIterable, Sendable {
     case gif
 }
 
+/// What Save does when annotating a file opened from disk (vs. a fresh capture).
+public enum OpenedImageSaveBehavior: String, CaseIterable, Sendable {
+    /// Prompt every time with "Overwrite Original" / "Save as New Copy".
+    case ask
+    /// Always overwrite the original file, preserving its format.
+    case overwrite
+    /// Always save a new file, exactly like a fresh capture.
+    case copy
+}
+
 public enum TranslationCardPosition: String, CaseIterable, Sendable {
     case belowSelection
     case centerScreen
@@ -750,6 +760,15 @@ public final class AppSettings: @unchecked Sendable {
 
     public func setExportLocation(_ url: URL) {
         defaults.set(url, forKey: "exportLocation")
+    }
+
+    public var openedImageSaveBehavior: OpenedImageSaveBehavior {
+        get {
+            guard let raw = defaults.string(forKey: "openedImageSaveBehavior"),
+                  let value = OpenedImageSaveBehavior(rawValue: raw) else { return .ask }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "openedImageSaveBehavior") }
     }
 
     // MARK: Cloud Share

@@ -147,6 +147,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var openedImageSaveBehavior: OpenedImageSaveBehavior {
+        get {
+            access(keyPath: \.openedImageSaveBehavior)
+            return settings.openedImageSaveBehavior
+        }
+        set {
+            withMutation(keyPath: \.openedImageSaveBehavior) {
+                settings.openedImageSaveBehavior = newValue
+            }
+        }
+    }
     var screenshotTimestampEnabled: Bool {
         get {
             access(keyPath: \.screenshotTimestampEnabled)

@@ -508,4 +508,28 @@ struct AppSettingsTests {
         settings.selfTimerHUDPosition = nil
         #expect(settings.selfTimerHUDPosition == nil)
     }
+
+    @Test("Default opened image save behavior is ask")
+    func defaultOpenedImageSaveBehavior() {
+        let suite = "test.openedImageSaveBehavior.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.openedImageSaveBehavior == .ask)
+    }
+
+    @Test("Opened image save behavior round-trips")
+    func openedImageSaveBehaviorRoundTrip() {
+        let suite = "test.openedImageSaveBehavior.roundtrip"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        settings.openedImageSaveBehavior = .overwrite
+        #expect(settings.openedImageSaveBehavior == .overwrite)
+
+        settings.openedImageSaveBehavior = .copy
+        #expect(settings.openedImageSaveBehavior == .copy)
+    }
 }

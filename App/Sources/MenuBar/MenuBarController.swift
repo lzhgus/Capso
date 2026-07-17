@@ -94,6 +94,10 @@ final class MenuBarController: NSObject {
         editClipboardImage.toolTip = String(localized: "Open the image currently copied to the clipboard in Annotate")
         menu.addItem(editClipboardImage)
 
+        let openImageFile = menuItem(String(localized: "Open Image..."), action: #selector(openImageFile))
+        openImageFile.toolTip = String(localized: "Open an image file in Annotate")
+        menu.addItem(openImageFile)
+
         menu.addItem(.separator())
 
         let captureText = menuItem(String(localized: "Capture Text (OCR)"), action: #selector(captureText))
@@ -193,6 +197,10 @@ final class MenuBarController: NSObject {
 
     @objc private func editClipboardImage() {
         captureCoordinator.editClipboardImage()
+    }
+
+    @objc private func openImageFile() {
+        captureCoordinator.openImageFilesWithPanel()
     }
 
     @objc private func captureText() {
