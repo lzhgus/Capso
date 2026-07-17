@@ -38,6 +38,9 @@ final class CaptureOverlayView: NSView {
     /// When true, preset features (badge, R-key, right-click menu, ratio lock) are disabled.
     /// Used by OCR and Recording overlays which always use freeform selection.
     private let presetsDisabled: Bool
+    /// Screenshot window capture supports Shift multi-select; recording keeps
+    /// its existing single-window behavior even though it shares this view.
+    private let allowsMultiWindowSelection: Bool
 
     private var mode: CaptureOverlayMode = .area
     private var isDragging = false
@@ -57,7 +60,6 @@ final class CaptureOverlayView: NSView {
     /// Ordered by selection time; capture reorders to front-to-back z-order.
     private var selectedWindowIDs: [CGWindowID] = []
     private var isShiftHeld = false
-    private var isApplyingRemoteMultiWindowSelection = false
 
     private var cursorHidden = false
 
@@ -91,13 +93,15 @@ final class CaptureOverlayView: NSView {
         frame: NSRect,
         settings: AppSettings,
         safeAreaTopInset: CGFloat,
-        presetsDisabled: Bool = false
+        presetsDisabled: Bool = false,
+        allowsMultiWindowSelection: Bool = true
     ) {
         self.settings = settings
         self.safeAreaTopInset = safeAreaTopInset
         // Presets are disabled when explicitly requested (OCR/Recording) or when
         // the user has turned off the feature in Settings.
         self.presetsDisabled = presetsDisabled || !settings.capturePresetsEnabled
+        self.allowsMultiWindowSelection = allowsMultiWindowSelection
         self.activePreset = self.presetsDisabled ? .freeform : settings.capturePreset
         super.init(frame: frame)
         addTrackingArea(NSTrackingArea(
@@ -107,20 +111,20 @@ final class CaptureOverlayView: NSView {
             userInfo: nil
         ))
 
-        multiWindowSelectionObserver = NotificationCenter.default.addObserver(
-            forName: .multiWindowSelectionChanged,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            let ids: [CGWindowID] = (note.userInfo?["windowIDs"] as? [NSNumber])?
-                .map { CGWindowID(truncating: $0) } ?? []
-            let isFromSelf = note.object as AnyObject? === self
-            MainActor.assumeIsolated {
-                guard let self, !isFromSelf else { return }
-                self.isApplyingRemoteMultiWindowSelection = true
-                self.selectedWindowIDs = ids
-                self.isApplyingRemoteMultiWindowSelection = false
-                self.needsDisplay = true
+        if allowsMultiWindowSelection {
+            multiWindowSelectionObserver = NotificationCenter.default.addObserver(
+                forName: .multiWindowSelectionChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                let ids: [CGWindowID] = (note.userInfo?["windowIDs"] as? [NSNumber])?
+                    .map { CGWindowID(truncating: $0) } ?? []
+                let isFromSelf = note.object as AnyObject? === self
+                MainActor.assumeIsolated {
+                    guard let self, !isFromSelf else { return }
+                    self.selectedWindowIDs = ids
+                    self.needsDisplay = true
+                }
             }
         }
 
@@ -468,10 +472,12 @@ final class CaptureOverlayView: NSView {
             }
         }
 
-        if selectedWindowIDs.count >= 1 {
-            drawMultiWindowCountBadge(count: selectedWindowIDs.count, in: context)
-        } else {
-            drawWindowSelectionHintBadge(in: context)
+        if allowsMultiWindowSelection {
+            if selectedWindowIDs.count >= 1 {
+                drawMultiWindowCountBadge(count: selectedWindowIDs.count, in: context)
+            } else {
+                drawWindowSelectionHintBadge(in: context)
+            }
         }
     }
 
@@ -810,7 +816,7 @@ final class CaptureOverlayView: NSView {
 
         case .windowSelection:
             if let windowID = hoveredWindowID {
-                if event.modifierFlags.contains(.shift) {
+                if allowsMultiWindowSelection, event.modifierFlags.contains(.shift) {
                     toggleWindowSelection(windowID)
                 } else {
                     restoreCursor()
@@ -978,6 +984,7 @@ final class CaptureOverlayView: NSView {
     /// Shared entry for both the view's `flagsChanged` and the window's local
     /// flags monitor so Shift-release confirmation stays reliable.
     func handleFlagsChanged(_ event: NSEvent) {
+        guard allowsMultiWindowSelection else { return }
         let shiftNow = event.modifierFlags.contains(.shift)
         if isShiftHeld && !shiftNow {
             confirmMultiWindowSelectionIfNeeded()
@@ -997,7 +1004,11 @@ final class CaptureOverlayView: NSView {
     /// Returns `true` when Esc cleared a multi-window selection instead of cancelling.
     @discardableResult
     func handleEscapeKey() -> Bool {
-        guard case .windowSelection = mode, !selectedWindowIDs.isEmpty else { return false }
+        guard allowsMultiWindowSelection,
+              case .windowSelection = mode,
+              !selectedWindowIDs.isEmpty else {
+            return false
+        }
         clearMultiWindowSelection()
         return true
     }
@@ -1022,7 +1033,6 @@ final class CaptureOverlayView: NSView {
     }
 
     private func broadcastMultiWindowSelection() {
-        guard !isApplyingRemoteMultiWindowSelection else { return }
         NotificationCenter.default.post(
             name: .multiWindowSelectionChanged,
             object: self,

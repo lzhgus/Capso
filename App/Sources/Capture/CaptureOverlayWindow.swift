@@ -17,7 +17,12 @@ final class CaptureOverlayWindow: NSPanel {
     private var localEscMonitor: Any?
     private var localFlagsMonitor: Any?
 
-    init(screen: NSScreen, settings: AppSettings, presetsDisabled: Bool = false) {
+    init(
+        screen: NSScreen,
+        settings: AppSettings,
+        presetsDisabled: Bool = false,
+        allowsMultiWindowSelection: Bool = true
+    ) {
         self.settings = settings
         super.init(
             contentRect: screen.frame,
@@ -46,7 +51,8 @@ final class CaptureOverlayWindow: NSPanel {
             frame: NSRect(origin: .zero, size: screen.frame.size),
             settings: settings,
             safeAreaTopInset: screen.safeAreaInsets.top,
-            presetsDisabled: presetsDisabled
+            presetsDisabled: presetsDisabled,
+            allowsMultiWindowSelection: allowsMultiWindowSelection
         )
         overlayView.onSelectionComplete = { [weak self] rect in
             guard let self, let screen = self.screen else { return }
@@ -112,7 +118,9 @@ final class CaptureOverlayWindow: NSPanel {
             switch event.keyCode {
             case 53:
                 DispatchQueue.main.async {
-                    guard let self else { return }
+                    // Global monitors are app-wide, so every display overlay
+                    // receives this event. Only the key overlay may act on it.
+                    guard let self, self.isKeyWindow else { return }
                     if self.overlayView.handleEscapeKey() { return }
                     self.onCancelled?()
                 }
@@ -126,15 +134,18 @@ final class CaptureOverlayWindow: NSPanel {
         }
         // Local monitor: catches ESC/Space when our window is key.
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // Local monitors are also app-wide. Leave events for other
+            // display overlays untouched so one key press is handled once.
+            guard let self, event.window === self else { return event }
             switch event.keyCode {
             case 53:
-                if self?.overlayView.handleEscapeKey() == true {
+                if self.overlayView.handleEscapeKey() {
                     return nil
                 }
-                self?.onCancelled?()
+                self.onCancelled?()
                 return nil
             case 49:
-                self?.overlayView.requestSpaceToggle()
+                self.overlayView.requestSpaceToggle()
                 return nil
             default:
                 return event

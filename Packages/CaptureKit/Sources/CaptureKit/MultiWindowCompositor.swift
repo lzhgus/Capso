@@ -6,32 +6,32 @@ import QuartzCore
 /// Pure geometry helpers for compositing multiple window screenshots onto one
 /// transparent canvas. Frames use ScreenCaptureKit global coordinates (origin
 /// at the top-left of the primary display, Y increasing downward).
-public enum MultiWindowCompositor {
+enum MultiWindowCompositor {
 
     /// Continuous corner radius (points) matching recent macOS window chrome.
-    public static let fallbackCornerRadiusPoints: CGFloat = 16
+    static let fallbackCornerRadiusPoints: CGFloat = 16
 
     /// Inset applied to the corner mask so soft anti-aliased fringe pixels
     /// (often light/white against a dark backdrop) are clipped away.
-    public static let cornerMaskInsetPoints: CGFloat = 0.75
+    static let cornerMaskInsetPoints: CGFloat = 0.75
 
     /// Alpha below this is forced to 0 after masking — kills residual soft
     /// white halos without touching fully opaque window chrome.
-    public static let softAlphaThreshold: UInt8 = 24
+    static let softAlphaThreshold: UInt8 = 24
 
-    public struct Layer: Sendable {
-        public let image: CGImage
+    struct Layer: Sendable {
+        let image: CGImage
         /// Window frame in ScreenCaptureKit global point coordinates.
-        public let frame: CGRect
+        let frame: CGRect
 
-        public init(image: CGImage, frame: CGRect) {
+        init(image: CGImage, frame: CGRect) {
             self.image = image
             self.frame = frame
         }
     }
 
     /// Axis-aligned union of the given frames. Returns `nil` when `frames` is empty.
-    public static func unionBounds(of frames: [CGRect]) -> CGRect? {
+    static func unionBounds(of frames: [CGRect]) -> CGRect? {
         guard let first = frames.first else { return nil }
         return frames.dropFirst().reduce(first) { $0.union($1) }
     }
@@ -43,7 +43,7 @@ public enum MultiWindowCompositor {
     /// Gaps between windows stay fully transparent (alpha 0). Each layer is
     /// pre-masked with a continuous corner silhouette (slightly inset) so
     /// square/white corner fringes do not survive into the composite.
-    public static func composite(
+    static func composite(
         layers: [Layer],
         cornerRadiusPoints: CGFloat = fallbackCornerRadiusPoints
     ) -> CGImage? {
@@ -102,7 +102,7 @@ public enum MultiWindowCompositor {
 
     /// Mask a captured window bitmap to a continuous rounded rect and harden
     /// soft alpha. Exposed for unit tests.
-    public static func prepareLayerImage(
+    static func prepareLayerImage(
         _ image: CGImage,
         pointSize: CGSize,
         cornerRadiusPoints: CGFloat,
