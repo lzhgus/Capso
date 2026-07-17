@@ -816,13 +816,20 @@ final class CaptureOverlayView: NSView {
 
         case .windowSelection:
             if let windowID = hoveredWindowID {
-                if allowsMultiWindowSelection, event.modifierFlags.contains(.shift) {
-                    toggleWindowSelection(windowID)
-                } else {
-                    restoreCursor()
-                    onWindowSelected?(windowID)
-                }
+                handleWindowClick(windowID, modifierFlags: event.modifierFlags)
             }
+        }
+    }
+
+    func handleWindowClick(
+        _ windowID: CGWindowID,
+        modifierFlags: NSEvent.ModifierFlags
+    ) {
+        if allowsMultiWindowSelection, modifierFlags.contains(.shift) {
+            toggleWindowSelection(windowID)
+        } else {
+            restoreCursor()
+            onWindowSelected?(windowID)
         }
     }
 

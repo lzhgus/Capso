@@ -12,6 +12,7 @@ final class CaptureOverlayWindow: NSPanel {
     var onSpaceToggle: (() -> Void)?
 
     private let settings: AppSettings
+    private let allowsMultiWindowSelection: Bool
     private var overlayView: CaptureOverlayView!
     private var globalEscMonitor: Any?
     private var localEscMonitor: Any?
@@ -24,6 +25,7 @@ final class CaptureOverlayWindow: NSPanel {
         allowsMultiWindowSelection: Bool = true
     ) {
         self.settings = settings
+        self.allowsMultiWindowSelection = allowsMultiWindowSelection
         super.init(
             contentRect: screen.frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -134,27 +136,33 @@ final class CaptureOverlayWindow: NSPanel {
         }
         // Local monitor: catches ESC/Space when our window is key.
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // Local monitors are also app-wide. Leave events for other
-            // display overlays untouched so one key press is handled once.
-            guard let self, event.window === self else { return event }
-            switch event.keyCode {
-            case 53:
-                if self.overlayView.handleEscapeKey() {
-                    return nil
-                }
-                self.onCancelled?()
-                return nil
-            case 49:
-                self.overlayView.requestSpaceToggle()
-                return nil
-            default:
-                return event
-            }
+            self?.handleLocalKeyEvent(event) ?? event
         }
         // Ensure Shift release confirms multi-window capture even if the view
         // is not first responder (e.g. after clicking across screens).
-        localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.overlayView.handleFlagsChanged(event)
+        if allowsMultiWindowSelection {
+            localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+                self?.overlayView.handleFlagsChanged(event)
+                return event
+            }
+        }
+    }
+
+    /// Local monitors are app-wide. Leave events for other display overlays
+    /// untouched so one key press is handled exactly once.
+    func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
+        guard event.windowNumber == windowNumber else { return event }
+        switch event.keyCode {
+        case 53:
+            if overlayView.handleEscapeKey() {
+                return nil
+            }
+            onCancelled?()
+            return nil
+        case 49:
+            overlayView.requestSpaceToggle()
+            return nil
+        default:
             return event
         }
     }

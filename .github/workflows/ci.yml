@@ -50,3 +50,13 @@ jobs:
 
       - name: Test RecordingKit
         run: swift test --package-path Packages/RecordingKit
+
+      - name: Test Capso app interactions
+        run: |
+          xcodebuild test -project Capso.xcodeproj \
+            -scheme Capso \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:CapsoTests
