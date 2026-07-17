@@ -5,23 +5,10 @@ import SharedKit
 
 @MainActor
 final class CaptureOverlayInteractionTests: XCTestCase {
-    private var defaultsSuiteName: String!
-    private var settings: AppSettings!
-
-    override func setUp() {
-        super.setUp()
-        defaultsSuiteName = "CaptureOverlayInteractionTests.\(UUID().uuidString)"
-        settings = AppSettings(defaults: UserDefaults(suiteName: defaultsSuiteName)!)
-    }
-
-    override func tearDown() {
-        UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
-        settings = nil
-        defaultsSuiteName = nil
-        super.tearDown()
-    }
-
     func testEscapeEventClearsMultiSelectionWithoutCancellingOtherDisplayOverlay() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
         let screen = try XCTUnwrap(NSScreen.main)
         let firstWindow = CaptureOverlayWindow(screen: screen, settings: settings)
         let secondWindow = CaptureOverlayWindow(screen: screen, settings: settings)
@@ -51,6 +38,9 @@ final class CaptureOverlayInteractionTests: XCTestCase {
     }
 
     func testRecordingWindowSelectionTreatsShiftClickAsSingleSelection() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
         let screen = try XCTUnwrap(NSScreen.main)
         let hostWindow = NSWindow(
             contentRect: screen.frame,
@@ -74,6 +64,11 @@ final class CaptureOverlayInteractionTests: XCTestCase {
 
         XCTAssertEqual(selectedWindowID, 42)
         XCTAssertFalse(view.handleEscapeKey(), "Shift-click must not leave recording in multi-select state")
+    }
+
+    private func makeSettings() -> (AppSettings, String) {
+        let suiteName = "CaptureOverlayInteractionTests.\(UUID().uuidString)"
+        return (AppSettings(defaults: UserDefaults(suiteName: suiteName)!), suiteName)
     }
 
     private func makeEscapeEvent(windowNumber: Int) throws -> NSEvent {
