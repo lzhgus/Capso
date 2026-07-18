@@ -37,14 +37,14 @@ struct ImageFileOpenBufferTests {
         #expect(buffer.takeIfReady(coordinatorIsReady: true) == nil)
     }
 
-    @Test("buffer keeps the first batch")
-    func bufferKeepsFirstBatch() {
+    @Test("buffer appends a second batch instead of dropping it")
+    func bufferAppendsSecondBatch() {
         var buffer = ImageFileOpenBuffer()
         let first = [URL(fileURLWithPath: "/tmp/a.png")]
         let second = [URL(fileURLWithPath: "/tmp/b.png")]
         buffer.enqueue(first)
         buffer.enqueue(second)
 
-        #expect(buffer.takeIfReady(coordinatorIsReady: true) == first)
+        #expect(buffer.takeIfReady(coordinatorIsReady: true) == first + second)
     }
 }

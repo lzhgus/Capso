@@ -104,6 +104,41 @@ final class OpenedImageSaveTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: originalURL), originalData)
     }
 
+    func testHandleOpenedFileSaveWithOverwriteBehaviorReturnsFalseWhenWriteFails() throws {
+        let (coordinator, settings, exportDir) = try makeCoordinatorWithTempExport()
+        defer { try? FileManager.default.removeItem(at: exportDir) }
+        settings.openedImageSaveBehavior = .overwrite
+
+        let originalURL = exportDir
+            .appendingPathComponent("missing-subdir")
+            .appendingPathComponent("original.png")
+        let rendered = try makeTestImage(width: 9, height: 3)
+
+        let didProceed = coordinator.handleOpenedFileSave(
+            rendered, originalURL: originalURL, sourceAppName: nil, sourceWindowTitle: nil, date: Date()
+        )
+
+        XCTAssertFalse(didProceed)
+    }
+
+    func testHandleOpenedFileSaveWithAskBehaviorOverwriteReturnsFalseWhenWriteFails() throws {
+        let (coordinator, settings, exportDir) = try makeCoordinatorWithTempExport()
+        defer { try? FileManager.default.removeItem(at: exportDir) }
+        settings.openedImageSaveBehavior = .ask
+        coordinator.saveChoicePrompt = { _ in .overwrite }
+
+        let originalURL = exportDir
+            .appendingPathComponent("missing-subdir")
+            .appendingPathComponent("original.png")
+        let rendered = try makeTestImage(width: 7, height: 2)
+
+        let didProceed = coordinator.handleOpenedFileSave(
+            rendered, originalURL: originalURL, sourceAppName: nil, sourceWindowTitle: nil, date: Date()
+        )
+
+        XCTAssertFalse(didProceed)
+    }
+
     // MARK: - Helpers
 
     private func makeCoordinatorWithTempExport() throws -> (CaptureCoordinator, AppSettings, URL) {

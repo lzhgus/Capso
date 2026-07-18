@@ -94,7 +94,7 @@ final class MenuBarController: NSObject {
         editClipboardImage.toolTip = String(localized: "Open the image currently copied to the clipboard in Annotate")
         menu.addItem(editClipboardImage)
 
-        let openImageFile = menuItem(String(localized: "Open Image..."), action: #selector(openImageFile))
+        let openImageFile = menuItem(String(localized: "Open Image..."), action: #selector(openImageFile), key: "o", modifiers: [.command])
         openImageFile.toolTip = String(localized: "Open an image file in Annotate")
         menu.addItem(openImageFile)
 

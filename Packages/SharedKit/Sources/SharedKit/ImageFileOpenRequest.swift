@@ -22,8 +22,11 @@ public struct ImageFileOpenBuffer: Sendable {
     public init() {}
 
     public mutating func enqueue(_ urls: [URL]) {
-        guard pendingURLs == nil else { return }
-        pendingURLs = urls
+        if let existing = pendingURLs {
+            pendingURLs = existing + urls
+        } else {
+            pendingURLs = urls
+        }
     }
 
     public mutating func takeIfReady(coordinatorIsReady: Bool) -> [URL]? {

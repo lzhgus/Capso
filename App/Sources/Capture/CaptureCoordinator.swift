@@ -268,8 +268,7 @@ final class CaptureCoordinator {
     ) -> Bool {
         switch settings.openedImageSaveBehavior {
         case .overwrite:
-            overwriteOriginalFile(rendered, at: originalURL)
-            return true
+            return overwriteOriginalFile(rendered, at: originalURL)
         case .copy:
             saveRenderedImage(rendered, sourceAppName: sourceAppName, sourceWindowTitle: sourceWindowTitle, date: date)
             return true
@@ -277,8 +276,7 @@ final class CaptureCoordinator {
             let choice = saveChoicePrompt?(originalURL) ?? promptSaveChoice(for: originalURL)
             switch choice {
             case .overwrite:
-                overwriteOriginalFile(rendered, at: originalURL)
-                return true
+                return overwriteOriginalFile(rendered, at: originalURL)
             case .saveAsCopy:
                 saveRenderedImage(rendered, sourceAppName: sourceAppName, sourceWindowTitle: sourceWindowTitle, date: date)
                 return true
@@ -308,23 +306,26 @@ final class CaptureCoordinator {
         }
     }
 
-    private func overwriteOriginalFile(_ rendered: CGImage, at url: URL) {
+    @discardableResult
+    private func overwriteOriginalFile(_ rendered: CGImage, at url: URL) -> Bool {
         guard let data = ImageFileWriter.data(from: rendered, matchingFormatOf: url) else {
             showToast(
                 String(localized: "Couldn't overwrite file"),
                 icon: "exclamationmark.triangle",
                 iconColor: .systemRed
             )
-            return
+            return false
         }
         do {
             try data.write(to: url, options: .atomic)
+            return true
         } catch {
             showToast(
                 String(localized: "Couldn't overwrite file"),
                 icon: "exclamationmark.triangle",
                 iconColor: .systemRed
             )
+            return false
         }
     }
 
