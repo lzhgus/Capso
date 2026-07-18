@@ -92,8 +92,9 @@ final class InlineAnnotationEditorWindow: NSPanel, NSWindowDelegate {
     }
 
     /// Closes if there's nothing to lose, otherwise confirms with the user
-    /// first. Used by Esc and the toolbar's Close button — never by
-    /// Save/Copy/Pin, which call `close()` directly and should never prompt.
+    /// first. Used by the toolbar's Close button and the red titlebar button
+    /// — never by Save/Copy/Pin, which call `close()` directly and should
+    /// never prompt. Esc never reaches this; see `AnnotationEscapePolicy`.
     func requestClose() {
         guard AnnotationEditorCloseGuard.shouldClose(
             hasUnsavedChanges: document.hasUnsavedChanges,
@@ -376,6 +377,8 @@ private struct InlineAnnotationEditorView: View {
         case .commitTextEditing:
             commitEditingTrigger += 1
         case .exitCropMode:
+            // Unreachable here (isCropMode is always false above). Kept so
+            // this switch stays exhaustive and matches AnnotationEditorWindow.
             break
         case .switchToSelectTool:
             switchToSelectTool()

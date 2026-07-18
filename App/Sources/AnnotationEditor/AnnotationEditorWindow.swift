@@ -127,8 +127,9 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
     }
 
     /// Closes if there's nothing to lose, otherwise confirms with the user
-    /// first. Used by Esc and the toolbar's Close button — never by
-    /// Save/Copy/Pin, which call `close()` directly and should never prompt.
+    /// first. Used by the toolbar's Close button and the red titlebar button
+    /// — never by Save/Copy/Pin, which call `close()` directly and should
+    /// never prompt. Esc never reaches this; see `AnnotationEscapePolicy`.
     func requestClose() {
         guard AnnotationEditorCloseGuard.shouldClose(
             hasUnsavedChanges: document.hasUnsavedChanges,
