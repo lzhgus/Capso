@@ -26,7 +26,7 @@ final class AnnotationEditorWindowCloseTests: XCTestCase {
             image: try makeTestImage(),
             screenshotOutputPreset: .losslessPNG,
             screenshotFilenameTemplate: "Screenshot",
-            onSave: { _ in },
+            onSave: { _ in true },
             onCopy: { _ in },
             onPin: { _, _ in },
             onClose: onClose
