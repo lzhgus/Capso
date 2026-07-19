@@ -23,6 +23,14 @@ public final class AnnotationDocument {
     public var canUndo: Bool { !undoStack.isEmpty }
     public var canRedo: Bool { !redoStack.isEmpty }
 
+    /// Whether the document has anything a user would be upset to lose.
+    /// `canUndo` is included (not just `objects`/`cropRect`) so that
+    /// destructive edits which don't leave visible objects behind — e.g. a
+    /// rotate/flip via `replaceImage` — still count as unsaved work.
+    public var hasUnsavedChanges: Bool {
+        !objects.isEmpty || cropRect != nil || canUndo
+    }
+
     public init(imageSize: CGSize) {
         self.imageSize = imageSize
     }

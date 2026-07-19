@@ -5,10 +5,13 @@ import AnnotationKit
 import SharedKit
 
 @MainActor
-final class AnnotationEditorWindow: NSPanel {
-    private let document: AnnotationDocument
+final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
+    let document: AnnotationDocument
     private let interactionState = AnnotationEditorInteractionState()
     private var alphaValueBeforeDrag: CGFloat?
+    private let onCloseCallback: () -> Void
+    /// Injectable so tests never present a real modal alert.
+    var confirmDiscard: () -> Bool = { false }
 
     init(
         image: CGImage,
@@ -26,6 +29,7 @@ final class AnnotationEditorWindow: NSPanel {
         let imgW = CGFloat(image.width)
         let imgH = CGFloat(image.height)
         self.document = AnnotationDocument(imageSize: CGSize(width: imgW, height: imgH))
+        self.onCloseCallback = onClose
 
         // Prefer the screen where the capture originated (the one the user was
         // focused on). Falling back to NSScreen.main unconditionally would
@@ -72,6 +76,11 @@ final class AnnotationEditorWindow: NSPanel {
         self.isRestorable = false
         self.setFrame(targetFrame, display: false)
 
+        self.confirmDiscard = { [weak self] in
+            AnnotationEditorCloseGuard.presentDiscardAlert(above: self)
+        }
+        self.delegate = self
+
         let view = AnnotationEditorView(
             sourceImage: image,
             document: document,
@@ -110,14 +119,34 @@ final class AnnotationEditorWindow: NSPanel {
                 }
             },
             onCancel: { [weak self] in
-                onClose()
-                MainActor.assumeIsolated {
-                    self?.close()
-                }
+                self?.requestClose()
             }
         )
 
         self.contentView = NSHostingView(rootView: view)
+    }
+
+    /// Closes if there's nothing to lose, otherwise confirms with the user
+    /// first. Used by the toolbar's Close button and the red titlebar button
+    /// — never by Save/Copy/Pin, which call `close()` directly and should
+    /// never prompt. Esc never reaches this; see `AnnotationEscapePolicy`.
+    func requestClose() {
+        guard AnnotationEditorCloseGuard.shouldClose(
+            hasUnsavedChanges: document.hasUnsavedChanges,
+            confirmDiscard: confirmDiscard
+        ) else { return }
+        close()
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        AnnotationEditorCloseGuard.shouldClose(
+            hasUnsavedChanges: document.hasUnsavedChanges,
+            confirmDiscard: confirmDiscard
+        )
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onCloseCallback()
     }
 
     private func hideDuringExternalDrag() {
