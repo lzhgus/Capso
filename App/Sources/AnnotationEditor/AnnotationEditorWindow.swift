@@ -6,6 +6,7 @@ import SharedKit
 
 @MainActor
 final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
+    /// Internal (not private) so tests can assert on document state.
     let document: AnnotationDocument
     private let interactionState = AnnotationEditorInteractionState()
     private var alphaValueBeforeDrag: CGFloat?
@@ -21,7 +22,7 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
         captureDate: Date = Date(),
         screenshotOutputPreset: ScreenshotOutputPreset,
         screenshotFilenameTemplate: String,
-        onSave: @escaping (CGImage) -> Void,
+        onSave: @escaping (CGImage) -> Bool,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage, CGRect?) -> Void,
         onClose: @escaping () -> Void
@@ -91,7 +92,10 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
             screenshotOutputPreset: screenshotOutputPreset,
             screenshotFilenameTemplate: screenshotFilenameTemplate,
             onSave: { [weak self] rendered in
-                onSave(rendered)
+                // `onSave` may cancel (e.g. the user dismisses an "overwrite
+                // vs. save a copy" prompt) — only close the window when a
+                // save actually happened, otherwise the editor should stay open.
+                guard onSave(rendered) else { return }
                 MainActor.assumeIsolated {
                     self?.close()
                 }
