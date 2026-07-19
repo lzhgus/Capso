@@ -107,6 +107,7 @@ targets:
     dependencies:
       - target: Capso
       - package: SharedKit
+      - package: AnnotationKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.awesomemacapps.capso.tests
