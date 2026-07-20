@@ -297,6 +297,43 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "highlightClicks") }
     }
 
+    /// When `true`, show a KeyCastr-style keystroke overlay while recording.
+    /// Opt-in (default off). Requires Input Monitoring permission.
+    public var showKeyPressesWhileRecording: Bool {
+        get { defaults.object(forKey: "showKeyPressesWhileRecording") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "showKeyPressesWhileRecording") }
+    }
+
+    /// Last dragged origin of the key-press overlay (AppKit bottom-left screen coords).
+    /// `nil` means use the default bottom-left placement on the recording display.
+    public var keyPressOverlayOriginX: Double? {
+        get {
+            guard defaults.object(forKey: "keyPressOverlayOriginX") != nil else { return nil }
+            return defaults.double(forKey: "keyPressOverlayOriginX")
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: "keyPressOverlayOriginX")
+            } else {
+                defaults.removeObject(forKey: "keyPressOverlayOriginX")
+            }
+        }
+    }
+
+    public var keyPressOverlayOriginY: Double? {
+        get {
+            guard defaults.object(forKey: "keyPressOverlayOriginY") != nil else { return nil }
+            return defaults.double(forKey: "keyPressOverlayOriginY")
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: "keyPressOverlayOriginY")
+            } else {
+                defaults.removeObject(forKey: "keyPressOverlayOriginY")
+            }
+        }
+    }
+
     public var cursorSmoothing: Bool {
         get { defaults.object(forKey: "cursorSmoothing") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "cursorSmoothing") }

@@ -44,6 +44,8 @@ final class RecordingCoordinator {
     private var clickMonitor: ClickMonitor?
     private var cursorTelemetry: CursorTelemetry?
     private var clickHighlightWindow: ClickHighlightWindow?
+    private var keyPressMonitor: KeyPressMonitor?
+    private var keyPressOverlayWindow: KeyPressOverlayWindow?
     private var countdownWindow: CountdownWindow?
     private var escGlobalMonitor: Any?
     private var escLocalMonitor: Any?
@@ -508,6 +510,7 @@ final class RecordingCoordinator {
                     }
                     try await self.recorder.startRecording(config: config, excludeWindowIDs: excludeIDs)
                     self.startClickHighlight()
+                    self.startKeyPressOverlay()
                     self.startCursorTelemetry()
                     self.showRecordingControls()
                 } catch {
@@ -865,6 +868,55 @@ final class RecordingCoordinator {
         clickHighlightWindow = nil
     }
 
+    private func startKeyPressOverlay() {
+        guard settings.showKeyPressesWhileRecording else { return }
+
+        stopKeyPressOverlay()
+
+        // Request Input Monitoring once so System Settings lists Capso.
+        if !CGPreflightListenEventAccess() {
+            _ = CGRequestListenEventAccess()
+            if !CGPreflightListenEventAccess() {
+                showInputMonitoringNeededAlert()
+            }
+        }
+
+        let window = KeyPressOverlayWindow(settings: settings, preferredScreen: selectedScreen)
+        window.show()
+        keyPressOverlayWindow = window
+
+        let monitor = KeyPressMonitor()
+        // Prefer detailed callback so command-ish keys (⌘/⌃) start a new bezel line (KeyCastr).
+        monitor.onKeyDisplayDetailed = { [weak self] label, isCommand in
+            Task { @MainActor in
+                self?.keyPressOverlayWindow?.appendChip(label, isCommand: isCommand)
+            }
+        }
+        monitor.start()
+        keyPressMonitor = monitor
+    }
+
+    private func stopKeyPressOverlay() {
+        keyPressMonitor?.stop()
+        keyPressMonitor = nil
+        keyPressOverlayWindow?.hideAndClose()
+        keyPressOverlayWindow = nil
+    }
+
+    private func showInputMonitoringNeededAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = String(localized: "Input Monitoring Needed")
+        alert.informativeText = String(localized: "To show key presses while recording, enable Capso in System Settings > Privacy & Security > Input Monitoring, then start recording again.")
+        alert.addButton(withTitle: String(localized: "Open Input Monitoring Settings"))
+        alert.addButton(withTitle: String(localized: "Continue Without Overlay"))
+        alert.window.level = .screenSaver + 2
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            PermissionManager().openInputMonitoringSettings()
+        }
+    }
+
     private func startCursorTelemetry() {
         // CursorTelemetry normalizes CGEvent positions, which are in global
         // TOP-LEFT origin. `selectedRect` is in display-local top-left origin
@@ -1000,6 +1052,7 @@ final class RecordingCoordinator {
 
     private func hideRecordingUI() {
         stopClickHighlight()
+        stopKeyPressOverlay()
         cursorTelemetry?.stop()
         cursorTelemetry = nil
         controlsWindow?.close()

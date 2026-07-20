@@ -12,6 +12,7 @@ final class PreferencesViewModel {
 
     private(set) var screenRecordingGranted: Bool = false
     private(set) var accessibilityGranted: Bool = false
+    private(set) var inputMonitoringGranted: Bool = false
     private(set) var cameraGranted: Bool = false
     private(set) var microphoneGranted: Bool = false
 
@@ -336,6 +337,17 @@ final class PreferencesViewModel {
         set {
             withMutation(keyPath: \.highlightClicks) {
                 settings.highlightClicks = newValue
+            }
+        }
+    }
+    var showKeyPressesWhileRecording: Bool {
+        get {
+            access(keyPath: \.showKeyPressesWhileRecording)
+            return settings.showKeyPressesWhileRecording
+        }
+        set {
+            withMutation(keyPath: \.showKeyPressesWhileRecording) {
+                settings.showKeyPressesWhileRecording = newValue
             }
         }
     }
@@ -672,6 +684,9 @@ final class PreferencesViewModel {
         case .accessibility:
             permissionManager.requestAccessibilityPermission()
             permissionManager.openSettings(for: kind)
+        case .inputMonitoring:
+            _ = permissionManager.requestInputMonitoringPermission()
+            permissionManager.openSettings(for: kind)
         case .camera:
             await permissionManager.requestCameraPermission()
         case .microphone:
@@ -687,6 +702,7 @@ final class PreferencesViewModel {
     private func updatePermissionSnapshot() {
         screenRecordingGranted = permissionManager.screenRecordingGranted
         accessibilityGranted = permissionManager.accessibilityGranted
+        inputMonitoringGranted = permissionManager.inputMonitoringGranted
         cameraGranted = permissionManager.cameraGranted
         microphoneGranted = permissionManager.microphoneGranted
     }

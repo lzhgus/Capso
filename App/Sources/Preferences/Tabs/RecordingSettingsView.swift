@@ -22,6 +22,15 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(
+                        label: "Show Key Presses",
+                        sublabel: "KeyCastr-style overlay of keys while recording. Requires Input Monitoring. Off by default.",
+                        showDivider: true
+                    ) {
+                        Toggle("", isOn: $viewModel.showKeyPressesWhileRecording)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                     // TODO: Re-enable "Cursor Smoothing" once Bézier interpolation
                     // of the cursor path is actually implemented in the recording
                     // pipeline. AppSettings.cursorSmoothing is stored but never

@@ -162,6 +162,26 @@ struct AppSettingsTests {
         #expect(settings.playShutterSound == true)
     }
 
+    @Test("Show key presses while recording is disabled by default")
+    func defaultShowKeyPressesWhileRecording() {
+        let suite = "test.showKeyPressesWhileRecording.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.showKeyPressesWhileRecording == false)
+    }
+
+    @Test("Show key presses while recording persists across instances")
+    func showKeyPressesWhileRecordingPersists() {
+        let suite = "test.showKeyPressesWhileRecording.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.showKeyPressesWhileRecording = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.showKeyPressesWhileRecording == true)
+    }
+
     @Test("Diagnostic logging is disabled by default")
     func defaultDiagnosticLoggingEnabled() {
         let suite = "test.diagnosticLogging.default"

@@ -1,11 +1,13 @@
 import AppKit
 import AVFoundation
+import CoreGraphics
 import Observation
 @preconcurrency import ScreenCaptureKit
 
 public enum PermissionKind: String, CaseIterable, Sendable {
     case screenRecording
     case accessibility
+    case inputMonitoring
     case camera
     case microphone
 
@@ -15,6 +17,9 @@ public enum PermissionKind: String, CaseIterable, Sendable {
             return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
         case .accessibility:
             return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        case .inputMonitoring:
+            // Input Monitoring pane (ListenEvent) — required for global keystroke visualizer.
+            return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
         case .camera:
             return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!
         case .microphone:
@@ -30,12 +35,14 @@ public final class PermissionManager {
     public private(set) var cameraGranted: Bool = false
     public private(set) var microphoneGranted: Bool = false
     public private(set) var accessibilityGranted: Bool = false
+    public private(set) var inputMonitoringGranted: Bool = false
 
     public init() {}
 
     public func refreshAll() async {
         await checkScreenRecordingPermission()
         checkAccessibilityPermission()
+        checkInputMonitoringPermission()
         checkCameraPermission()
         checkMicrophonePermission()
     }
@@ -101,6 +108,25 @@ public final class PermissionManager {
         accessibilityGranted = AXIsProcessTrustedWithOptions(options)
     }
 
+    // MARK: - Input Monitoring
+
+    public func checkInputMonitoringPermission() {
+        inputMonitoringGranted = CGPreflightListenEventAccess()
+    }
+
+    /// Request Input Monitoring so global keystroke monitors can receive events.
+    /// Returns whether access is currently granted after the request attempt.
+    @discardableResult
+    public func requestInputMonitoringPermission() -> Bool {
+        if CGPreflightListenEventAccess() {
+            inputMonitoringGranted = true
+            return true
+        }
+        let granted = CGRequestListenEventAccess()
+        inputMonitoringGranted = granted
+        return granted
+    }
+
     // MARK: - Open System Settings
 
     public func openScreenRecordingSettings() {
@@ -117,6 +143,10 @@ public final class PermissionManager {
 
     public func openAccessibilitySettings() {
         openSettings(for: .accessibility)
+    }
+
+    public func openInputMonitoringSettings() {
+        openSettings(for: .inputMonitoring)
     }
 
     public func openSettings(for kind: PermissionKind) {
