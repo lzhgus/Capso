@@ -130,8 +130,10 @@ public final class KeyPressMonitor: @unchecked Sendable {
     }
 
     private func emit(from event: NSEvent) {
+        // Use the NSEvent overload so autorepeats (`isARepeat`) are dropped —
+        // the Keystroke-only path has no repeat flag and would flood the bezel.
+        guard let label = KeystrokeFormatter.displayString(for: event) else { return }
         let keystroke = KeystrokeFormatter.Keystroke(event: event)
-        guard let label = KeystrokeFormatter.displayString(for: keystroke) else { return }
         onKeyDisplayDetailed?(label, keystroke.isCommand)
         onKeyDisplay?(label)
     }
