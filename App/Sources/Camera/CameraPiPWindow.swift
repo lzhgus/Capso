@@ -4,6 +4,33 @@ import SwiftUI
 import CameraKit
 import SharedKit
 
+/// Hosts the SwiftUI PiP content and reports pointer enter/exit for fade-on-hover.
+@MainActor
+private final class CameraPiPTrackingHostingView<Content: View>: NSHostingView<Content> {
+    var onPointerInsideChange: ((Bool) -> Void)?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        let options: NSTrackingArea.Options = [
+            .mouseEnteredAndExited,
+            .activeAlways,
+            .inVisibleRect
+        ]
+        addTrackingArea(NSTrackingArea(rect: .zero, options: options, owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onPointerInsideChange?(true)
+        super.mouseEntered(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onPointerInsideChange?(false)
+        super.mouseExited(with: event)
+    }
+}
+
 @MainActor
 final class CameraPiPWindow: NSPanel {
     private let cameraManager: CameraManager
@@ -19,6 +46,10 @@ final class CameraPiPWindow: NSPanel {
     private var allowsPresentationFrameOutsideVisibleArea = false
     private var storedPiPFrame: CGRect?
     private var mouseDownPoint: NSPoint?
+    private var isPointerInside = false
+    /// Stored as `nonisolated(unsafe)` so deinit can tear monitors down without MainActor hops.
+    nonisolated(unsafe) private var globalMouseMonitor: Any?
+    nonisolated(unsafe) private var localMouseMonitor: Any?
     private let clickThreshold: CGFloat = 5
     private let defaultWindowLevel: NSWindow.Level = .floating
     private let presentationWindowLevel = NSWindow.Level.statusBar + 1
@@ -89,6 +120,9 @@ final class CameraPiPWindow: NSPanel {
         }
 
         installContentView()
+        // Start fully solid; fade / click-through only kick in once the pointer enters the PiP.
+        isPointerInside = false
+        updateHoverInteraction(animated: false)
 
         // Snap to corners when dragged near screen edges
         NotificationCenter.default.addObserver(
@@ -97,9 +131,20 @@ final class CameraPiPWindow: NSPanel {
             name: NSWindow.didMoveNotification,
             object: self
         )
+
+        // Preferences / menu bar can toggle fade mid-session; re-apply only for these keys.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHoverOptionsChanged),
+            name: .cameraPiPHoverOptionsChanged,
+            object: settings
+        )
     }
 
-    func show() { makeKeyAndOrderFront(nil) }
+    func show() {
+        makeKeyAndOrderFront(nil)
+        updateHoverInteraction(animated: false)
+    }
 
     func togglePresentationMode() {
         guard !isPresentationTransitioning else { return }
@@ -115,6 +160,8 @@ final class CameraPiPWindow: NSPanel {
         isPresentationMode = true
         isPresentationTransitioning = true
         applyPresentationWindowMode()
+        // Fullscreen presentation must stay fully opaque and interactive.
+        updateHoverInteraction(animated: true)
 
         // Animate to fill the recording area.
         NSAnimationContext.runAnimationGroup { context in
@@ -124,6 +171,7 @@ final class CameraPiPWindow: NSPanel {
         } completionHandler: {
             self.installContentView()
             self.isPresentationTransitioning = false
+            self.updateHoverInteraction(animated: false)
         }
     }
 
@@ -134,11 +182,14 @@ final class CameraPiPWindow: NSPanel {
             isPresentationMode = false
             installContentView()
             restoreDefaultWindowMode()
+            updateHoverInteraction(animated: true)
             return
         }
 
         isPresentationMode = false
         isPresentationTransitioning = true
+        // Restore fade / click-through behavior as soon as we leave presentation chrome.
+        updateHoverInteraction(animated: true)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.28
@@ -149,6 +200,7 @@ final class CameraPiPWindow: NSPanel {
             self.storedPiPFrame = nil
             self.isPresentationTransitioning = false
             self.restoreDefaultWindowMode()
+            self.updateHoverInteraction(animated: false)
         }
     }
 
@@ -162,6 +214,7 @@ final class CameraPiPWindow: NSPanel {
         builder.onShapeSelected = { [weak self] _ in self?.applySettings() }
         builder.onSizeSelected = { [weak self] _ in self?.applySettings() }
         builder.onMirrorToggled = { [weak self] _ in self?.applySettings() }
+        builder.onHoverOptionsChanged = { [weak self] in self?.updateHoverInteraction(animated: true) }
         // PiP context menu doesn't change camera device — toolbar handles enable/disable.
         builder.onCameraSelected = nil
         builder.onMenuClosed = { [weak self] in self?.menuBuilder = nil }
@@ -305,7 +358,21 @@ final class CameraPiPWindow: NSPanel {
     }
 
     deinit {
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+        }
         NotificationCenter.default.removeObserver(self)
+    }
+
+    /// Posted from `AppSettings` when fade / click-through toggles change. Hop to the main
+    /// actor before touching UI state (writes can arrive off the main thread in theory).
+    @objc nonisolated private func handleHoverOptionsChanged() {
+        Task { @MainActor [weak self] in
+            self?.updateHoverInteraction(animated: true)
+        }
     }
 
     override var canBecomeKey: Bool { true }
@@ -320,13 +387,17 @@ final class CameraPiPWindow: NSPanel {
 
     /// Re-read settings and update the window's size + content view.
     func applySettings() {
-        let newSize = Self.windowSize(shape: settings.cameraShape, settings: settings)
-        var newFrame = self.frame
-        // Keep top-left fixed when resizing
-        newFrame.origin.y += newFrame.size.height - newSize.height
-        newFrame.size = newSize
-        self.setFrame(newFrame, display: true, animate: true)
+        // Presentation mode fills the recording area — don't shrink to the PiP preset size.
+        if !isPresentationMode {
+            let newSize = Self.windowSize(shape: settings.cameraShape, settings: settings)
+            var newFrame = self.frame
+            // Keep top-left fixed when resizing
+            newFrame.origin.y += newFrame.size.height - newSize.height
+            newFrame.size = newSize
+            self.setFrame(newFrame, display: true, animate: true)
+        }
         installContentView()
+        updateHoverInteraction(animated: true)
     }
 
     /// Compute the window content size for the given shape, honoring custom size override.
@@ -388,6 +459,97 @@ final class CameraPiPWindow: NSPanel {
             usePresentationChrome: isPresentationMode,
             forcedSize: isPresentationMode ? self.frame.size : nil
         )
-        self.contentView = NSHostingView(rootView: view)
+        let hostingView = CameraPiPTrackingHostingView(rootView: view)
+        hostingView.onPointerInsideChange = { [weak self] inside in
+            self?.handlePointerInsideChange(inside)
+        }
+        self.contentView = hostingView
+    }
+
+    private func handlePointerInsideChange(_ inside: Bool) {
+        guard isPointerInside != inside else { return }
+        isPointerInside = inside
+        updateHoverInteraction(animated: true)
+    }
+
+    /// Applies fade opacity and optional click-through from current pointer / settings state.
+    private func updateHoverInteraction(animated: Bool) {
+        let fadeEnabled = settings.cameraPiPFadeOnHover
+        let clickThroughEnabled = settings.cameraPiPClickThrough
+
+        let target = CameraPiPPlacement.fadeAlpha(
+            enabled: fadeEnabled,
+            presentationModeActive: isPresentationMode,
+            pointerInside: isPointerInside
+        )
+
+        if abs(alphaValue - target) > 0.001 {
+            if animated {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.18
+                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    self.animator().alphaValue = target
+                }
+            } else {
+                alphaValue = target
+            }
+        }
+
+        let shouldClickThrough = CameraPiPPlacement.shouldClickThrough(
+            clickThroughEnabled: clickThroughEnabled,
+            presentationModeActive: isPresentationMode,
+            pointerInside: isPointerInside
+        )
+        applyClickThrough(shouldClickThrough)
+    }
+
+    private func applyClickThrough(_ enabled: Bool) {
+        if ignoresMouseEvents != enabled {
+            ignoresMouseEvents = enabled
+        }
+        // Tracking areas stop receiving enter/exit while the window ignores mouse events.
+        // Poll screen-space mouse location until the pointer leaves the PiP frame.
+        if enabled {
+            startClickThroughMouseMonitorsIfNeeded()
+        } else {
+            stopClickThroughMouseMonitors()
+        }
+    }
+
+    private func startClickThroughMouseMonitorsIfNeeded() {
+        guard globalMouseMonitor == nil, localMouseMonitor == nil else { return }
+
+        let handler: (NSEvent) -> Void = { [weak self] _ in
+            Task { @MainActor in
+                self?.syncPointerInsideFromScreenLocation()
+            }
+        }
+
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged],
+            handler: handler
+        )
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        ) { event in
+            handler(event)
+            return event
+        }
+    }
+
+    private func stopClickThroughMouseMonitors() {
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+            self.globalMouseMonitor = nil
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+            self.localMouseMonitor = nil
+        }
+    }
+
+    private func syncPointerInsideFromScreenLocation() {
+        let inside = frame.contains(NSEvent.mouseLocation)
+        handlePointerInsideChange(inside)
     }
 }
