@@ -90,18 +90,17 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
 
         let fadeItem = makeItem(
             title: String(localized: "Fade on Hover"),
-            isSelected: settings.cameraPiPFadeWhenIdle,
+            isSelected: settings.cameraPiPFadeOnHover,
             action: #selector(toggleFadeOnHover)
         )
         menu.addItem(fadeItem)
 
         let clickThroughItem = makeItem(
-            title: String(localized: "Click Through When Faded"),
-            isSelected: settings.cameraPiPClickThroughWhenFaded,
-            action: #selector(toggleClickThroughWhenFaded)
+            title: String(localized: "Click Through PiP"),
+            isSelected: settings.cameraPiPClickThrough,
+            action: #selector(toggleClickThrough)
         )
-        // Click-through only applies while fade-on-hover is enabled (moving PiP is blocked when active).
-        clickThroughItem.isEnabled = settings.cameraPiPFadeWhenIdle
+        // Independent of fade-on-hover. Fullscreen presentation never click-throughs.
         menu.addItem(clickThroughItem)
 
         // Wire all items to this builder so selectors fire on it
@@ -168,13 +167,12 @@ final class CameraMenuBuilder: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleFadeOnHover() {
-        settings.cameraPiPFadeWhenIdle.toggle()
+        settings.cameraPiPFadeOnHover.toggle()
         onHoverOptionsChanged?()
     }
 
-    @objc private func toggleClickThroughWhenFaded() {
-        guard settings.cameraPiPFadeWhenIdle else { return }
-        settings.cameraPiPClickThroughWhenFaded.toggle()
+    @objc private func toggleClickThrough() {
+        settings.cameraPiPClickThrough.toggle()
         onHoverOptionsChanged?()
     }
 }

@@ -168,19 +168,10 @@ struct CameraPiPPlacementTests {
         )
     }
 
-    @Test("Click-through is off unless fade, option, and hover all apply")
-    func clickThroughRequiresFadeHoverAndOption() {
+    @Test("Click-through is independent of fade and only needs option + hover")
+    func clickThroughRequiresOptionAndHover() {
         #expect(
             !CameraPiPPlacement.shouldClickThrough(
-                fadeEnabled: false,
-                clickThroughEnabled: true,
-                presentationModeActive: false,
-                pointerInside: true
-            )
-        )
-        #expect(
-            !CameraPiPPlacement.shouldClickThrough(
-                fadeEnabled: true,
                 clickThroughEnabled: false,
                 presentationModeActive: false,
                 pointerInside: true
@@ -188,7 +179,6 @@ struct CameraPiPPlacementTests {
         )
         #expect(
             !CameraPiPPlacement.shouldClickThrough(
-                fadeEnabled: true,
                 clickThroughEnabled: true,
                 presentationModeActive: false,
                 pointerInside: false
@@ -196,7 +186,6 @@ struct CameraPiPPlacementTests {
         )
         #expect(
             CameraPiPPlacement.shouldClickThrough(
-                fadeEnabled: true,
                 clickThroughEnabled: true,
                 presentationModeActive: false,
                 pointerInside: true
@@ -204,14 +193,20 @@ struct CameraPiPPlacementTests {
         )
     }
 
-    @Test("Click-through is never active in presentation mode")
+    @Test("Click-through is never active in fullscreen presentation mode")
     func clickThroughDisabledInPresentationMode() {
         #expect(
             !CameraPiPPlacement.shouldClickThrough(
-                fadeEnabled: true,
                 clickThroughEnabled: true,
                 presentationModeActive: true,
                 pointerInside: true
+            )
+        )
+        #expect(
+            !CameraPiPPlacement.shouldClickThrough(
+                clickThroughEnabled: true,
+                presentationModeActive: true,
+                pointerInside: false
             )
         )
     }

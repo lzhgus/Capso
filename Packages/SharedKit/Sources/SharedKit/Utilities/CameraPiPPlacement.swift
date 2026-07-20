@@ -22,7 +22,7 @@ public enum CameraPiPPlacement {
     /// Full opacity for the camera PiP (idle, presentation mode, or feature disabled).
     public static let fadeFullAlpha: CGFloat = 1.0
 
-    /// Target window opacity for optional fade-when-hover behavior.
+    /// Target window opacity for optional fade-on-hover behavior.
     /// PiP stays fully solid until the pointer enters it, then becomes nearly transparent.
     /// Fullscreen / presentation mode always stays fully opaque.
     public static func fadeAlpha(
@@ -34,18 +34,17 @@ public enum CameraPiPPlacement {
         return pointerInside ? fadeHoverAlpha : fadeFullAlpha
     }
 
-    /// Whether the PiP window should ignore mouse events so clicks hit content behind it.
-    /// Only while fade-on-hover is active, the pointer is over the PiP, and click-through is enabled.
-    /// Fullscreen / presentation mode never click-through.
+    /// Whether the small camera PiP should ignore mouse events so clicks hit content behind it.
+    /// Independent of fade-on-hover. Requires click-through enabled, pointer over the PiP, and
+    /// **not** fullscreen presentation mode (fullscreen always stays interactive).
     public static func shouldClickThrough(
-        fadeEnabled: Bool,
         clickThroughEnabled: Bool,
         presentationModeActive: Bool,
         pointerInside: Bool
     ) -> Bool {
-        guard fadeEnabled, clickThroughEnabled, !presentationModeActive, pointerInside else {
-            return false
-        }
+        // Fullscreen / presentation mode always receives clicks (never click-through).
+        guard !presentationModeActive else { return false }
+        guard clickThroughEnabled, pointerInside else { return false }
         return true
     }
 

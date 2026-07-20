@@ -243,11 +243,11 @@ struct RecordingToolbarView: View {
             Divider()
 
             Button {
-                settings.cameraPiPFadeWhenIdle.toggle()
+                settings.cameraPiPFadeOnHover.toggle()
                 cameraMenuRevision += 1
                 onCameraSettingsChanged()
             } label: {
-                if settings.cameraPiPFadeWhenIdle {
+                if settings.cameraPiPFadeOnHover {
                     Label("Fade on Hover", systemImage: "checkmark")
                 } else {
                     Text("Fade on Hover")
@@ -255,18 +255,16 @@ struct RecordingToolbarView: View {
             }
 
             Button {
-                guard settings.cameraPiPFadeWhenIdle else { return }
-                settings.cameraPiPClickThroughWhenFaded.toggle()
+                settings.cameraPiPClickThrough.toggle()
                 cameraMenuRevision += 1
                 onCameraSettingsChanged()
             } label: {
-                if settings.cameraPiPClickThroughWhenFaded {
-                    Label("Click Through When Faded", systemImage: "checkmark")
+                if settings.cameraPiPClickThrough {
+                    Label("Click Through PiP", systemImage: "checkmark")
                 } else {
-                    Text("Click Through When Faded")
+                    Text("Click Through PiP")
                 }
             }
-            .disabled(!settings.cameraPiPFadeWhenIdle)
         } label: {
             Image(systemName: cameraEnabled ? "camera.fill" : "camera")
                 .font(.system(size: 14))

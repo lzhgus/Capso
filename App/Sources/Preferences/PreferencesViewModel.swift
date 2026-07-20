@@ -440,25 +440,25 @@ final class PreferencesViewModel {
             }
         }
     }
-    var cameraPiPFadeWhenIdle: Bool {
+    var cameraPiPFadeOnHover: Bool {
         get {
-            access(keyPath: \.cameraPiPFadeWhenIdle)
-            return settings.cameraPiPFadeWhenIdle
+            access(keyPath: \.cameraPiPFadeOnHover)
+            return settings.cameraPiPFadeOnHover
         }
         set {
-            withMutation(keyPath: \.cameraPiPFadeWhenIdle) {
-                settings.cameraPiPFadeWhenIdle = newValue
+            withMutation(keyPath: \.cameraPiPFadeOnHover) {
+                settings.cameraPiPFadeOnHover = newValue
             }
         }
     }
-    var cameraPiPClickThroughWhenFaded: Bool {
+    var cameraPiPClickThrough: Bool {
         get {
-            access(keyPath: \.cameraPiPClickThroughWhenFaded)
-            return settings.cameraPiPClickThroughWhenFaded
+            access(keyPath: \.cameraPiPClickThrough)
+            return settings.cameraPiPClickThrough
         }
         set {
-            withMutation(keyPath: \.cameraPiPClickThroughWhenFaded) {
-                settings.cameraPiPClickThroughWhenFaded = newValue
+            withMutation(keyPath: \.cameraPiPClickThrough) {
+                settings.cameraPiPClickThrough = newValue
             }
         }
     }

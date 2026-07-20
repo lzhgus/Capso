@@ -377,16 +377,25 @@ public final class AppSettings: @unchecked Sendable {
     /// (so content behind it is readable without moving the window). Idle stays fully solid.
     /// Presentation / fullscreen mode always stays opaque. Off by default.
     /// Recorded output matches on-screen opacity.
-    public var cameraPiPFadeWhenIdle: Bool {
-        get { defaults.object(forKey: "cameraPiPFadeWhenIdle") as? Bool ?? false }
-        set { defaults.set(newValue, forKey: "cameraPiPFadeWhenIdle") }
+    public var cameraPiPFadeOnHover: Bool {
+        get { defaults.object(forKey: "cameraPiPFadeOnHover") as? Bool ?? false }
+        set {
+            guard cameraPiPFadeOnHover != newValue else { return }
+            defaults.set(newValue, forKey: "cameraPiPFadeOnHover")
+            NotificationCenter.default.post(name: .cameraPiPHoverOptionsChanged, object: self)
+        }
     }
 
-    /// When `true` (and fade-on-hover is also on), mouse clicks pass through the faded PiP
-    /// to whatever is behind it. Off by default. Has no effect while presentation mode is active.
-    public var cameraPiPClickThroughWhenFaded: Bool {
-        get { defaults.object(forKey: "cameraPiPClickThroughWhenFaded") as? Bool ?? false }
-        set { defaults.set(newValue, forKey: "cameraPiPClickThroughWhenFaded") }
+    /// When `true`, mouse clicks pass through the small camera PiP to whatever is behind it
+    /// while the pointer is over it. Independent of fade-on-hover. Off by default.
+    /// Never applies in fullscreen / presentation mode (PiP stays interactive there).
+    public var cameraPiPClickThrough: Bool {
+        get { defaults.object(forKey: "cameraPiPClickThrough") as? Bool ?? false }
+        set {
+            guard cameraPiPClickThrough != newValue else { return }
+            defaults.set(newValue, forKey: "cameraPiPClickThrough")
+            NotificationCenter.default.post(name: .cameraPiPHoverOptionsChanged, object: self)
+        }
     }
 
     // MARK: Screenshots
@@ -878,4 +887,12 @@ public final class AppSettings: @unchecked Sendable {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
+}
+
+// MARK: - Camera PiP hover option notifications
+
+public extension Notification.Name {
+    /// Posted when `cameraPiPFadeOnHover` or `cameraPiPClickThrough` changes,
+    /// so a live PiP can re-apply opacity / click-through without observing all UserDefaults writes.
+    static let cameraPiPHoverOptionsChanged = Notification.Name("cameraPiPHoverOptionsChanged")
 }

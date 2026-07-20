@@ -166,17 +166,16 @@ final class MenuBarController: NSObject {
             keyEquivalent: ""
         )
         fadeItem.target = self
-        fadeItem.state = settings.cameraPiPFadeWhenIdle ? .on : .off
+        fadeItem.state = settings.cameraPiPFadeOnHover ? .on : .off
         submenu.addItem(fadeItem)
 
         let clickThroughItem = NSMenuItem(
-            title: String(localized: "Click Through When Faded"),
-            action: #selector(toggleCameraPiPClickThroughWhenFaded),
+            title: String(localized: "Click Through PiP"),
+            action: #selector(toggleCameraPiPClickThrough),
             keyEquivalent: ""
         )
         clickThroughItem.target = self
-        clickThroughItem.state = settings.cameraPiPClickThroughWhenFaded ? .on : .off
-        clickThroughItem.isEnabled = settings.cameraPiPFadeWhenIdle
+        clickThroughItem.state = settings.cameraPiPClickThrough ? .on : .off
         submenu.addItem(clickThroughItem)
 
         item.submenu = submenu
@@ -190,10 +189,9 @@ final class MenuBarController: NSObject {
             }
             switch item.action {
             case #selector(toggleCameraPiPFadeOnHover):
-                item.state = settings.cameraPiPFadeWhenIdle ? .on : .off
-            case #selector(toggleCameraPiPClickThroughWhenFaded):
-                item.state = settings.cameraPiPClickThroughWhenFaded ? .on : .off
-                item.isEnabled = settings.cameraPiPFadeWhenIdle
+                item.state = settings.cameraPiPFadeOnHover ? .on : .off
+            case #selector(toggleCameraPiPClickThrough):
+                item.state = settings.cameraPiPClickThrough ? .on : .off
             default:
                 break
             }
@@ -201,12 +199,11 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func toggleCameraPiPFadeOnHover() {
-        settings.cameraPiPFadeWhenIdle.toggle()
+        settings.cameraPiPFadeOnHover.toggle()
     }
 
-    @objc private func toggleCameraPiPClickThroughWhenFaded() {
-        guard settings.cameraPiPFadeWhenIdle else { return }
-        settings.cameraPiPClickThroughWhenFaded.toggle()
+    @objc private func toggleCameraPiPClickThrough() {
+        settings.cameraPiPClickThrough.toggle()
     }
 
     /// Self-Timer menu row. Title is "Self-Timer" with the saved duration

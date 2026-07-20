@@ -69,19 +69,18 @@ struct RecordingSettingsView: View {
                         label: "Fade on Hover",
                         sublabel: "Solid until you hover — then nearly transparent so you can see behind it. Stays solid in fullscreen. Recorded output matches what you see."
                     ) {
-                        Toggle("", isOn: $viewModel.cameraPiPFadeWhenIdle)
+                        Toggle("", isOn: $viewModel.cameraPiPFadeOnHover)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
                     SettingRow(
-                        label: "Click Through When Faded",
-                        sublabel: "While faded, clicks pass through the PiP to whatever is behind it. Requires Fade on Hover.",
+                        label: "Click Through PiP",
+                        sublabel: "While the pointer is over the small camera view, clicks pass through to whatever is behind it. Independent of Fade on Hover. Never applies in fullscreen.",
                         showDivider: true
                     ) {
-                        Toggle("", isOn: $viewModel.cameraPiPClickThroughWhenFaded)
+                        Toggle("", isOn: $viewModel.cameraPiPClickThrough)
                             .toggleStyle(.switch)
                             .controlSize(.small)
-                            .disabled(!viewModel.cameraPiPFadeWhenIdle)
                     }
                 }
             }

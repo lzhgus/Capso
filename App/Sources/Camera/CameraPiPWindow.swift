@@ -4,7 +4,7 @@ import SwiftUI
 import CameraKit
 import SharedKit
 
-/// Hosts the SwiftUI PiP content and reports pointer enter/exit for fade-on-idle.
+/// Hosts the SwiftUI PiP content and reports pointer enter/exit for fade-on-hover.
 @MainActor
 private final class CameraPiPTrackingHostingView<Content: View>: NSHostingView<Content> {
     var onPointerInsideChange: ((Bool) -> Void)?
@@ -132,12 +132,12 @@ final class CameraPiPWindow: NSPanel {
             object: self
         )
 
-        // Preferences can toggle fade mid-session; re-apply when UserDefaults changes.
+        // Preferences / menu bar can toggle fade mid-session; re-apply only for these keys.
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleDefaultsChanged),
-            name: UserDefaults.didChangeNotification,
-            object: nil
+            selector: #selector(handleHoverOptionsChanged),
+            name: .cameraPiPHoverOptionsChanged,
+            object: settings
         )
     }
 
@@ -367,9 +367,9 @@ final class CameraPiPWindow: NSPanel {
         NotificationCenter.default.removeObserver(self)
     }
 
-    /// UserDefaults can post from background threads (e.g. CoreML feature-flag registration
-    /// while the camera pipeline starts). Hop to the main actor before touching UI state.
-    @objc nonisolated private func handleDefaultsChanged() {
+    /// Posted from `AppSettings` when fade / click-through toggles change. Hop to the main
+    /// actor before touching UI state (writes can arrive off the main thread in theory).
+    @objc nonisolated private func handleHoverOptionsChanged() {
         Task { @MainActor [weak self] in
             self?.updateHoverInteraction(animated: true)
         }
@@ -474,8 +474,8 @@ final class CameraPiPWindow: NSPanel {
 
     /// Applies fade opacity and optional click-through from current pointer / settings state.
     private func updateHoverInteraction(animated: Bool) {
-        let fadeEnabled = settings.cameraPiPFadeWhenIdle
-        let clickThroughEnabled = settings.cameraPiPClickThroughWhenFaded
+        let fadeEnabled = settings.cameraPiPFadeOnHover
+        let clickThroughEnabled = settings.cameraPiPClickThrough
 
         let target = CameraPiPPlacement.fadeAlpha(
             enabled: fadeEnabled,
@@ -496,7 +496,6 @@ final class CameraPiPWindow: NSPanel {
         }
 
         let shouldClickThrough = CameraPiPPlacement.shouldClickThrough(
-            fadeEnabled: fadeEnabled,
             clickThroughEnabled: clickThroughEnabled,
             presentationModeActive: isPresentationMode,
             pointerInside: isPointerInside
