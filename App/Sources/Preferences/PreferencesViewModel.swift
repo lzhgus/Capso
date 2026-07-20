@@ -452,6 +452,28 @@ final class PreferencesViewModel {
             }
         }
     }
+    var cameraPiPFadeOnHover: Bool {
+        get {
+            access(keyPath: \.cameraPiPFadeOnHover)
+            return settings.cameraPiPFadeOnHover
+        }
+        set {
+            withMutation(keyPath: \.cameraPiPFadeOnHover) {
+                settings.cameraPiPFadeOnHover = newValue
+            }
+        }
+    }
+    var cameraPiPClickThrough: Bool {
+        get {
+            access(keyPath: \.cameraPiPClickThrough)
+            return settings.cameraPiPClickThrough
+        }
+        set {
+            withMutation(keyPath: \.cameraPiPClickThrough) {
+                settings.cameraPiPClickThrough = newValue
+            }
+        }
+    }
 
     // MARK: Quick Access
     var quickAccessPosition: QuickAccessPosition {

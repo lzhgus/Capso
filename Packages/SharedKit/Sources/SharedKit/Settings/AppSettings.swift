@@ -410,6 +410,31 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "cameraCustomSizePt") }
     }
 
+    /// When `true`, the camera PiP becomes nearly transparent while the pointer is over it
+    /// (so content behind it is readable without moving the window). Idle stays fully solid.
+    /// Presentation / fullscreen mode always stays opaque. Off by default.
+    /// Recorded output matches on-screen opacity.
+    public var cameraPiPFadeOnHover: Bool {
+        get { defaults.object(forKey: "cameraPiPFadeOnHover") as? Bool ?? false }
+        set {
+            guard cameraPiPFadeOnHover != newValue else { return }
+            defaults.set(newValue, forKey: "cameraPiPFadeOnHover")
+            NotificationCenter.default.post(name: .cameraPiPHoverOptionsChanged, object: self)
+        }
+    }
+
+    /// When `true`, mouse clicks pass through the small camera PiP to whatever is behind it
+    /// while the pointer is over it. Independent of fade-on-hover. Off by default.
+    /// Never applies in fullscreen / presentation mode (PiP stays interactive there).
+    public var cameraPiPClickThrough: Bool {
+        get { defaults.object(forKey: "cameraPiPClickThrough") as? Bool ?? false }
+        set {
+            guard cameraPiPClickThrough != newValue else { return }
+            defaults.set(newValue, forKey: "cameraPiPClickThrough")
+            NotificationCenter.default.post(name: .cameraPiPHoverOptionsChanged, object: self)
+        }
+    }
+
     // MARK: Screenshots
     public var screenshotShowPreview: Bool {
         get { defaults.object(forKey: "screenshotShowPreview") as? Bool ?? true }
@@ -899,4 +924,12 @@ public final class AppSettings: @unchecked Sendable {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
+}
+
+// MARK: - Camera PiP hover option notifications
+
+public extension Notification.Name {
+    /// Posted when `cameraPiPFadeOnHover` or `cameraPiPClickThrough` changes,
+    /// so a live PiP can re-apply opacity / click-through without observing all UserDefaults writes.
+    static let cameraPiPHoverOptionsChanged = Notification.Name("cameraPiPHoverOptionsChanged")
 }

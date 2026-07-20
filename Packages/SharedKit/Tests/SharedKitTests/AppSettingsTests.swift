@@ -180,6 +180,71 @@ struct AppSettingsTests {
         first.showKeyPressesWhileRecording = true
         let second = AppSettings(defaults: defaults)
         #expect(second.showKeyPressesWhileRecording == true)
+    @Test("Camera PiP fade on hover is disabled by default")
+    func defaultCameraPiPFadeOnHover() {
+        let suite = "test.cameraPiPFadeOnHover.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.cameraPiPFadeOnHover == false)
+    }
+
+    @Test("Camera PiP fade on hover persists across instances")
+    func cameraPiPFadeOnHoverPersists() {
+        let suite = "test.cameraPiPFadeOnHover.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.cameraPiPFadeOnHover = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.cameraPiPFadeOnHover == true)
+    }
+
+    @Test("Camera PiP hover option changes post a scoped notification only when value changes")
+    func cameraPiPHoverOptionsChangedNotification() {
+        let suite = "test.cameraPiPHoverOptionsChanged.notification"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        final class PostCounter: @unchecked Sendable {
+            var count = 0
+        }
+        let posts = PostCounter()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .cameraPiPHoverOptionsChanged,
+            object: settings,
+            queue: nil
+        ) { _ in posts.count += 1 }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        settings.cameraPiPFadeOnHover = true
+        settings.cameraPiPFadeOnHover = true // no-op, same value
+        #expect(posts.count == 1)
+
+        settings.cameraPiPClickThrough = true
+        settings.cameraPiPClickThrough = true // no-op
+        #expect(posts.count == 2)
+    }
+
+    @Test("Camera PiP click-through is disabled by default")
+    func defaultCameraPiPClickThrough() {
+        let suite = "test.cameraPiPClickThrough.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.cameraPiPClickThrough == false)
+    }
+
+    @Test("Camera PiP click-through persists across instances")
+    func cameraPiPClickThroughPersists() {
+        let suite = "test.cameraPiPClickThrough.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.cameraPiPClickThrough = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.cameraPiPClickThrough == true)
     }
 
     @Test("Diagnostic logging is disabled by default")
