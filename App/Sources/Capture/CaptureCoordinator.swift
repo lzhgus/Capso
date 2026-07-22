@@ -1792,10 +1792,7 @@ final class CaptureCoordinator {
     }
 
     private func copyImageToClipboard(_ image: CGImage) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let nsImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
-        pasteboard.writeObjects([nsImage])
+        ImageUtilities.copyPNGToPasteboard(image)
     }
 
     private func saveImageToFile(_ result: CaptureResult) {

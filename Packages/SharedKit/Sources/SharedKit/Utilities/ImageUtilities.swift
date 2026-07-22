@@ -17,6 +17,23 @@ public enum ImageUtilities {
         return rep.representation(using: .png, properties: [:])
     }
 
+    /// Copies an image to the pasteboard as PNG data.
+    ///
+    /// Writing an `NSImage` directly lets AppKit serialize it as TIFF, which
+    /// makes clipboard consumers treat fresh screenshots as TIFF images even
+    /// though Capso's default screenshot export format is PNG.
+    @discardableResult
+    public static func copyPNGToPasteboard(
+        _ cgImage: CGImage,
+        pasteboard: NSPasteboard = .general
+    ) -> Bool {
+        guard let data = pngData(from: cgImage) else { return false }
+        let item = NSPasteboardItem()
+        guard item.setData(data, forType: .png) else { return false }
+        pasteboard.clearContents()
+        return pasteboard.writeObjects([item])
+    }
+
     public static func jpegData(from cgImage: CGImage, quality: Double = 0.85) -> Data? {
         let rep = NSBitmapImageRep(cgImage: cgImage)
         return rep.representation(using: .jpeg, properties: [.compressionFactor: quality])

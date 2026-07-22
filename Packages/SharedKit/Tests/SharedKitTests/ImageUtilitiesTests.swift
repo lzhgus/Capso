@@ -24,6 +24,24 @@ struct ImageUtilitiesTests {
         #expect(resized.width == 9)
         #expect(resized.height == 6)
     }
+
+    @Test("Screenshot clipboard data prefers PNG over TIFF")
+    func screenshotClipboardDataPrefersPNG() throws {
+        let pasteboard = NSPasteboard(
+            name: NSPasteboard.Name("CapsoImageUtilitiesTests.\(UUID().uuidString)")
+        )
+        let image = try makeSolidImage(
+            width: 8,
+            height: 6,
+            color: CGColor(red: 0, green: 1, blue: 0, alpha: 1)
+        )
+
+        #expect(ImageUtilities.copyPNGToPasteboard(image, pasteboard: pasteboard))
+        let declaredTypes = pasteboard.types ?? []
+        #expect(declaredTypes.first == .png)
+        #expect(declaredTypes.contains(.png))
+        #expect(pasteboard.data(forType: .png) != nil)
+    }
 }
 
 private func makeSolidImage(width: Int, height: Int, color: CGColor) throws -> CGImage {

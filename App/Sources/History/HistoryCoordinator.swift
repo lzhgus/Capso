@@ -601,9 +601,7 @@ final class HistoryCoordinator {
     }
 
     private func copyImageToClipboard(_ image: CGImage) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.writeObjects([ImageUtilities.nsImage(from: image)])
+        ImageUtilities.copyPNGToPasteboard(image)
     }
 
     private func pinImage(
@@ -670,16 +668,16 @@ final class HistoryCoordinator {
 
     func copyToClipboard(_ entry: HistoryEntry) {
         guard let sourceURL = fullImageURL(for: entry) else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
 
         switch entry.captureMode {
         case .recording, .gif:
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
             pasteboard.writeObjects([sourceURL as NSURL])
 
         case .area, .fullscreen, .window:
-            guard let nsImage = NSImage(contentsOf: sourceURL) else { return }
-            pasteboard.writeObjects([nsImage])
+            guard let image = Self.loadCGImage(from: sourceURL) else { return }
+            ImageUtilities.copyPNGToPasteboard(image)
         }
     }
 
