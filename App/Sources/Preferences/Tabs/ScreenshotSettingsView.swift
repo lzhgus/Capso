@@ -40,7 +40,7 @@ struct ScreenshotSettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(width: 110)
+                        .fixedSize(horizontal: true, vertical: false)
                     }
                     SettingRow(label: "Auto Save", sublabel: "Save to file automatically", showDivider: true) {
                         Toggle("", isOn: $viewModel.screenshotAutoSave)
