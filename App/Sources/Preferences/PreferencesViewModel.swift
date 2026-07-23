@@ -104,6 +104,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var screenshotClipboardFormat: ScreenshotClipboardFormat {
+        get {
+            access(keyPath: \.screenshotClipboardFormat)
+            return settings.screenshotClipboardFormat
+        }
+        set {
+            withMutation(keyPath: \.screenshotClipboardFormat) {
+                settings.screenshotClipboardFormat = newValue
+            }
+        }
+    }
     var screenshotAutoSave: Bool {
         get {
             access(keyPath: \.screenshotAutoSave)

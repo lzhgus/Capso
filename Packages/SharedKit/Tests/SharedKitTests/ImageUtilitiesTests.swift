@@ -25,22 +25,28 @@ struct ImageUtilitiesTests {
         #expect(resized.height == 6)
     }
 
-    @Test("Screenshot clipboard data prefers PNG over TIFF")
-    func screenshotClipboardDataPrefersPNG() throws {
-        let pasteboard = NSPasteboard(
-            name: NSPasteboard.Name("CapsoImageUtilitiesTests.\(UUID().uuidString)")
-        )
+    @Test("Screenshot clipboard writes the selected image format")
+    func screenshotClipboardWritesSelectedFormat() throws {
         let image = try makeSolidImage(
             width: 8,
             height: 6,
             color: CGColor(red: 0, green: 1, blue: 0, alpha: 1)
         )
+        let cases: [(ScreenshotClipboardFormat, NSPasteboard.PasteboardType)] = [
+            (.png, .png),
+            (.jpeg, ImageUtilities.jpegPasteboardType),
+            (.tiff, .tiff),
+        ]
 
-        #expect(ImageUtilities.copyPNGToPasteboard(image, pasteboard: pasteboard))
-        let declaredTypes = pasteboard.types ?? []
-        #expect(declaredTypes.first == .png)
-        #expect(declaredTypes.contains(.png))
-        #expect(pasteboard.data(forType: .png) != nil)
+        for (format, expectedType) in cases {
+            let pasteboard = NSPasteboard(
+                name: NSPasteboard.Name("CapsoImageUtilitiesTests.\(UUID().uuidString)")
+            )
+
+            #expect(ImageUtilities.copyToPasteboard(image, format: format, pasteboard: pasteboard))
+            #expect(pasteboard.types?.first == expectedType)
+            #expect(pasteboard.data(forType: expectedType) != nil)
+        }
     }
 }
 

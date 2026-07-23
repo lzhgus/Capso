@@ -28,6 +28,20 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(
+                        label: "Clipboard Format",
+                        sublabel: "Used whenever a screenshot is copied",
+                        showDivider: true
+                    ) {
+                        Picker("", selection: $viewModel.screenshotClipboardFormat) {
+                            Text("PNG").tag(ScreenshotClipboardFormat.png)
+                            Text("JPEG").tag(ScreenshotClipboardFormat.jpeg)
+                            Text("TIFF").tag(ScreenshotClipboardFormat.tiff)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 110)
+                    }
                     SettingRow(label: "Auto Save", sublabel: "Save to file automatically", showDivider: true) {
                         Toggle("", isOn: $viewModel.screenshotAutoSave)
                             .toggleStyle(.switch)

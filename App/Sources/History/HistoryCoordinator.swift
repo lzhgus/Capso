@@ -601,7 +601,10 @@ final class HistoryCoordinator {
     }
 
     private func copyImageToClipboard(_ image: CGImage) {
-        ImageUtilities.copyPNGToPasteboard(image)
+        ImageUtilities.copyToPasteboard(
+            image,
+            format: settings.screenshotClipboardFormat
+        )
     }
 
     private func pinImage(
@@ -677,7 +680,7 @@ final class HistoryCoordinator {
 
         case .area, .fullscreen, .window:
             guard let image = Self.loadCGImage(from: sourceURL) else { return }
-            ImageUtilities.copyPNGToPasteboard(image)
+            copyImageToClipboard(image)
         }
     }
 

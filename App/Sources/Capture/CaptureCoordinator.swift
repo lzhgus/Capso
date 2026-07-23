@@ -1792,7 +1792,10 @@ final class CaptureCoordinator {
     }
 
     private func copyImageToClipboard(_ image: CGImage) {
-        ImageUtilities.copyPNGToPasteboard(image)
+        ImageUtilities.copyToPasteboard(
+            image,
+            format: settings.screenshotClipboardFormat
+        )
     }
 
     private func saveImageToFile(_ result: CaptureResult) {

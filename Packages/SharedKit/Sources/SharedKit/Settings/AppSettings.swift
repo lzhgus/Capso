@@ -8,6 +8,12 @@ public enum ScreenshotFormat: String, CaseIterable, Sendable {
     case jpeg
 }
 
+public enum ScreenshotClipboardFormat: String, CaseIterable, Sendable {
+    case png
+    case jpeg
+    case tiff
+}
+
 public enum ScreenshotOutputPreset: String, CaseIterable, Sendable {
     case losslessPNG
     case standardJPEG
@@ -444,6 +450,15 @@ public final class AppSettings: @unchecked Sendable {
     public var screenshotAutoCopy: Bool {
         get { defaults.object(forKey: "screenshotAutoCopy") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "screenshotAutoCopy") }
+    }
+
+    public var screenshotClipboardFormat: ScreenshotClipboardFormat {
+        get {
+            guard let raw = defaults.string(forKey: "screenshotClipboardFormat"),
+                  let value = ScreenshotClipboardFormat(rawValue: raw) else { return .tiff }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "screenshotClipboardFormat") }
     }
 
     public var screenshotAutoSave: Bool {
