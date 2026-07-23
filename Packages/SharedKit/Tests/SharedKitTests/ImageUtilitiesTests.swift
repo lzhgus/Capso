@@ -24,6 +24,30 @@ struct ImageUtilitiesTests {
         #expect(resized.width == 9)
         #expect(resized.height == 6)
     }
+
+    @Test("Screenshot clipboard writes the selected image format")
+    func screenshotClipboardWritesSelectedFormat() throws {
+        let image = try makeSolidImage(
+            width: 8,
+            height: 6,
+            color: CGColor(red: 0, green: 1, blue: 0, alpha: 1)
+        )
+        let cases: [(ScreenshotClipboardFormat, NSPasteboard.PasteboardType)] = [
+            (.png, .png),
+            (.jpeg, ImageUtilities.jpegPasteboardType),
+            (.tiff, .tiff),
+        ]
+
+        for (format, expectedType) in cases {
+            let pasteboard = NSPasteboard(
+                name: NSPasteboard.Name("CapsoImageUtilitiesTests.\(UUID().uuidString)")
+            )
+
+            #expect(ImageUtilities.copyToPasteboard(image, format: format, pasteboard: pasteboard))
+            #expect(pasteboard.types?.first == expectedType)
+            #expect(pasteboard.data(forType: expectedType) != nil)
+        }
+    }
 }
 
 private func makeSolidImage(width: Int, height: Int, color: CGColor) throws -> CGImage {

@@ -3,6 +3,8 @@ import AppKit
 import CoreGraphics
 
 public enum ImageUtilities {
+    static let jpegPasteboardType = NSPasteboard.PasteboardType("public.jpeg")
+
     public static func nsImage(from cgImage: CGImage) -> NSImage {
         let size = NSSize(width: cgImage.width, height: cgImage.height)
         return NSImage(cgImage: cgImage, size: size)
@@ -15,6 +17,52 @@ public enum ImageUtilities {
     public static func pngData(from cgImage: CGImage) -> Data? {
         let rep = NSBitmapImageRep(cgImage: cgImage)
         return rep.representation(using: .png, properties: [:])
+    }
+
+    public static func tiffData(from cgImage: CGImage) -> Data? {
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        return rep.representation(using: .tiff, properties: [:])
+    }
+
+    /// Copies an explicitly encoded image to the pasteboard.
+    ///
+    /// Writing an `NSImage` directly lets AppKit choose TIFF. Encoding first
+    /// keeps the pasteboard type aligned with the user's clipboard preference.
+    @discardableResult
+    public static func copyToPasteboard(
+        _ cgImage: CGImage,
+        format: ScreenshotClipboardFormat,
+        jpegQuality: Double = 0.85,
+        pasteboard: NSPasteboard = .general
+    ) -> Bool {
+        let data: Data?
+        let pasteboardType: NSPasteboard.PasteboardType
+
+        switch format {
+        case .png:
+            data = pngData(from: cgImage)
+            pasteboardType = .png
+        case .jpeg:
+            data = jpegData(from: cgImage, quality: jpegQuality)
+            pasteboardType = jpegPasteboardType
+        case .tiff:
+            data = tiffData(from: cgImage)
+            pasteboardType = .tiff
+        }
+
+        guard let data else { return false }
+        let item = NSPasteboardItem()
+        guard item.setData(data, forType: pasteboardType) else { return false }
+        pasteboard.clearContents()
+        return pasteboard.writeObjects([item])
+    }
+
+    @discardableResult
+    public static func copyPNGToPasteboard(
+        _ cgImage: CGImage,
+        pasteboard: NSPasteboard = .general
+    ) -> Bool {
+        copyToPasteboard(cgImage, format: .png, pasteboard: pasteboard)
     }
 
     public static func jpegData(from cgImage: CGImage, quality: Double = 0.85) -> Data? {
