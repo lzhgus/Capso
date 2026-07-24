@@ -6,6 +6,7 @@ public struct WindowInfo: Identifiable, Sendable {
     public let id: CGWindowID
     public let title: String
     public let appName: String
+    public let appBundleIdentifier: String?
     public let frame: CGRect
     public let isOnScreen: Bool
     public let windowLayer: Int
@@ -16,6 +17,7 @@ public struct WindowInfo: Identifiable, Sendable {
         self.id = scWindow.windowID
         self.title = trimmedTitle.isEmpty ? fallbackTitle : trimmedTitle
         self.appName = scWindow.owningApplication?.applicationName ?? ""
+        self.appBundleIdentifier = scWindow.owningApplication?.bundleIdentifier
         self.frame = scWindow.frame
         self.isOnScreen = scWindow.isOnScreen
         self.windowLayer = scWindow.windowLayer
@@ -44,17 +46,46 @@ public enum ContentEnumerator {
             .filter { window in
                 let trimmedTitle = window.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let appName = window.owningApplication?.applicationName ?? ""
-                let hasUsableLabel = !trimmedTitle.isEmpty || !appName.isEmpty
-                let isOwnAppWindow = window.owningApplication?.bundleIdentifier == myBundleID
 
-                return window.frame.width > 100
-                    && window.frame.height > 50
-                    && window.isOnScreen
-                    && window.owningApplication != nil
-                    && hasUsableLabel
-                    && (window.windowLayer == 0 || isOwnAppWindow)
+                return isCaptureCandidate(
+                    frame: window.frame,
+                    isOnScreen: window.isOnScreen,
+                    title: trimmedTitle,
+                    appName: appName,
+                    hasOwningApplication: window.owningApplication != nil,
+                    windowLayer: window.windowLayer,
+                    isOwnAppWindow: window.owningApplication?.bundleIdentifier == myBundleID
+                )
             }
             .map { WindowInfo(from: $0) }
+    }
+
+    static func isCaptureCandidate(
+        frame: CGRect,
+        isOnScreen: Bool,
+        title: String,
+        appName: String,
+        hasOwningApplication: Bool,
+        windowLayer: Int,
+        isOwnAppWindow: Bool
+    ) -> Bool {
+        let hasUsableLabel = !title.isEmpty || !appName.isEmpty
+        let isSystemMenuBar = !hasOwningApplication
+            && windowLayer == Int(CGWindowLevelForKey(.mainMenuWindow))
+        let isElevatedApplicationWindow = hasOwningApplication
+            && windowLayer > 0
+            && windowLayer < Int(CGWindowLevelForKey(.screenSaverWindow))
+        let hasUsableSize = frame.width > 100
+            && (frame.height > 50 || (isSystemMenuBar && frame.height >= 20))
+
+        return hasUsableSize
+            && isOnScreen
+            && (hasOwningApplication || isSystemMenuBar)
+            && hasUsableLabel
+            && (windowLayer == 0
+                || isOwnAppWindow
+                || isElevatedApplicationWindow
+                || isSystemMenuBar)
     }
 
     public static func displays() async throws -> [DisplayInfo] {

@@ -1,13 +1,25 @@
 // App/Sources/Recording/RecordingToolbarWindow.swift
 import AppKit
+import Observation
 import SwiftUI
 import SharedKit
+
+@Observable
+@MainActor
+private final class RecordingToolbarState {
+    var cameraEnabled = false
+    var selectedCameraID: String?
+    var micEnabled = false
+    var systemAudioEnabled = true
+}
 
 /// Floating toolbar shown after area selection, before recording starts.
 @MainActor
 final class RecordingToolbarWindow: NSPanel {
     private let settings: AppSettings
     private let onCancelAction: () -> Void
+    private let onRecordAction: (RecordingFormatChoice, Bool, String?, Bool, Bool) -> Void
+    private let toolbarState = RecordingToolbarState()
 
     init(
         selectionRect: CGRect,
@@ -21,6 +33,7 @@ final class RecordingToolbarWindow: NSPanel {
     ) {
         self.settings = settings
         self.onCancelAction = onCancel
+        self.onRecordAction = onRecord
         let width: CGFloat = 240
         let height: CGFloat = 220
 
@@ -50,6 +63,7 @@ final class RecordingToolbarWindow: NSPanel {
             width: outputSize.width,
             height: outputSize.height,
             settings: settings,
+            state: toolbarState,
             onRecord: onRecord,
             onCameraToggled: onCameraToggled,
             onChangeArea: onChangeArea,
@@ -82,6 +96,21 @@ final class RecordingToolbarWindow: NSPanel {
             onCancelAction()
             return
         }
+        if event.keyCode == 36 { // Return
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers.isEmpty || modifiers == .option else {
+                super.keyDown(with: event)
+                return
+            }
+            onRecordAction(
+                modifiers == .option ? .gif : .video,
+                toolbarState.cameraEnabled,
+                toolbarState.selectedCameraID,
+                toolbarState.micEnabled,
+                toolbarState.systemAudioEnabled
+            )
+            return
+        }
         super.keyDown(with: event)
     }
 
@@ -93,42 +122,51 @@ private struct RecordingToolbarWrapper: View {
     let width: Int
     let height: Int
     let settings: AppSettings
+    @Bindable var state: RecordingToolbarState
     let onRecord: (RecordingFormatChoice, Bool, String?, Bool, Bool) -> Void
     let onCameraToggled: (Bool, String?) async -> Bool
     let onChangeArea: () -> Void
     let onCancel: () -> Void
     let onCameraSettingsChanged: () -> Void
 
-    @State private var cameraEnabled = false
-    @State private var selectedCameraID: String?
-    @State private var micEnabled = false
-    @State private var systemAudioEnabled = true
     @State private var cameraToggleTask: Task<Void, Never>?
 
     var body: some View {
         RecordingToolbarView(
             width: width,
             height: height,
-            cameraEnabled: $cameraEnabled,
-            selectedCameraID: $selectedCameraID,
-            micEnabled: $micEnabled,
-            systemAudioEnabled: $systemAudioEnabled,
+            cameraEnabled: $state.cameraEnabled,
+            selectedCameraID: $state.selectedCameraID,
+            micEnabled: $state.micEnabled,
+            systemAudioEnabled: $state.systemAudioEnabled,
             settings: settings,
             onRecordVideo: {
-                onRecord(.video, cameraEnabled, selectedCameraID, micEnabled, systemAudioEnabled)
+                onRecord(
+                    .video,
+                    state.cameraEnabled,
+                    state.selectedCameraID,
+                    state.micEnabled,
+                    state.systemAudioEnabled
+                )
             },
             onRecordGIF: {
-                onRecord(.gif, cameraEnabled, selectedCameraID, micEnabled, systemAudioEnabled)
+                onRecord(
+                    .gif,
+                    state.cameraEnabled,
+                    state.selectedCameraID,
+                    state.micEnabled,
+                    state.systemAudioEnabled
+                )
             },
             onChangeArea: onChangeArea,
             onCancel: onCancel,
             onCameraSettingsChanged: onCameraSettingsChanged
         )
-        .onChange(of: cameraEnabled) { _, newValue in
-            updateCamera(enabled: newValue, deviceID: selectedCameraID)
+        .onChange(of: state.cameraEnabled) { _, newValue in
+            updateCamera(enabled: newValue, deviceID: state.selectedCameraID)
         }
-        .onChange(of: selectedCameraID) { _, newValue in
-            if cameraEnabled {
+        .onChange(of: state.selectedCameraID) { _, newValue in
+            if state.cameraEnabled {
                 updateCamera(enabled: true, deviceID: newValue)
             }
         }
@@ -143,8 +181,8 @@ private struct RecordingToolbarWrapper: View {
             let didApply = await onCameraToggled(enabled, deviceID)
             guard !Task.isCancelled else { return }
             if enabled && !didApply {
-                cameraEnabled = false
-                selectedCameraID = nil
+                state.cameraEnabled = false
+                state.selectedCameraID = nil
             }
         }
     }
