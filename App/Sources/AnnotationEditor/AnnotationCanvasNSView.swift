@@ -81,6 +81,12 @@ final class AnnotationCanvasNSView: NSView {
     /// Fired on commit / cancel.
     var onTextEditingEnded: (() -> Void)?
     var onInteractionChanged: ((Bool) -> Void)?
+    /// Fired for each trackpad pinch step. Passes the per-event magnification
+    /// delta and the focal location in this view's (flipped, top-left) coords.
+    /// Optional: when nil, `magnify(with:)` forwards to `super` so consumers that
+    /// don't opt in (the main editor's scroll container, the all-in-one overlay)
+    /// are unaffected.
+    var onMagnify: ((_ magnification: CGFloat, _ locationInView: CGPoint) -> Void)?
 
     func commitTextEditingIfNeeded() {
         commitTextEditing()
@@ -144,6 +150,42 @@ final class AnnotationCanvasNSView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+    }
+
+    // Trackpad pinch. Two-finger magnify is a distinct event stream from the
+    // one-finger mouse drags used for drawing, so this never interferes with
+    // annotation creation. Forwarded to the owner (which applies focal-point
+    // zoom); when no owner opts in we defer to the default responder-chain
+    // behavior so an enclosing scroll view can handle it instead.
+    override func magnify(with event: NSEvent) {
+        guard let onMagnify else {
+            // No gesture owner (main editor / all-in-one overlay). Hand off to an
+            // enclosing scroll view when there is one — the responder chain does
+            // not reliably forward `magnify` up through the SwiftUI hosting views,
+            // so without this an over-image pinch is swallowed.
+            if let scrollView = enclosingScrollView {
+                scrollView.magnify(with: event)
+            } else {
+                super.magnify(with: event)
+            }
+            return
+        }
+        let location = convert(event.locationInWindow, from: nil)
+        onMagnify(event.magnification, location)
+    }
+
+    // Two-finger scroll (pan). Like `magnify`, the SwiftUI hosting views don't
+    // reliably forward `scrollWheel` up the responder chain, so an over-image
+    // two-finger drag never reaches the enclosing scroll view. Hand it off
+    // explicitly so panning works over the image, not just the margins. The
+    // canvas itself has no use for scroll events. When there's no enclosing
+    // scroll view (inline / all-in-one overlays) we defer to the default.
+    override func scrollWheel(with event: NSEvent) {
+        if let scrollView = enclosingScrollView {
+            scrollView.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
+        }
     }
 
     private func toImagePoint(_ viewPoint: CGPoint) -> CGPoint {

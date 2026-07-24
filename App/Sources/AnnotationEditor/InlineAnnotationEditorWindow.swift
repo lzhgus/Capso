@@ -130,6 +130,13 @@ private struct InlineAnnotationEditorView: View {
     @State private var refreshTrigger = 0
     @State private var commitEditingTrigger = 0
     @State private var textRegions: [CGRect] = []
+    /// User-applied pinch zoom multiplier layered on top of `displayScale`.
+    /// 1.0 == the natural life-size fit; the overlay never zooms below fit.
+    @State private var userZoom: CGFloat = 1.0
+    /// Top-left of the (possibly enlarged) canvas in the ZStack's coordinate
+    /// space. Panned during focal zoom so the pinch point stays fixed.
+    @State private var contentOrigin: CGPoint = .zero
+    @State private var didInitOrigin = false
 
     private var imageSize: CGSize {
         CGSize(width: sourceImage.width, height: sourceImage.height)
@@ -140,6 +147,22 @@ private struct InlineAnnotationEditorView: View {
             imageSize: imageSize,
             screenRect: screenLocalRect
         ) ?? 1
+    }
+
+    /// The scale actually handed to the canvas: base fit scale times the user's
+    /// pinch zoom. Keeps `toImagePoint` / handle chrome correct at any zoom.
+    private var effectiveScale: CGFloat { displayScale * userZoom }
+
+    /// Size of the canvas at the current effective scale. Equals the viewport
+    /// (`canvasRect`) size at `userZoom == 1` and grows when zoomed in.
+    private var canvasSize: CGSize {
+        CGSize(width: imageSize.width * effectiveScale, height: imageSize.height * effectiveScale)
+    }
+
+    /// Content top-left, falling back to the viewport origin until the first
+    /// layout initializes it, so the canvas doesn't flash offset on appear.
+    private var resolvedContentOrigin: CGPoint {
+        didInitOrigin ? contentOrigin : canvasRect.origin
     }
 
     private var currentStyle: AnnotationKit.StrokeStyle {
@@ -205,6 +228,7 @@ private struct InlineAnnotationEditorView: View {
             dimmingOverlay
             canvas
             toolbar
+            resetZoomShortcut
         }
         .frame(width: screenSize.width, height: screenSize.height)
         .background(Color.clear)
@@ -237,19 +261,38 @@ private struct InlineAnnotationEditorView: View {
             textFillColor: textFillColor,
             textOutlineColor: textOutlineColor,
             textGlyphStrokeColor: textGlyphStrokeColor,
-            zoomScale: displayScale,
+            zoomScale: effectiveScale,
             refreshTrigger: refreshTrigger,
             textRegions: textRegions,
             commitEditingTrigger: commitEditingTrigger,
             onSwitchToSelect: switchToSelectTool,
             onInteractionChanged: handleCanvasInteractionChanged,
             onTextEditingStarted: handleTextEditingStarted,
-            onTextEditingEnded: handleTextEditingEnded
+            onTextEditingEnded: handleTextEditingEnded,
+            onMagnify: handleMagnify
         )
-        .frame(width: canvasRect.width, height: canvasRect.height)
+        // Render at full (possibly enlarged) size, panned by the focal offset,
+        // then clip to the fixed capture-footprint viewport so a zoomed canvas
+        // never covers the toolbar or spills across the screen.
+        .frame(width: canvasSize.width, height: canvasSize.height, alignment: .topLeading)
+        .offset(
+            x: resolvedContentOrigin.x - canvasRect.minX,
+            y: resolvedContentOrigin.y - canvasRect.minY
+        )
+        .frame(width: canvasRect.width, height: canvasRect.height, alignment: .topLeading)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(canvasBorder)
         .position(x: canvasRect.midX, y: canvasRect.midY)
+    }
+
+    /// Zero-footprint button carrying the ⌘0 "reset zoom" shortcut. Kept in the
+    /// hierarchy (opacity 0, no hit testing) so the shortcut stays live.
+    private var resetZoomShortcut: some View {
+        Button("", action: resetZoom)
+            .keyboardShortcut("0", modifiers: .command)
+            .opacity(0)
+            .allowsHitTesting(false)
+            .frame(width: 0, height: 0)
     }
 
     private var canvasBorder: some View {
@@ -284,6 +327,10 @@ private struct InlineAnnotationEditorView: View {
     }
 
     private func handleAppear() {
+        if !didInitOrigin {
+            contentOrigin = canvasRect.origin
+            didInitOrigin = true
+        }
         lineWidth = savedWidth(for: currentTool)
         strokePattern = savedStrokePattern
         Task {
@@ -315,6 +362,44 @@ private struct InlineAnnotationEditorView: View {
 
     private func handleCanvasInteractionChanged(_ isInteracting: Bool) {
         interactionState.setCanvasInteraction(isInteracting)
+    }
+
+    /// Focal-point pinch zoom: keeps the content point under the pinch fixed
+    /// while scaling, then constrains the pan so the canvas keeps covering its
+    /// viewport. `locInView` is in the canvas's flipped, top-left coordinates.
+    private func handleMagnify(_ magnification: CGFloat, _ locInView: CGPoint) {
+        let oldScale = effectiveScale
+        let newUserZoom = CanvasZoom.clampScale(userZoom * (1 + magnification), min: 1.0, max: 8.0)
+        guard newUserZoom != userZoom else { return }
+        let newScale = displayScale * newUserZoom
+
+        let origin = resolvedContentOrigin
+        let focal = CGPoint(x: origin.x + locInView.x, y: origin.y + locInView.y)
+        let zoomed = CanvasZoom.focalOffset(
+            oldScale: oldScale,
+            newScale: newScale,
+            focalPoint: focal,
+            currentOffset: origin
+        )
+
+        let newSize = CGSize(width: imageSize.width * newScale, height: imageSize.height * newScale)
+        // Clamp in viewport-relative space (origin - viewport top-left), then
+        // lift the result back into the ZStack's coordinate space.
+        let relative = CanvasZoom.clampOffset(
+            CGPoint(x: zoomed.x - canvasRect.minX, y: zoomed.y - canvasRect.minY),
+            contentSize: newSize,
+            viewportSize: canvasRect.size
+        )
+
+        userZoom = newUserZoom
+        contentOrigin = CGPoint(x: relative.x + canvasRect.minX, y: relative.y + canvasRect.minY)
+        didInitOrigin = true
+    }
+
+    private func resetZoom() {
+        userZoom = 1
+        contentOrigin = canvasRect.origin
+        didInitOrigin = true
     }
 
     private func switchToSelectTool() {

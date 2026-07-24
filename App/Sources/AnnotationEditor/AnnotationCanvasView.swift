@@ -29,6 +29,10 @@ struct AnnotationCanvasView: NSViewRepresentable {
     var onTextEditingStarted: ((CGFloat, Bool, Bool, Bool) -> Void)?
     /// Called when the inline text editor commits / dismisses.
     var onTextEditingEnded: (() -> Void)?
+    /// Called for each trackpad pinch step. Passes the per-event magnification
+    /// delta and the focal location in canvas (flipped, top-left) coordinates.
+    /// Optional — canvases that don't support gesture zoom simply leave it nil.
+    var onMagnify: ((CGFloat, CGPoint) -> Void)?
 
     /// Tools that stay active after each stroke so the user can keep drawing
     /// without reaching back to the toolbar (issue #75). Shape tools (arrow,
@@ -66,6 +70,10 @@ struct AnnotationCanvasView: NSViewRepresentable {
             onTextEditingStarted?(fontSize, hasFill, hasOutline, hasStroke)
         }
         view.onTextEditingEnded = { onTextEditingEnded?() }
+        // Pass the optional through directly: a nil here must stay nil so the
+        // NSView forwards pinch to an enclosing scroll view (main editor) instead
+        // of swallowing it in a no-op wrapper.
+        view.onMagnify = onMagnify
         return view
     }
 
@@ -98,6 +106,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
             onTextEditingStarted?(fontSize, hasFill, hasOutline, hasStroke)
         }
         nsView.onTextEditingEnded = { onTextEditingEnded?() }
+        nsView.onMagnify = onMagnify
         if context.coordinator.lastCommitEditingTrigger != commitEditingTrigger {
             context.coordinator.lastCommitEditingTrigger = commitEditingTrigger
             nsView.commitTextEditingIfNeeded()
