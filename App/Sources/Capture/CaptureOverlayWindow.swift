@@ -140,13 +140,14 @@ final class CaptureOverlayWindow: NSPanel {
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleLocalKeyEvent(event) ?? event
         }
-        // Ensure Shift release confirms multi-window capture even if the view
-        // is not first responder (e.g. after clicking across screens).
-        if allowsMultiWindowSelection {
-            localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-                self?.overlayView.handleFlagsChanged(event)
-                return event
-            }
+        // Ensure Shift-driven behavior still runs when the view is not first
+        // responder (e.g. after clicking across screens): multi-window
+        // confirmation on release, and the live 1:1 square lock during a drag.
+        // Installed for every overlay since the square lock is not gated on
+        // multi-window selection. Double delivery (view + monitor) is a no-op.
+        localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.overlayView.handleFlagsChanged(event)
+            return event
         }
     }
 

@@ -17,6 +17,13 @@ public enum CaptureSelectionHitTarget: Sendable, Equatable {
 }
 
 public enum CaptureSelectionGeometry {
+    /// The aspect ratio to apply while creating or resizing a selection.
+    /// Holding Shift locks the selection to a 1:1 square, overriding any active
+    /// preset ratio; otherwise the preset ratio (if any) is used.
+    public static func selectionAspectRatio(presetRatio: CGFloat?, squareLock: Bool) -> CGFloat? {
+        squareLock ? 1 : presetRatio
+    }
+
     public static func rect(
         from startPoint: CGPoint,
         to currentPoint: CGPoint,

@@ -15,6 +15,7 @@ final class CaptureAllInOneToolbarWindow {
     private var annotationOverlay: CaptureAllInOneAnnotationOverlay?
     private var globalEscMonitor: Any?
     private var localEscMonitor: Any?
+    private var localFlagsMonitor: Any?
     private var globalSelectionMouseMonitor: Any?
     private var localSelectionMouseMonitor: Any?
     private var screenLocalSelectionRect: CGRect
@@ -470,6 +471,13 @@ final class CaptureAllInOneToolbarWindow {
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleKeyboardEvent(event)
         }
+        // The toolbar panel can be key while the selection is being dragged, so
+        // route flags changes to the selection view here too. Double delivery
+        // (view + monitor) is a no-op.
+        localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.selectionOverlayView?.handleFlagsChanged(event)
+            return event
+        }
     }
 
     private func removeKeyboardMonitor() {
@@ -480,6 +488,10 @@ final class CaptureAllInOneToolbarWindow {
         if let localEscMonitor {
             NSEvent.removeMonitor(localEscMonitor)
             self.localEscMonitor = nil
+        }
+        if let localFlagsMonitor {
+            NSEvent.removeMonitor(localFlagsMonitor)
+            self.localFlagsMonitor = nil
         }
     }
 
@@ -1126,7 +1138,9 @@ private struct UtilityShortcutBadge: View {
     }
 }
 
-private final class AllInOneSelectionOverlayView: NSView {
+/// Internal rather than file-private so interaction tests can drive its
+/// mouse/flags handling directly.
+final class AllInOneSelectionOverlayView: NSView {
     var onSelectionPreviewChanged: ((CGRect) -> Void)?
     var onSelectionChanged: ((CGRect) -> Void)?
     var onCancel: (() -> Void)?
@@ -1151,6 +1165,10 @@ private final class AllInOneSelectionOverlayView: NSView {
     private let hitSlop: CGFloat = 26
     private var dragOperation: DragOperation = .none
     private var trackingArea: NSTrackingArea?
+    /// Whether Shift is currently held, locking the drag to a 1:1 square.
+    private var squareLock = false
+    /// Last pointer location during a drag, so a live Shift toggle can recompute.
+    private var lastDragPoint: CGPoint = .zero
 
     init(
         frame: CGRect,
@@ -1287,6 +1305,13 @@ private final class AllInOneSelectionOverlayView: NSView {
         window?.makeFirstResponder(self)
 
         let point = convert(event.locationInWindow, from: nil)
+        // Seed the pointer and Shift state before any early return (including
+        // the fixed-size move path) so a Shift press that lands before the first
+        // mouseDragged recomputes from this press point instead of `.zero` or the
+        // previous drag's endpoint.
+        lastDragPoint = point
+        squareLock = event.modifierFlags.contains(.shift)
+
         if let fixedSize = activePreset.fixedPixelSize {
             if CaptureSelectionGeometry.hitTarget(
                 at: point,
@@ -1329,6 +1354,35 @@ private final class AllInOneSelectionOverlayView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        lastDragPoint = point
+        squareLock = event.modifierFlags.contains(.shift)
+        updateSelectionForDrag(to: point)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        handleFlagsChanged(event)
+        super.flagsChanged(with: event)
+    }
+
+    /// Holding or releasing Shift mid-drag re-runs the current drag against the
+    /// last pointer location so the square lock engages/releases live. Shared
+    /// entry for the view's `flagsChanged` and the window's local flags monitor,
+    /// so the toggle lands even when this view is not first responder.
+    func handleFlagsChanged(_ event: NSEvent) {
+        let nextSquareLock = event.modifierFlags.contains(.shift)
+        guard nextSquareLock != squareLock else { return }
+        squareLock = nextSquareLock
+        if case .none = dragOperation { return }
+        updateSelectionForDrag(to: lastDragPoint)
+    }
+
+    /// Applies the active drag operation for a pointer location, honoring the
+    /// resolved aspect ratio (Shift locks to 1:1, otherwise the preset ratio).
+    private func updateSelectionForDrag(to point: CGPoint) {
+        let ratio = CaptureSelectionGeometry.selectionAspectRatio(
+            presetRatio: activePreset.isFixedSize ? nil : activePreset.ratio,
+            squareLock: squareLock
+        )
 
         switch dragOperation {
         case .none:
@@ -1340,7 +1394,7 @@ private final class AllInOneSelectionOverlayView: NSView {
                 in: bounds
             )
         case let .resize(handle, startRect):
-            if let ratio = activePreset.ratio, !activePreset.isFixedSize {
+            if let ratio {
                 selectionRect = CaptureSelectionGeometry.resize(
                     startRect,
                     handle: handle,
@@ -1359,7 +1413,7 @@ private final class AllInOneSelectionOverlayView: NSView {
                 )
             }
         case let .create(startPoint):
-            if let ratio = activePreset.ratio, !activePreset.isFixedSize {
+            if let ratio {
                 selectionRect = CaptureSelectionGeometry.rect(
                     from: startPoint,
                     to: point,

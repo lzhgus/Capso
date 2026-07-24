@@ -46,6 +46,11 @@ final class CaptureOverlayView: NSView {
     private var isDragging = false
     private var dragStart: NSPoint = .zero
     private var dragEnd: NSPoint = .zero
+    /// Whether Shift is currently held, locking the area drag to a 1:1 square.
+    private var squareLock = false
+    /// Last raw (unconstrained) pointer location during an area drag, so a live
+    /// Shift toggle can recompute the constrained corner.
+    private var lastRawEnd: NSPoint = .zero
     private var currentMouseLocation: NSPoint?
 
     /// The currently active capture preset. Starts from settings and can be
@@ -631,7 +636,9 @@ final class CaptureOverlayView: NSView {
         )
     }
 
-    private var selectionRect: CGRect {
+    /// The live selection built from the drag anchors. Internal so interaction
+    /// tests can assert mid-drag state.
+    var selectionRect: CGRect {
         let x = min(dragStart.x, dragEnd.x)
         let y = min(dragStart.y, dragEnd.y)
         let w = abs(dragEnd.x - dragStart.x)
@@ -795,9 +802,16 @@ final class CaptureOverlayView: NSView {
     override func mouseDown(with event: NSEvent) {
         switch mode {
         case .area:
+            let loc = convert(event.locationInWindow, from: nil)
+            // Seed the pointer and Shift state before any early return so a
+            // Shift press that lands before the first mouseDragged recomputes
+            // from this press point instead of `.zero` or the previous drag's
+            // endpoint.
+            lastRawEnd = loc
+            squareLock = event.modifierFlags.contains(.shift)
+
             // Fixed-size: no drag — capture immediately centered on cursor
             if let fixedSize = activePreset.fixedPixelSize {
-                let loc = convert(event.locationInWindow, from: nil)
                 let fixedRect = CGRect(
                     x: loc.x - CGFloat(fixedSize.width) / 2,
                     y: loc.y - CGFloat(fixedSize.height) / 2,
@@ -810,7 +824,7 @@ final class CaptureOverlayView: NSView {
             }
 
             isDragging = true
-            dragStart = convert(event.locationInWindow, from: nil)
+            dragStart = loc
             dragEnd = dragStart
             needsDisplay = true
 
@@ -835,7 +849,11 @@ final class CaptureOverlayView: NSView {
 
     /// Apply aspect-ratio constraint to a raw drag endpoint, clamped to view bounds.
     private func constrainedDragEnd(rawEnd: NSPoint) -> NSPoint {
-        guard let ratio = activePreset.ratio, !activePreset.isFixedSize else {
+        let resolvedRatio = CaptureSelectionGeometry.selectionAspectRatio(
+            presetRatio: activePreset.isFixedSize ? nil : activePreset.ratio,
+            squareLock: squareLock
+        )
+        guard let ratio = resolvedRatio else {
             return rawEnd
         }
 
@@ -893,6 +911,8 @@ final class CaptureOverlayView: NSView {
     override func mouseDragged(with event: NSEvent) {
         guard case .area = mode else { return }
         let rawEnd = convert(event.locationInWindow, from: nil)
+        lastRawEnd = rawEnd
+        squareLock = event.modifierFlags.contains(.shift)
         dragEnd = constrainedDragEnd(rawEnd: rawEnd)
         // Reticle tracks the constrained corner so it stays on the selection edge
         currentMouseLocation = dragEnd
@@ -911,6 +931,7 @@ final class CaptureOverlayView: NSView {
         // Fixed-size mode already captured in mouseDown — skip mouseUp
         guard !activePreset.isFixedSize else { return }
         let rawEnd = convert(event.locationInWindow, from: nil)
+        squareLock = event.modifierFlags.contains(.shift)
         dragEnd = constrainedDragEnd(rawEnd: rawEnd)
         isDragging = false
 
@@ -988,9 +1009,23 @@ final class CaptureOverlayView: NSView {
         super.flagsChanged(with: event)
     }
 
+    /// Toggling Shift mid-drag re-runs the constraint against the last pointer
+    /// location so the 1:1 square lock engages/releases live.
+    private func updateSquareLockDuringDrag(with event: NSEvent) {
+        guard case .area = mode, isDragging else { return }
+        let shiftNow = event.modifierFlags.contains(.shift)
+        guard shiftNow != squareLock else { return }
+        squareLock = shiftNow
+        dragEnd = constrainedDragEnd(rawEnd: lastRawEnd)
+        currentMouseLocation = dragEnd
+        needsDisplay = true
+    }
+
     /// Shared entry for both the view's `flagsChanged` and the window's local
-    /// flags monitor so Shift-release confirmation stays reliable.
+    /// flags monitor so Shift-release confirmation and the live square lock stay
+    /// reliable even when the dragging view is not first responder.
     func handleFlagsChanged(_ event: NSEvent, allowsNonKeyConfirmation: Bool = false) {
+        updateSquareLockDuringDrag(with: event)
         guard allowsMultiWindowSelection else { return }
         let shiftNow = event.modifierFlags.contains(.shift)
         if (isShiftHeld || allowsNonKeyConfirmation) && !shiftNow {

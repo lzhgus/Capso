@@ -190,6 +190,178 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         XCTAssertNil(selectedWindowIDs)
     }
 
+    // MARK: - Shift square lock
+
+    func testShiftPressedBeforeFirstDragKeepsSelectionAnchoredAtPressPoint() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.flagsChanged(with: try makeFlagsChangedEvent(modifierFlags: .shift))
+
+        // Nothing has moved yet, so the square lock must resolve to an empty
+        // selection at the press point — not jump toward the screen origin.
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 0, height: 0))
+    }
+
+    func testShiftDuringDragSquaresSelectionFromLastPointerLocation() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 60))
+
+        view.flagsChanged(with: try makeFlagsChangedEvent(modifierFlags: .shift))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
+
+        view.flagsChanged(with: try makeFlagsChangedEvent(modifierFlags: []))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 60))
+    }
+
+    func testSecondDragDoesNotReusePreviousDragEndpoint() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 400, y: 300)))
+        view.mouseUp(with: try makeMouseEvent(.leftMouseUp, at: NSPoint(x: 400, y: 300)))
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 100, y: 100)))
+        view.flagsChanged(with: try makeFlagsChangedEvent(modifierFlags: .shift))
+
+        XCTAssertEqual(view.selectionRect, CGRect(x: 100, y: 100, width: 0, height: 0))
+    }
+
+    func testFlagsMonitorPathAppliesSquareLockWhenViewIsNotFirstResponder() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings, allowsMultiWindowSelection: false)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+
+        // The window's local flags monitor calls handleFlagsChanged directly,
+        // bypassing the view's flagsChanged responder path.
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
+    }
+
+    func testAllInOneShiftBeforeFirstDragCreatesSquareAtPressPoint() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 120, y: 100)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+
+        // No movement yet, so the square collapses to the minimum size anchored
+        // at the press point instead of being derived from `.zero`.
+        XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 120, y: 100, width: 24, height: 24))
+    }
+
+    func testAllInOneShiftBeforeFirstDragKeepsFixedSizeSelectionCentered() throws {
+        let (view, previews) = makeAllInOneOverlayView(
+            activePreset: .fixedSize(width: 200, height: 100, name: nil)
+        )
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 700, y: 500)))
+        let centered = try XCTUnwrap(previews.last)
+        XCTAssertEqual(centered, CGRect(x: 600, y: 450, width: 200, height: 100))
+
+        // Shift before the first drag must not move the fixed-size selection.
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        XCTAssertEqual(previews.last, centered)
+    }
+
+    func testAllInOneSecondDragDoesNotReusePreviousDragEndpoint() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 120, y: 100)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 400, y: 300)))
+        view.mouseUp(with: try makeMouseEvent(.leftMouseUp, at: NSPoint(x: 400, y: 300)))
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 200, y: 450)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+
+        // A minimum square at the new press point — the previous drag's endpoint
+        // (400, 300) must not size this one.
+        XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 200, y: 426, width: 24, height: 24))
+    }
+
+    private func makeAreaOverlayView(
+        settings: AppSettings,
+        allowsMultiWindowSelection: Bool = true
+    ) -> CaptureOverlayView {
+        let frame = NSRect(x: 0, y: 0, width: 800, height: 600)
+        let view = CaptureOverlayView(
+            frame: frame,
+            settings: settings,
+            safeAreaTopInset: 0,
+            allowsMultiWindowSelection: allowsMultiWindowSelection
+        )
+        let hostWindow = NSWindow(
+            contentRect: frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        hostWindow.contentView = view
+        view.setMode(.area)
+        return view
+    }
+
+    /// Hosts the all-in-one selection overlay and records every live preview it
+    /// publishes, which is how the window observes selection changes.
+    private func makeAllInOneOverlayView(
+        activePreset: CapturePreset
+    ) -> (AllInOneSelectionOverlayView, PreviewRecorder) {
+        let frame = CGRect(x: 0, y: 0, width: 800, height: 600)
+        let view = AllInOneSelectionOverlayView(
+            frame: frame,
+            selectionRect: CGRect(x: 200, y: 160, width: 300, height: 200),
+            minSelectionSize: CGSize(width: 24, height: 24),
+            activePreset: activePreset
+        )
+        let hostWindow = NSWindow(
+            contentRect: frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        hostWindow.contentView = view
+
+        let recorder = PreviewRecorder()
+        view.onSelectionPreviewChanged = { recorder.rects.append($0) }
+        return (view, recorder)
+    }
+
+    @MainActor
+    private final class PreviewRecorder {
+        var rects: [CGRect] = []
+        var last: CGRect? { rects.last }
+    }
+
+    private func makeMouseEvent(
+        _ type: NSEvent.EventType,
+        at location: NSPoint,
+        modifierFlags: NSEvent.ModifierFlags = []
+    ) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.mouseEvent(
+            with: type,
+            location: location,
+            modifierFlags: modifierFlags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        ))
+    }
+
     private func makeSettings() -> (AppSettings, String) {
         let suiteName = "CaptureOverlayInteractionTests.\(UUID().uuidString)"
         return (AppSettings(defaults: UserDefaults(suiteName: suiteName)!), suiteName)
