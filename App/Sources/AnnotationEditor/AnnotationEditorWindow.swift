@@ -5,10 +5,14 @@ import AnnotationKit
 import SharedKit
 
 @MainActor
-final class AnnotationEditorWindow: NSPanel {
-    private let document: AnnotationDocument
+final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
+    /// Internal (not private) so tests can assert on document state.
+    let document: AnnotationDocument
     private let interactionState = AnnotationEditorInteractionState()
     private var alphaValueBeforeDrag: CGFloat?
+    private let onCloseCallback: () -> Void
+    /// Injectable so tests never present a real modal alert.
+    var confirmDiscard: () -> Bool = { false }
 
     init(
         image: CGImage,
@@ -18,7 +22,7 @@ final class AnnotationEditorWindow: NSPanel {
         captureDate: Date = Date(),
         screenshotOutputPreset: ScreenshotOutputPreset,
         screenshotFilenameTemplate: String,
-        onSave: @escaping (CGImage) -> Void,
+        onSave: @escaping (CGImage) -> Bool,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage, CGRect?) -> Void,
         onClose: @escaping () -> Void
@@ -26,6 +30,7 @@ final class AnnotationEditorWindow: NSPanel {
         let imgW = CGFloat(image.width)
         let imgH = CGFloat(image.height)
         self.document = AnnotationDocument(imageSize: CGSize(width: imgW, height: imgH))
+        self.onCloseCallback = onClose
 
         // Prefer the screen where the capture originated (the one the user was
         // focused on). Falling back to NSScreen.main unconditionally would
@@ -72,6 +77,11 @@ final class AnnotationEditorWindow: NSPanel {
         self.isRestorable = false
         self.setFrame(targetFrame, display: false)
 
+        self.confirmDiscard = { [weak self] in
+            AnnotationEditorCloseGuard.presentDiscardAlert(above: self)
+        }
+        self.delegate = self
+
         let view = AnnotationEditorView(
             sourceImage: image,
             document: document,
@@ -82,7 +92,10 @@ final class AnnotationEditorWindow: NSPanel {
             screenshotOutputPreset: screenshotOutputPreset,
             screenshotFilenameTemplate: screenshotFilenameTemplate,
             onSave: { [weak self] rendered in
-                onSave(rendered)
+                // `onSave` may cancel (e.g. the user dismisses an "overwrite
+                // vs. save a copy" prompt) — only close the window when a
+                // save actually happened, otherwise the editor should stay open.
+                guard onSave(rendered) else { return }
                 MainActor.assumeIsolated {
                     self?.close()
                 }
@@ -110,14 +123,34 @@ final class AnnotationEditorWindow: NSPanel {
                 }
             },
             onCancel: { [weak self] in
-                onClose()
-                MainActor.assumeIsolated {
-                    self?.close()
-                }
+                self?.requestClose()
             }
         )
 
         self.contentView = NSHostingView(rootView: view)
+    }
+
+    /// Closes if there's nothing to lose, otherwise confirms with the user
+    /// first. Used by the toolbar's Close button and the red titlebar button
+    /// — never by Save/Copy/Pin, which call `close()` directly and should
+    /// never prompt. Esc never reaches this; see `AnnotationEscapePolicy`.
+    func requestClose() {
+        guard AnnotationEditorCloseGuard.shouldClose(
+            hasUnsavedChanges: document.hasUnsavedChanges,
+            confirmDiscard: confirmDiscard
+        ) else { return }
+        close()
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        AnnotationEditorCloseGuard.shouldClose(
+            hasUnsavedChanges: document.hasUnsavedChanges,
+            confirmDiscard: confirmDiscard
+        )
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onCloseCallback()
     }
 
     private func hideDuringExternalDrag() {

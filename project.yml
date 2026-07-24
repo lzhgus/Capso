@@ -17,8 +17,8 @@ settings:
     CODE_SIGN_IDENTITY: "Developer ID Application"
     DEVELOPMENT_TEAM: "T247WTJV77"
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: "0.9.4"
-    CURRENT_PROJECT_VERSION: "48"
+    MARKETING_VERSION: "0.9.6"
+    CURRENT_PROJECT_VERSION: "50"
 
 packages:
   SharedKit:
@@ -67,6 +67,8 @@ targets:
       - path: App/Resources
         excludes:
           - "Info.plist"
+      - path: THIRD_PARTY_NOTICES.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.awesomemacapps.capso
@@ -107,6 +109,7 @@ targets:
     dependencies:
       - target: Capso
       - package: SharedKit
+      - package: AnnotationKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.awesomemacapps.capso.tests

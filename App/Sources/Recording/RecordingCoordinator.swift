@@ -18,6 +18,16 @@ import EffectsKit
 import EditorKit
 import ShareKit
 
+enum KeyPressOverlayPermissionDecision: Equatable {
+    case showOverlay
+    case continueWithoutOverlay
+    case cancelRecording
+
+    static func forAlertResponse(_ response: NSApplication.ModalResponse) -> Self {
+        response == .alertFirstButtonReturn ? .cancelRecording : .continueWithoutOverlay
+    }
+}
+
 /// Orchestrates recording flow:
 /// 1. Show overlay for area selection (drag, or Space to switch to window selection)
 /// 2. Show recording toolbar (format, camera, mic, audio)
@@ -44,6 +54,8 @@ final class RecordingCoordinator {
     private var clickMonitor: ClickMonitor?
     private var cursorTelemetry: CursorTelemetry?
     private var clickHighlightWindow: ClickHighlightWindow?
+    private var keyPressMonitor: KeyPressMonitor?
+    private var keyPressOverlayWindow: KeyPressOverlayWindow?
     private var countdownWindow: CountdownWindow?
     private var escGlobalMonitor: Any?
     private var escLocalMonitor: Any?
@@ -467,6 +479,17 @@ final class RecordingCoordinator {
         systemAudioEnabled: Bool,
         restoredCameraPiPState: CameraPiPRestorationState? = nil
     ) {
+        // Resolve Input Monitoring before creating any recording UI. Opening
+        // System Settings cancels this attempt, as the alert instructs the user
+        // to grant access and start recording again.
+        let keyPressOverlayDecision = prepareKeyPressOverlayPermission()
+        guard keyPressOverlayDecision != .cancelRecording else {
+            dismissToolbarUI()
+            selectedTarget = nil
+            return
+        }
+        let keyPressOverlayReady = keyPressOverlayDecision == .showOverlay
+
         currentRecordingFormat = format
         currentCameraEnabled = cameraEnabled
         currentMicEnabled = micEnabled
@@ -508,6 +531,9 @@ final class RecordingCoordinator {
                     }
                     try await self.recorder.startRecording(config: config, excludeWindowIDs: excludeIDs)
                     self.startClickHighlight()
+                    if keyPressOverlayReady {
+                        self.startKeyPressOverlay()
+                    }
                     self.startCursorTelemetry()
                     self.showRecordingControls()
                 } catch {
@@ -865,6 +891,93 @@ final class RecordingCoordinator {
         clickHighlightWindow = nil
     }
 
+    /// Ensures Input Monitoring is available when the key HUD is enabled.
+    /// Must run **before** capture starts so permission UI is not recorded.
+    /// Returns whether this attempt should show the overlay, continue without
+    /// it, or stop so the user can grant access and start recording again.
+    private func prepareKeyPressOverlayPermission() -> KeyPressOverlayPermissionDecision {
+        guard settings.showKeyPressesWhileRecording else { return .continueWithoutOverlay }
+
+        // Window-target capture only includes the selected app window, so Capso's HUD
+        // cannot appear in the file. Skip until we support compositing (if ever).
+        if case .window = selectedTarget {
+            return .continueWithoutOverlay
+        }
+
+        let permissions = PermissionManager()
+        if permissions.requestInputMonitoringPermission() {
+            return .showOverlay
+        }
+
+        return showInputMonitoringNeededAlert(permissions: permissions)
+    }
+
+    private func startKeyPressOverlay() {
+        guard settings.showKeyPressesWhileRecording else { return }
+        if case .window = selectedTarget { return }
+        guard let recordingFrame = appKitRecordingFrame() else { return }
+
+        // Permission was preflighted before capture; never create the HUD without access.
+        let permissions = PermissionManager()
+        permissions.checkInputMonitoringPermission()
+        guard permissions.inputMonitoringGranted else { return }
+
+        stopKeyPressOverlay()
+
+        let window = KeyPressOverlayWindow(settings: settings, recordingFrame: recordingFrame)
+        window.show()
+        keyPressOverlayWindow = window
+
+        let monitor = KeyPressMonitor()
+        // Prefer detailed callback so command-ish keys (⌘/⌃) start a new bezel line (KeyCastr).
+        monitor.onKeyDisplayDetailed = { [weak self] label, isCommand in
+            Task { @MainActor in
+                self?.keyPressOverlayWindow?.appendChip(label, isCommand: isCommand)
+            }
+        }
+        monitor.start()
+        keyPressMonitor = monitor
+    }
+
+    /// Recording selection as an AppKit global frame (bottom-left origin).
+    /// Shared by controls, border, PiP, and the key-press HUD.
+    private func appKitRecordingFrame() -> CGRect? {
+        guard let screen = selectedScreen else { return nil }
+        let screenFrame = screen.frame
+        let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
+        return CGRect(
+            x: selectedRect.origin.x + screenFrame.origin.x,
+            y: viewY + screenFrame.origin.y,
+            width: selectedRect.width,
+            height: selectedRect.height
+        )
+    }
+
+    private func stopKeyPressOverlay() {
+        keyPressMonitor?.stop()
+        keyPressMonitor = nil
+        keyPressOverlayWindow?.hideAndClose()
+        keyPressOverlayWindow = nil
+    }
+
+    private func showInputMonitoringNeededAlert(
+        permissions: PermissionManager
+    ) -> KeyPressOverlayPermissionDecision {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = String(localized: "Input Monitoring Needed")
+        alert.informativeText = String(localized: "To show key presses while recording, enable Capso in System Settings > Privacy & Security > Input Monitoring, then start recording again.")
+        alert.addButton(withTitle: String(localized: "Open Input Monitoring Settings"))
+        alert.addButton(withTitle: String(localized: "Continue Without Overlay"))
+        alert.window.level = .screenSaver + 2
+        let response = alert.runModal()
+        let decision = KeyPressOverlayPermissionDecision.forAlertResponse(response)
+        if decision == .cancelRecording {
+            permissions.openInputMonitoringSettings()
+        }
+        return decision
+    }
+
     private func startCursorTelemetry() {
         // CursorTelemetry normalizes CGEvent positions, which are in global
         // TOP-LEFT origin. `selectedRect` is in display-local top-left origin
@@ -907,16 +1020,8 @@ final class RecordingCoordinator {
     }
 
     private func showRecordingControls() {
-        guard let screen = selectedScreen else { return }
-
-        let screenFrame = screen.frame
-        let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
-        let recordingFrame = CGRect(
-            x: selectedRect.origin.x + screenFrame.origin.x,
-            y: viewY + screenFrame.origin.y,
-            width: selectedRect.width,
-            height: selectedRect.height
-        )
+        guard let screen = selectedScreen,
+              let recordingFrame = appKitRecordingFrame() else { return }
 
         controlsWindow = RecordingControlsWindow(
             recordingFrame: recordingFrame,
@@ -930,21 +1035,13 @@ final class RecordingCoordinator {
     }
 
     private func showBorder() {
-        guard let screen = selectedScreen else { return }
-        // Convert selectedRect (display-local top-down) back to global AppKit
-        // coordinates for the border window's frame.
-        let screenFrame = screen.frame
-        let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
+        guard let screen = selectedScreen,
+              let recordingFrame = appKitRecordingFrame() else { return }
         // Expand the border frame outward by the border width (3pt) so the
         // border is drawn entirely OUTSIDE the capture area. This prevents
         // ScreenCaptureKit from capturing the red border in the recording.
         let borderInset: CGFloat = 3
-        let borderFrame = CGRect(
-            x: selectedRect.origin.x + screenFrame.origin.x - borderInset,
-            y: viewY + screenFrame.origin.y - borderInset,
-            width: selectedRect.width + borderInset * 2,
-            height: selectedRect.height + borderInset * 2
-        )
+        let borderFrame = recordingFrame.insetBy(dx: -borderInset, dy: -borderInset)
         borderWindow = RecordingBorderWindow(frame: borderFrame, screen: screen)
         borderWindow?.show()
     }
@@ -955,21 +1052,10 @@ final class RecordingCoordinator {
         cameraPiPWindow?.close()
         cameraPiPWindow = nil
 
-        var recordingFrame: CGRect?
-        if let screen = selectedScreen {
-            let screenFrame = screen.frame
-            let viewY = screenFrame.height - selectedRect.origin.y - selectedRect.height
-            recordingFrame = CGRect(
-                x: selectedRect.origin.x + screenFrame.origin.x,
-                y: viewY + screenFrame.origin.y,
-                width: selectedRect.width,
-                height: selectedRect.height
-            )
-        }
         cameraPiPWindow = CameraPiPWindow(
             cameraManager: cameraManager,
             settings: settings,
-            recordingFrame: recordingFrame,
+            recordingFrame: appKitRecordingFrame(),
             restorationState: restorationState
         )
         cameraPiPWindow?.show()
@@ -1000,6 +1086,7 @@ final class RecordingCoordinator {
 
     private func hideRecordingUI() {
         stopClickHighlight()
+        stopKeyPressOverlay()
         cursorTelemetry?.stop()
         cursorTelemetry = nil
         controlsWindow?.close()

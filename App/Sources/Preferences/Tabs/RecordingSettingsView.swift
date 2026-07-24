@@ -22,6 +22,15 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(
+                        label: "Show Key Presses",
+                        sublabel: "KeyCastr-style overlay of keys while recording. Requires Input Monitoring. Off by default.",
+                        showDivider: true
+                    ) {
+                        Toggle("", isOn: $viewModel.showKeyPressesWhileRecording)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                     // TODO: Re-enable "Cursor Smoothing" once Bézier interpolation
                     // of the cursor path is actually implemented in the recording
                     // pipeline. AppSettings.cursorSmoothing is stored but never
@@ -57,6 +66,28 @@ struct RecordingSettingsView: View {
                     // }
                     SettingRow(label: "Remember Last Recording Area", showDivider: true) {
                         Toggle("", isOn: $viewModel.rememberLastRecordingArea)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                }
+            }
+
+            SettingGroup(title: "Camera PiP") {
+                SettingCard {
+                    SettingRow(
+                        label: "Fade on Hover",
+                        sublabel: "Solid until you hover — then nearly transparent so you can see behind it. Stays solid in fullscreen. Recorded output matches what you see."
+                    ) {
+                        Toggle("", isOn: $viewModel.cameraPiPFadeOnHover)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                    SettingRow(
+                        label: "Click Through PiP",
+                        sublabel: "While the pointer is over the small camera view, clicks pass through to whatever is behind it. Independent of Fade on Hover. Never applies in fullscreen.",
+                        showDivider: true
+                    ) {
+                        Toggle("", isOn: $viewModel.cameraPiPClickThrough)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }

@@ -162,6 +162,93 @@ struct AppSettingsTests {
         #expect(settings.playShutterSound == true)
     }
 
+    @Test("Show key presses while recording is disabled by default")
+    func defaultShowKeyPressesWhileRecording() {
+        let suite = "test.showKeyPressesWhileRecording.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.showKeyPressesWhileRecording == false)
+    }
+
+    @Test("Show key presses while recording persists across instances")
+    func showKeyPressesWhileRecordingPersists() {
+        let suite = "test.showKeyPressesWhileRecording.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.showKeyPressesWhileRecording = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.showKeyPressesWhileRecording == true)
+    }
+
+    @Test("Camera PiP fade on hover is disabled by default")
+    func defaultCameraPiPFadeOnHover() {
+        let suite = "test.cameraPiPFadeOnHover.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.cameraPiPFadeOnHover == false)
+    }
+
+    @Test("Camera PiP fade on hover persists across instances")
+    func cameraPiPFadeOnHoverPersists() {
+        let suite = "test.cameraPiPFadeOnHover.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.cameraPiPFadeOnHover = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.cameraPiPFadeOnHover == true)
+    }
+
+    @Test("Camera PiP hover option changes post a scoped notification only when value changes")
+    func cameraPiPHoverOptionsChangedNotification() {
+        let suite = "test.cameraPiPHoverOptionsChanged.notification"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        final class PostCounter: @unchecked Sendable {
+            var count = 0
+        }
+        let posts = PostCounter()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .cameraPiPHoverOptionsChanged,
+            object: settings,
+            queue: nil
+        ) { _ in posts.count += 1 }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        settings.cameraPiPFadeOnHover = true
+        settings.cameraPiPFadeOnHover = true // no-op, same value
+        #expect(posts.count == 1)
+
+        settings.cameraPiPClickThrough = true
+        settings.cameraPiPClickThrough = true // no-op
+        #expect(posts.count == 2)
+    }
+
+    @Test("Camera PiP click-through is disabled by default")
+    func defaultCameraPiPClickThrough() {
+        let suite = "test.cameraPiPClickThrough.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.cameraPiPClickThrough == false)
+    }
+
+    @Test("Camera PiP click-through persists across instances")
+    func cameraPiPClickThroughPersists() {
+        let suite = "test.cameraPiPClickThrough.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let first = AppSettings(defaults: defaults)
+        first.cameraPiPClickThrough = true
+        let second = AppSettings(defaults: defaults)
+        #expect(second.cameraPiPClickThrough == true)
+    }
+
     @Test("Diagnostic logging is disabled by default")
     func defaultDiagnosticLoggingEnabled() {
         let suite = "test.diagnosticLogging.default"
@@ -507,5 +594,29 @@ struct AppSettingsTests {
         #expect(settings.selfTimerHUDPosition == CGPoint(x: 412.5, y: 88.0))
         settings.selfTimerHUDPosition = nil
         #expect(settings.selfTimerHUDPosition == nil)
+    }
+
+    @Test("Default opened image save behavior is ask")
+    func defaultOpenedImageSaveBehavior() {
+        let suite = "test.openedImageSaveBehavior.default"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.openedImageSaveBehavior == .ask)
+    }
+
+    @Test("Opened image save behavior round-trips")
+    func openedImageSaveBehaviorRoundTrip() {
+        let suite = "test.openedImageSaveBehavior.roundtrip"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        settings.openedImageSaveBehavior = .overwrite
+        #expect(settings.openedImageSaveBehavior == .overwrite)
+
+        settings.openedImageSaveBehavior = .copy
+        #expect(settings.openedImageSaveBehavior == .copy)
     }
 }

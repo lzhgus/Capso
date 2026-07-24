@@ -5,9 +5,12 @@ import CaptureKit
 import OCRKit
 
 @MainActor
-final class InlineAnnotationEditorWindow: NSPanel {
-    private let document: AnnotationDocument
+final class InlineAnnotationEditorWindow: NSPanel, NSWindowDelegate {
+    let document: AnnotationDocument
     private let interactionState = AnnotationEditorInteractionState()
+    private let onCloseCallback: () -> Void
+    /// Injectable so tests never present a real modal alert.
+    var confirmDiscard: () -> Bool = { false }
 
     init(
         image: CGImage,
@@ -21,6 +24,7 @@ final class InlineAnnotationEditorWindow: NSPanel {
         self.document = AnnotationDocument(
             imageSize: CGSize(width: image.width, height: image.height)
         )
+        self.onCloseCallback = onClose
 
         super.init(
             contentRect: screen.frame,
@@ -40,6 +44,11 @@ final class InlineAnnotationEditorWindow: NSPanel {
         self.isMovable = false
         self.isRestorable = false
         self.setFrame(screen.frame, display: false)
+
+        self.confirmDiscard = { [weak self] in
+            AnnotationEditorCloseGuard.presentDiscardAlert(above: self)
+        }
+        self.delegate = self
 
         let pinAnchor = CGRect(
             x: screen.frame.minX + screenLocalRect.minX,
@@ -67,8 +76,7 @@ final class InlineAnnotationEditorWindow: NSPanel {
                 self?.close()
             },
             onCancel: { [weak self] in
-                onClose()
-                self?.close()
+                self?.requestClose()
             }
         )
 
@@ -81,6 +89,29 @@ final class InlineAnnotationEditorWindow: NSPanel {
     func show() {
         orderFrontRegardless()
         makeKey()
+    }
+
+    /// Closes if there's nothing to lose, otherwise confirms with the user
+    /// first. Used by the toolbar's Close button and the red titlebar button
+    /// — never by Save/Copy/Pin, which call `close()` directly and should
+    /// never prompt. Esc never reaches this; see `AnnotationEscapePolicy`.
+    func requestClose() {
+        guard AnnotationEditorCloseGuard.shouldClose(
+            hasUnsavedChanges: document.hasUnsavedChanges,
+            confirmDiscard: confirmDiscard
+        ) else { return }
+        close()
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        AnnotationEditorCloseGuard.shouldClose(
+            hasUnsavedChanges: document.hasUnsavedChanges,
+            confirmDiscard: confirmDiscard
+        )
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onCloseCallback()
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -229,6 +260,7 @@ private struct InlineAnnotationEditorView: View {
             canvas
             toolbar
             resetZoomShortcut
+            escapeKeyHandler
         }
         .frame(width: screenSize.width, height: screenSize.height)
         .background(Color.clear)
@@ -405,6 +437,42 @@ private struct InlineAnnotationEditorView: View {
     private func switchToSelectTool() {
         document.clearSelection()
         currentTool = .select
+    }
+
+    /// A zero-size button is the same key-equivalent mechanism the toolbar's
+    /// Close button used to use, so Esc keeps working without focus. Unlike
+    /// that button, this one never closes the editor — see
+    /// `AnnotationEscapePolicy` for the full precedence.
+    private var escapeKeyHandler: some View {
+        Button(action: handleEscape) { EmptyView() }
+            .buttonStyle(.plain)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
+            .keyboardShortcut(.escape, modifiers: [])
+    }
+
+    private func handleEscape() {
+        switch AnnotationEscapePolicy.action(
+            isEditingText: isEditingText,
+            isCropMode: false,
+            currentTool: currentTool,
+            hasSelection: document.selectedObjectID != nil
+        ) {
+        case .commitTextEditing:
+            commitEditingTrigger += 1
+        case .exitCropMode:
+            // Unreachable here (isCropMode is always false above). Kept so
+            // this switch stays exhaustive and matches AnnotationEditorWindow.
+            break
+        case .switchToSelectTool:
+            switchToSelectTool()
+        case .clearSelection:
+            document.clearSelection()
+            refreshTrigger += 1
+        case .none:
+            break
+        }
     }
 
     private func handleTextEditingStarted(
@@ -680,7 +748,6 @@ private struct InlineAnnotationToolbar: View {
     private var actionControls: some View {
         HStack(spacing: 4) {
             iconButton(systemName: "xmark", help: "Close", action: onCancel)
-                .keyboardShortcut(.escape, modifiers: [])
             copyActionButton
             iconButton(systemName: "pin", help: "Pin to Screen", action: onPin)
                 .keyboardShortcut("p", modifiers: .command)

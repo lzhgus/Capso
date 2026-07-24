@@ -13,11 +13,10 @@ public enum ClipboardImageReader {
             .urlReadingFileURLsOnly: true
         ]
         let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
-        guard let url = urls?.first(where: { $0.isFileURL }),
-              let image = NSImage(contentsOf: url) else {
+        guard let url = urls?.first(where: { $0.isFileURL }) else {
             return nil
         }
-        return ImageUtilities.cgImage(from: image)
+        return ImageFileReader.image(at: url)
     }
 
     private static func objectImage(from pasteboard: NSPasteboard) -> CGImage? {

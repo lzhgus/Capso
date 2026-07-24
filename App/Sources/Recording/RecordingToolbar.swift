@@ -239,6 +239,32 @@ struct RecordingToolbarView: View {
                     Text("Mirror")
                 }
             }
+
+            Divider()
+
+            Button {
+                settings.cameraPiPFadeOnHover.toggle()
+                cameraMenuRevision += 1
+                onCameraSettingsChanged()
+            } label: {
+                if settings.cameraPiPFadeOnHover {
+                    Label("Fade on Hover", systemImage: "checkmark")
+                } else {
+                    Text("Fade on Hover")
+                }
+            }
+
+            Button {
+                settings.cameraPiPClickThrough.toggle()
+                cameraMenuRevision += 1
+                onCameraSettingsChanged()
+            } label: {
+                if settings.cameraPiPClickThrough {
+                    Label("Click Through PiP", systemImage: "checkmark")
+                } else {
+                    Text("Click Through PiP")
+                }
+            }
         } label: {
             Image(systemName: cameraEnabled ? "camera.fill" : "camera")
                 .font(.system(size: 14))

@@ -497,6 +497,7 @@ final class HistoryCoordinator {
             onSave: { [weak self] rendered in
                 self?.replaceImage(for: entry, with: rendered)
                 self?.annotationWindow = nil
+                return true
             },
             onCopy: { [weak self] rendered in
                 self?.copyImageToClipboard(rendered)

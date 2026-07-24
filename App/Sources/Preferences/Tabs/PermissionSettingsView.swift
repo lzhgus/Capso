@@ -32,6 +32,13 @@ struct PermissionSettingsView: View {
                         showDivider: true
                     )
                     permissionRow(
+                        kind: .inputMonitoring,
+                        title: "Input Monitoring",
+                        subtitle: "Required to show key presses while recording",
+                        isGranted: viewModel.inputMonitoringGranted,
+                        showDivider: true
+                    )
+                    permissionRow(
                         kind: .camera,
                         title: "Camera",
                         subtitle: "Required for camera overlay",
@@ -93,7 +100,7 @@ struct PermissionSettingsView: View {
         switch kind {
         case .camera, .microphone:
             return "Request"
-        case .screenRecording, .accessibility:
+        case .screenRecording, .accessibility, .inputMonitoring:
             return "Open"
         }
     }
@@ -103,7 +110,7 @@ struct PermissionSettingsView: View {
         switch kind {
         case .camera, .microphone:
             return "hand.tap"
-        case .screenRecording, .accessibility:
+        case .screenRecording, .accessibility, .inputMonitoring:
             return "gearshape"
         }
     }

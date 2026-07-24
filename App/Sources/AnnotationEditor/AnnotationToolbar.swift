@@ -273,7 +273,6 @@ struct AnnotationToolbar: View {
     private var actionGroup: some View {
         HStack(spacing: 6) {
             actionButton(icon: "xmark", help: "Close", isDestructive: true, action: onCancel)
-                .keyboardShortcut(.escape, modifiers: [])
 
             dragActionButton
 

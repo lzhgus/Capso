@@ -123,4 +123,91 @@ struct CameraPiPPlacementTests {
 
         #expect(frame == recordingFrame)
     }
+
+    @Test("Fade alpha stays full when feature is disabled")
+    func fadeAlphaStaysFullWhenDisabled() {
+        #expect(
+            CameraPiPPlacement.fadeAlpha(
+                enabled: false,
+                presentationModeActive: false,
+                pointerInside: true
+            ) == CameraPiPPlacement.fadeFullAlpha
+        )
+    }
+
+    @Test("Fade alpha stays full while idle and enabled")
+    func fadeAlphaStaysFullWhileIdleAndEnabled() {
+        #expect(
+            CameraPiPPlacement.fadeAlpha(
+                enabled: true,
+                presentationModeActive: false,
+                pointerInside: false
+            ) == CameraPiPPlacement.fadeFullAlpha
+        )
+    }
+
+    @Test("Fade alpha drops while pointer is over PiP")
+    func fadeAlphaDropsWhilePointerInside() {
+        #expect(
+            CameraPiPPlacement.fadeAlpha(
+                enabled: true,
+                presentationModeActive: false,
+                pointerInside: true
+            ) == CameraPiPPlacement.fadeHoverAlpha
+        )
+    }
+
+    @Test("Fade alpha stays full in presentation mode even when pointer is over PiP")
+    func fadeAlphaStaysFullInPresentationMode() {
+        #expect(
+            CameraPiPPlacement.fadeAlpha(
+                enabled: true,
+                presentationModeActive: true,
+                pointerInside: true
+            ) == CameraPiPPlacement.fadeFullAlpha
+        )
+    }
+
+    @Test("Click-through is independent of fade and only needs option + hover")
+    func clickThroughRequiresOptionAndHover() {
+        #expect(
+            !CameraPiPPlacement.shouldClickThrough(
+                clickThroughEnabled: false,
+                presentationModeActive: false,
+                pointerInside: true
+            )
+        )
+        #expect(
+            !CameraPiPPlacement.shouldClickThrough(
+                clickThroughEnabled: true,
+                presentationModeActive: false,
+                pointerInside: false
+            )
+        )
+        #expect(
+            CameraPiPPlacement.shouldClickThrough(
+                clickThroughEnabled: true,
+                presentationModeActive: false,
+                pointerInside: true
+            )
+        )
+    }
+
+    @Test("Click-through is never active in fullscreen presentation mode")
+    func clickThroughDisabledInPresentationMode() {
+        #expect(
+            !CameraPiPPlacement.shouldClickThrough(
+                clickThroughEnabled: true,
+                presentationModeActive: true,
+                pointerInside: true
+            )
+        )
+        #expect(
+            !CameraPiPPlacement.shouldClickThrough(
+                clickThroughEnabled: true,
+                presentationModeActive: true,
+                pointerInside: false
+            )
+        )
+    }
 }

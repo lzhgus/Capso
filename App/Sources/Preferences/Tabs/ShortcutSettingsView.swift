@@ -93,7 +93,7 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Translate Typed Text", name: .translateTypedText, showDivider: true)
                     shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
                     shortcutRow("Start / Stop Recording", name: .recordScreen, showDivider: true)
-                    shortcutRow("Screenshot History", name: .screenshotHistory)
+                    shortcutRow("Screenshot History", name: .screenshotHistory, showDivider: true)
                 }
             }
 

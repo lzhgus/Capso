@@ -45,6 +45,16 @@ public enum RecordingFormat: String, CaseIterable, Sendable {
     case gif
 }
 
+/// What Save does when annotating a file opened from disk (vs. a fresh capture).
+public enum OpenedImageSaveBehavior: String, CaseIterable, Sendable {
+    /// Prompt every time with "Overwrite Original" / "Save as New Copy".
+    case ask
+    /// Always overwrite the original file, preserving its format.
+    case overwrite
+    /// Always save a new file, exactly like a fresh capture.
+    case copy
+}
+
 public enum TranslationCardPosition: String, CaseIterable, Sendable {
     case belowSelection
     case centerScreen
@@ -287,6 +297,43 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "highlightClicks") }
     }
 
+    /// When `true`, show a KeyCastr-style keystroke overlay while recording.
+    /// Opt-in (default off). Requires Input Monitoring permission.
+    public var showKeyPressesWhileRecording: Bool {
+        get { defaults.object(forKey: "showKeyPressesWhileRecording") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "showKeyPressesWhileRecording") }
+    }
+
+    /// Last dragged offset of the key-press overlay from the recording frame origin
+    /// (AppKit bottom-left). `nil` means default bottom-leading placement inside the capture.
+    public var keyPressOverlayOffsetX: Double? {
+        get {
+            guard defaults.object(forKey: "keyPressOverlayOffsetX") != nil else { return nil }
+            return defaults.double(forKey: "keyPressOverlayOffsetX")
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: "keyPressOverlayOffsetX")
+            } else {
+                defaults.removeObject(forKey: "keyPressOverlayOffsetX")
+            }
+        }
+    }
+
+    public var keyPressOverlayOffsetY: Double? {
+        get {
+            guard defaults.object(forKey: "keyPressOverlayOffsetY") != nil else { return nil }
+            return defaults.double(forKey: "keyPressOverlayOffsetY")
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: "keyPressOverlayOffsetY")
+            } else {
+                defaults.removeObject(forKey: "keyPressOverlayOffsetY")
+            }
+        }
+    }
+
     public var cursorSmoothing: Bool {
         get { defaults.object(forKey: "cursorSmoothing") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "cursorSmoothing") }
@@ -361,6 +408,31 @@ public final class AppSettings: @unchecked Sendable {
     public var cameraCustomSizePt: Double {
         get { defaults.object(forKey: "cameraCustomSizePt") as? Double ?? 0 }
         set { defaults.set(newValue, forKey: "cameraCustomSizePt") }
+    }
+
+    /// When `true`, the camera PiP becomes nearly transparent while the pointer is over it
+    /// (so content behind it is readable without moving the window). Idle stays fully solid.
+    /// Presentation / fullscreen mode always stays opaque. Off by default.
+    /// Recorded output matches on-screen opacity.
+    public var cameraPiPFadeOnHover: Bool {
+        get { defaults.object(forKey: "cameraPiPFadeOnHover") as? Bool ?? false }
+        set {
+            guard cameraPiPFadeOnHover != newValue else { return }
+            defaults.set(newValue, forKey: "cameraPiPFadeOnHover")
+            NotificationCenter.default.post(name: .cameraPiPHoverOptionsChanged, object: self)
+        }
+    }
+
+    /// When `true`, mouse clicks pass through the small camera PiP to whatever is behind it
+    /// while the pointer is over it. Independent of fade-on-hover. Off by default.
+    /// Never applies in fullscreen / presentation mode (PiP stays interactive there).
+    public var cameraPiPClickThrough: Bool {
+        get { defaults.object(forKey: "cameraPiPClickThrough") as? Bool ?? false }
+        set {
+            guard cameraPiPClickThrough != newValue else { return }
+            defaults.set(newValue, forKey: "cameraPiPClickThrough")
+            NotificationCenter.default.post(name: .cameraPiPHoverOptionsChanged, object: self)
+        }
     }
 
     // MARK: Screenshots
@@ -752,6 +824,15 @@ public final class AppSettings: @unchecked Sendable {
         defaults.set(url, forKey: "exportLocation")
     }
 
+    public var openedImageSaveBehavior: OpenedImageSaveBehavior {
+        get {
+            guard let raw = defaults.string(forKey: "openedImageSaveBehavior"),
+                  let value = OpenedImageSaveBehavior(rawValue: raw) else { return .ask }
+            return value
+        }
+        set { defaults.set(newValue.rawValue, forKey: "openedImageSaveBehavior") }
+    }
+
     // MARK: Cloud Share
 
     public var cloudShareProvider: String? {
@@ -843,4 +924,12 @@ public final class AppSettings: @unchecked Sendable {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
+}
+
+// MARK: - Camera PiP hover option notifications
+
+public extension Notification.Name {
+    /// Posted when `cameraPiPFadeOnHover` or `cameraPiPClickThrough` changes,
+    /// so a live PiP can re-apply opacity / click-through without observing all UserDefaults writes.
+    static let cameraPiPHoverOptionsChanged = Notification.Name("cameraPiPHoverOptionsChanged")
 }

@@ -123,4 +123,56 @@ struct AnnotationDocumentTests {
         doc.undo()
         #expect(doc.objects.count == 0)
     }
+
+    @Test("Fresh document has no unsaved changes")
+    @MainActor
+    func freshDocumentIsClean() {
+        let doc = AnnotationDocument(imageSize: CGSize(width: 800, height: 600))
+        #expect(doc.hasUnsavedChanges == false)
+    }
+
+    @Test("Adding an object marks the document dirty")
+    @MainActor
+    func addObjectMarksDirty() {
+        let doc = AnnotationDocument(imageSize: CGSize(width: 800, height: 600))
+        doc.addObject(ArrowObject(start: .zero, end: CGPoint(x: 100, y: 100)))
+        #expect(doc.hasUnsavedChanges == true)
+    }
+
+    @Test("Undoing back to the start is clean again")
+    @MainActor
+    func undoBackToCleanIsClean() {
+        let doc = AnnotationDocument(imageSize: CGSize(width: 800, height: 600))
+        doc.addObject(ArrowObject(start: .zero, end: CGPoint(x: 100, y: 100)))
+        doc.undo()
+        #expect(doc.hasUnsavedChanges == false)
+    }
+
+    @Test("Adding then removing the object stays dirty")
+    @MainActor
+    func addThenRemoveStaysDirty() {
+        let doc = AnnotationDocument(imageSize: CGSize(width: 800, height: 600))
+        let arrow = ArrowObject(start: .zero, end: CGPoint(x: 100, y: 100))
+        doc.addObject(arrow)
+        doc.removeObject(id: arrow.id)
+        #expect(doc.hasUnsavedChanges == true)
+    }
+
+    @Test("Setting a crop rect marks the document dirty")
+    @MainActor
+    func cropRectMarksDirty() {
+        let doc = AnnotationDocument(imageSize: CGSize(width: 800, height: 600))
+        doc.setCropRect(CGRect(x: 0, y: 0, width: 100, height: 100))
+        #expect(doc.hasUnsavedChanges == true)
+        doc.undo()
+        #expect(doc.hasUnsavedChanges == false)
+    }
+
+    @Test("Replacing the image (rotate/flip) marks the document dirty")
+    @MainActor
+    func replaceImageMarksDirty() {
+        let doc = AnnotationDocument(imageSize: CGSize(width: 800, height: 600))
+        doc.replaceImage(size: CGSize(width: 600, height: 800))
+        #expect(doc.hasUnsavedChanges == true)
+    }
 }

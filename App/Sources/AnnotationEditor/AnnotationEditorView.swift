@@ -235,7 +235,42 @@ struct AnnotationEditorView: View {
                 editorContent
             }
         }
+        .background(escapeKeyHandler)
         .onDisappear { invalidateDragCache() }
+    }
+
+    /// A zero-size button is the same key-equivalent mechanism the toolbar's
+    /// Close button used to use, so Esc keeps working without focus. Unlike
+    /// that button, this one never closes the editor — see
+    /// `AnnotationEscapePolicy` for the full precedence.
+    private var escapeKeyHandler: some View {
+        Button(action: handleEscape) { EmptyView() }
+            .buttonStyle(.plain)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
+            .keyboardShortcut(.escape, modifiers: [])
+    }
+
+    private func handleEscape() {
+        switch AnnotationEscapePolicy.action(
+            isEditingText: isEditingText,
+            isCropMode: isCropMode,
+            currentTool: currentTool,
+            hasSelection: document.selectedObjectID != nil
+        ) {
+        case .commitTextEditing:
+            commitEditingTrigger += 1
+        case .exitCropMode:
+            isCropMode = false
+        case .switchToSelectTool:
+            switchToSelectTool()
+        case .clearSelection:
+            document.clearSelection()
+            refreshTrigger += 1
+        case .none:
+            break
+        }
     }
 
     private var cropEditor: some View {

@@ -12,6 +12,7 @@ final class PreferencesViewModel {
 
     private(set) var screenRecordingGranted: Bool = false
     private(set) var accessibilityGranted: Bool = false
+    private(set) var inputMonitoringGranted: Bool = false
     private(set) var cameraGranted: Bool = false
     private(set) var microphoneGranted: Bool = false
 
@@ -144,6 +145,17 @@ final class PreferencesViewModel {
         set {
             withMutation(keyPath: \.screenshotShowsCursor) {
                 settings.screenshotShowsCursor = newValue
+            }
+        }
+    }
+    var openedImageSaveBehavior: OpenedImageSaveBehavior {
+        get {
+            access(keyPath: \.openedImageSaveBehavior)
+            return settings.openedImageSaveBehavior
+        }
+        set {
+            withMutation(keyPath: \.openedImageSaveBehavior) {
+                settings.openedImageSaveBehavior = newValue
             }
         }
     }
@@ -328,6 +340,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var showKeyPressesWhileRecording: Bool {
+        get {
+            access(keyPath: \.showKeyPressesWhileRecording)
+            return settings.showKeyPressesWhileRecording
+        }
+        set {
+            withMutation(keyPath: \.showKeyPressesWhileRecording) {
+                settings.showKeyPressesWhileRecording = newValue
+            }
+        }
+    }
     var cursorSmoothing: Bool {
         get {
             access(keyPath: \.cursorSmoothing)
@@ -426,6 +449,28 @@ final class PreferencesViewModel {
         set {
             withMutation(keyPath: \.cameraCustomSizePt) {
                 settings.cameraCustomSizePt = newValue
+            }
+        }
+    }
+    var cameraPiPFadeOnHover: Bool {
+        get {
+            access(keyPath: \.cameraPiPFadeOnHover)
+            return settings.cameraPiPFadeOnHover
+        }
+        set {
+            withMutation(keyPath: \.cameraPiPFadeOnHover) {
+                settings.cameraPiPFadeOnHover = newValue
+            }
+        }
+    }
+    var cameraPiPClickThrough: Bool {
+        get {
+            access(keyPath: \.cameraPiPClickThrough)
+            return settings.cameraPiPClickThrough
+        }
+        set {
+            withMutation(keyPath: \.cameraPiPClickThrough) {
+                settings.cameraPiPClickThrough = newValue
             }
         }
     }
@@ -661,6 +706,9 @@ final class PreferencesViewModel {
         case .accessibility:
             permissionManager.requestAccessibilityPermission()
             permissionManager.openSettings(for: kind)
+        case .inputMonitoring:
+            _ = permissionManager.requestInputMonitoringPermission()
+            permissionManager.openSettings(for: kind)
         case .camera:
             await permissionManager.requestCameraPermission()
         case .microphone:
@@ -676,6 +724,7 @@ final class PreferencesViewModel {
     private func updatePermissionSnapshot() {
         screenRecordingGranted = permissionManager.screenRecordingGranted
         accessibilityGranted = permissionManager.accessibilityGranted
+        inputMonitoringGranted = permissionManager.inputMonitoringGranted
         cameraGranted = permissionManager.cameraGranted
         microphoneGranted = permissionManager.microphoneGranted
     }
