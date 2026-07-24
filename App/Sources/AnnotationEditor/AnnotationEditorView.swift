@@ -2,6 +2,7 @@
 import AppKit
 import SwiftUI
 import AnnotationKit
+import CaptureKit
 import OCRKit
 import SharedKit
 
@@ -333,7 +334,10 @@ struct AnnotationEditorView: View {
 
     private var canvasArea: some View {
         GeometryReader { geo in
-            ScrollView([.horizontal, .vertical]) {
+            ZoomableScrollContainer(
+                zoomScale: $zoomScale,
+                contentSize: CGSize(width: previewWidth, height: previewHeight)
+            ) {
                 previewCanvas
             }
             .background(Color(white: 0.12))
@@ -567,11 +571,11 @@ struct AnnotationEditorView: View {
     }
 
     private func zoomIn() {
-        zoomScale = min(zoomScale * 1.25, 4.0)
+        zoomScale = CanvasZoom.clampScale(zoomScale * 1.25, min: 0.1, max: 4.0)
     }
 
     private func zoomOut() {
-        zoomScale = max(zoomScale / 1.25, 0.1)
+        zoomScale = CanvasZoom.clampScale(zoomScale / 1.25, min: 0.1, max: 4.0)
     }
 
     /// Update the selected object's style when color/lineWidth/filled changes

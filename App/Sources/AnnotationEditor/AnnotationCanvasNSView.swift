@@ -31,6 +31,19 @@ private enum SelectionAction {
     case decrementCounter
 }
 
+/// The parts of a scroll `NSEvent` a canvas owner needs to route the gesture
+/// itself. Used by surfaces with no enclosing `NSScrollView` (the inline
+/// editor), which have to implement pan / ⌘-scroll zoom on their own.
+struct CanvasScrollEvent {
+    let deltaX: CGFloat
+    let deltaY: CGFloat
+    /// Pointer location in the canvas's flipped, top-left coordinates.
+    let locationInView: CGPoint
+    let commandHeld: Bool
+    let isMomentum: Bool
+    let hasPreciseDeltas: Bool
+}
+
 private protocol PathEditableAnnotation: AnnotationObject {
     var start: CGPoint { get set }
     var end: CGPoint { get set }
@@ -81,6 +94,18 @@ final class AnnotationCanvasNSView: NSView {
     /// Fired on commit / cancel.
     var onTextEditingEnded: (() -> Void)?
     var onInteractionChanged: ((Bool) -> Void)?
+    /// Fired for each trackpad pinch step. Passes the per-event magnification
+    /// delta and the focal location in this view's (flipped, top-left) coords.
+    /// Optional: when nil, `magnify(with:)` forwards to `super` so consumers that
+    /// don't opt in (the main editor's scroll container, the all-in-one overlay)
+    /// are unaffected.
+    var onMagnify: ((_ magnification: CGFloat, _ locationInView: CGPoint) -> Void)?
+    /// Fired for each two-finger scroll / ⌘-scroll step. Owners that supply this
+    /// route the gesture themselves (pan vs zoom) via `CanvasScrollGesture`.
+    /// Optional: when nil, `scrollWheel(with:)` hands off to an enclosing scroll
+    /// view as before, so the main editor and the all-in-one overlay are
+    /// unaffected.
+    var onScroll: ((CanvasScrollEvent) -> Void)?
 
     func commitTextEditingIfNeeded() {
         commitTextEditing()
@@ -144,6 +169,54 @@ final class AnnotationCanvasNSView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+    }
+
+    // Trackpad pinch. Two-finger magnify is a distinct event stream from the
+    // one-finger mouse drags used for drawing, so this never interferes with
+    // annotation creation. Forwarded to the owner (which applies focal-point
+    // zoom); when no owner opts in we defer to the default responder-chain
+    // behavior so an enclosing scroll view can handle it instead.
+    override func magnify(with event: NSEvent) {
+        guard let onMagnify else {
+            // No gesture owner (main editor / all-in-one overlay). Hand off to an
+            // enclosing scroll view when there is one — the responder chain does
+            // not reliably forward `magnify` up through the SwiftUI hosting views,
+            // so without this an over-image pinch is swallowed.
+            if let scrollView = enclosingScrollView {
+                scrollView.magnify(with: event)
+            } else {
+                super.magnify(with: event)
+            }
+            return
+        }
+        let location = convert(event.locationInWindow, from: nil)
+        onMagnify(event.magnification, location)
+    }
+
+    // Two-finger scroll (pan) and ⌘-scroll (zoom). Like `magnify`, the SwiftUI
+    // hosting views don't reliably forward `scrollWheel` up the responder chain,
+    // so an over-image two-finger drag never reaches the enclosing scroll view.
+    // Hand it off explicitly so panning works over the image, not just the
+    // margins. The canvas itself has no use for scroll events.
+    override func scrollWheel(with event: NSEvent) {
+        // An owner that routes the gesture itself (the inline editor, which has
+        // no scroll view to fall back on) gets it first.
+        if let onScroll {
+            onScroll(CanvasScrollEvent(
+                deltaX: event.scrollingDeltaX,
+                deltaY: event.scrollingDeltaY,
+                locationInView: convert(event.locationInWindow, from: nil),
+                commandHeld: event.modifierFlags.contains(.command),
+                isMomentum: event.momentumPhase != [],
+                hasPreciseDeltas: event.hasPreciseScrollingDeltas
+            ))
+            return
+        }
+        if let scrollView = enclosingScrollView {
+            scrollView.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
+        }
     }
 
     private func toImagePoint(_ viewPoint: CGPoint) -> CGPoint {
