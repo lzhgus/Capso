@@ -1151,6 +1151,10 @@ private final class AllInOneSelectionOverlayView: NSView {
     private let hitSlop: CGFloat = 26
     private var dragOperation: DragOperation = .none
     private var trackingArea: NSTrackingArea?
+    /// Whether Shift is currently held, locking the drag to a 1:1 square.
+    private var squareLock = false
+    /// Last pointer location during a drag, so a live Shift toggle can recompute.
+    private var lastDragPoint: CGPoint = .zero
 
     init(
         frame: CGRect,
@@ -1329,6 +1333,34 @@ private final class AllInOneSelectionOverlayView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        lastDragPoint = point
+        squareLock = event.modifierFlags.contains(.shift)
+        updateSelectionForDrag(to: point)
+    }
+
+    // Holding or releasing Shift mid-drag re-runs the current drag against the
+    // last pointer location so the square lock engages/releases live.
+    override func flagsChanged(with event: NSEvent) {
+        let nextSquareLock = event.modifierFlags.contains(.shift)
+        guard nextSquareLock != squareLock else {
+            super.flagsChanged(with: event)
+            return
+        }
+        squareLock = nextSquareLock
+        if case .none = dragOperation {
+            super.flagsChanged(with: event)
+            return
+        }
+        updateSelectionForDrag(to: lastDragPoint)
+    }
+
+    /// Applies the active drag operation for a pointer location, honoring the
+    /// resolved aspect ratio (Shift locks to 1:1, otherwise the preset ratio).
+    private func updateSelectionForDrag(to point: CGPoint) {
+        let ratio = CaptureSelectionGeometry.selectionAspectRatio(
+            presetRatio: activePreset.isFixedSize ? nil : activePreset.ratio,
+            squareLock: squareLock
+        )
 
         switch dragOperation {
         case .none:
@@ -1340,7 +1372,7 @@ private final class AllInOneSelectionOverlayView: NSView {
                 in: bounds
             )
         case let .resize(handle, startRect):
-            if let ratio = activePreset.ratio, !activePreset.isFixedSize {
+            if let ratio {
                 selectionRect = CaptureSelectionGeometry.resize(
                     startRect,
                     handle: handle,
@@ -1359,7 +1391,7 @@ private final class AllInOneSelectionOverlayView: NSView {
                 )
             }
         case let .create(startPoint):
-            if let ratio = activePreset.ratio, !activePreset.isFixedSize {
+            if let ratio {
                 selectionRect = CaptureSelectionGeometry.rect(
                     from: startPoint,
                     to: point,

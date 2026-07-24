@@ -188,4 +188,56 @@ struct CaptureSelectionGeometryTests {
 
         #expect(fixed == CGRect(x: 200, y: 160, width: 300, height: 200))
     }
+
+    // MARK: - Shift-to-square aspect ratio resolution
+
+    @Test("Without square lock a free drag keeps no aspect ratio")
+    func resolverFreeDragHasNoRatio() {
+        #expect(CaptureSelectionGeometry.selectionAspectRatio(presetRatio: nil, squareLock: false) == nil)
+    }
+
+    @Test("Without square lock an active preset ratio passes through")
+    func resolverPresetRatioPassesThrough() {
+        let preset: CGFloat = 16.0 / 9.0
+        #expect(CaptureSelectionGeometry.selectionAspectRatio(presetRatio: preset, squareLock: false) == preset)
+    }
+
+    @Test("Square lock forces a 1:1 ratio with no preset")
+    func resolverSquareLockForcesOneToOne() {
+        #expect(CaptureSelectionGeometry.selectionAspectRatio(presetRatio: nil, squareLock: true) == 1)
+    }
+
+    @Test("Square lock overrides an active preset ratio")
+    func resolverSquareLockOverridesPreset() {
+        #expect(CaptureSelectionGeometry.selectionAspectRatio(presetRatio: 16.0 / 9.0, squareLock: true) == 1)
+    }
+
+    @Test("A square-locked up-left drag still produces a square")
+    func squareLockUpLeftDragIsSquare() {
+        let created = CaptureSelectionGeometry.rect(
+            from: CGPoint(x: 200, y: 200),
+            to: CGPoint(x: 120, y: 150),
+            in: bounds,
+            minSize: minSize,
+            aspectRatio: 1
+        )
+
+        #expect(abs(created.width - created.height) < 1e-6)
+        #expect(created.width > 0)
+        #expect(bounds.contains(created))
+    }
+
+    @Test("A tiny square-locked drag respects the minimum size and stays square")
+    func squareLockTinyDragRespectsMinimum() {
+        let created = CaptureSelectionGeometry.rect(
+            from: CGPoint(x: 100, y: 100),
+            to: CGPoint(x: 105, y: 102),
+            in: bounds,
+            minSize: minSize,
+            aspectRatio: 1
+        )
+
+        #expect(abs(created.width - created.height) < 1e-6)
+        #expect(created.width >= minSize.width)
+    }
 }
