@@ -301,7 +301,8 @@ private struct InlineAnnotationEditorView: View {
             onInteractionChanged: handleCanvasInteractionChanged,
             onTextEditingStarted: handleTextEditingStarted,
             onTextEditingEnded: handleTextEditingEnded,
-            onMagnify: handleMagnify
+            onMagnify: handleMagnify,
+            onScroll: handleScroll
         )
         // Render at full (possibly enlarged) size, panned by the focal offset,
         // then clip to the fixed capture-footprint viewport so a zoomed canvas
@@ -396,13 +397,42 @@ private struct InlineAnnotationEditorView: View {
         interactionState.setCanvasInteraction(isInteracting)
     }
 
-    /// Focal-point pinch zoom: keeps the content point under the pinch fixed
-    /// while scaling, then constrains the pan so the canvas keeps covering its
-    /// viewport. `locInView` is in the canvas's flipped, top-left coordinates.
+    /// Trackpad pinch. `locInView` is in the canvas's flipped, top-left coords.
     private func handleMagnify(_ magnification: CGFloat, _ locInView: CGPoint) {
-        let oldScale = effectiveScale
-        let newUserZoom = CanvasZoom.clampScale(userZoom * (1 + magnification), min: 1.0, max: 8.0)
+        applyUserZoom(
+            CanvasZoom.clampScale(userZoom * (1 + magnification), min: 1.0, max: 8.0),
+            focalInView: locInView
+        )
+    }
+
+    /// This overlay has no enclosing scroll view, so it routes scroll events
+    /// itself: ⌘-scroll zooms toward the cursor, a plain two-finger scroll pans.
+    /// Both are swallowed either way, since there is nothing else to scroll here.
+    private func handleScroll(_ scroll: CanvasScrollEvent) {
+        switch CanvasScrollGesture.action(
+            commandHeld: scroll.commandHeld,
+            isMomentum: scroll.isMomentum,
+            verticalDelta: scroll.deltaY,
+            horizontalDelta: scroll.deltaX,
+            hasPreciseDeltas: scroll.hasPreciseDeltas
+        ) {
+        case let .zoom(factor):
+            applyUserZoom(
+                CanvasZoom.clampScale(userZoom * factor, min: 1.0, max: 8.0),
+                focalInView: scroll.locationInView
+            )
+        case let .pan(dx, dy):
+            panContent(dx: dx, dy: dy)
+        case .ignore:
+            break
+        }
+    }
+
+    /// Focal-point zoom: keeps the content point under `locInView` fixed while
+    /// scaling, then constrains the pan so the canvas keeps covering its viewport.
+    private func applyUserZoom(_ newUserZoom: CGFloat, focalInView locInView: CGPoint) {
         guard newUserZoom != userZoom else { return }
+        let oldScale = effectiveScale
         let newScale = displayScale * newUserZoom
 
         let origin = resolvedContentOrigin
@@ -415,17 +445,33 @@ private struct InlineAnnotationEditorView: View {
         )
 
         let newSize = CGSize(width: imageSize.width * newScale, height: imageSize.height * newScale)
-        // Clamp in viewport-relative space (origin - viewport top-left), then
-        // lift the result back into the ZStack's coordinate space.
+        userZoom = newUserZoom
+        contentOrigin = clampedOrigin(zoomed, contentSize: newSize)
+        didInitOrigin = true
+    }
+
+    /// Move the canvas by a scroll delta. No-ops at fit, where the canvas exactly
+    /// covers its viewport and there is nothing to reveal.
+    private func panContent(dx: CGFloat, dy: CGFloat) {
+        guard userZoom > 1 else { return }
+        let origin = resolvedContentOrigin
+        contentOrigin = clampedOrigin(
+            CGPoint(x: origin.x + dx, y: origin.y + dy),
+            contentSize: canvasSize
+        )
+        didInitOrigin = true
+    }
+
+    /// Clamp a content origin so the canvas keeps covering the viewport. Converts
+    /// into viewport-relative space for `CanvasZoom`, then back into the ZStack's
+    /// coordinate space.
+    private func clampedOrigin(_ origin: CGPoint, contentSize: CGSize) -> CGPoint {
         let relative = CanvasZoom.clampOffset(
-            CGPoint(x: zoomed.x - canvasRect.minX, y: zoomed.y - canvasRect.minY),
-            contentSize: newSize,
+            CGPoint(x: origin.x - canvasRect.minX, y: origin.y - canvasRect.minY),
+            contentSize: contentSize,
             viewportSize: canvasRect.size
         )
-
-        userZoom = newUserZoom
-        contentOrigin = CGPoint(x: relative.x + canvasRect.minX, y: relative.y + canvasRect.minY)
-        didInitOrigin = true
+        return CGPoint(x: relative.x + canvasRect.minX, y: relative.y + canvasRect.minY)
     }
 
     private func resetZoom() {

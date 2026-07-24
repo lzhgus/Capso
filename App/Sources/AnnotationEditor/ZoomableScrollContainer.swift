@@ -161,22 +161,27 @@ final class FocalZoomScrollView: NSScrollView {
 
     // ⌘-scroll (or ⌘ + precise trackpad) zooms; plain scrolling pans as usual.
     override func scrollWheel(with event: NSEvent) {
-        // ⌘ (+ precise trackpad) zooms toward the cursor.
-        if event.modifierFlags.contains(.command), event.momentumPhase == [],
-           let factor = ScrollZoomBehavior.scaleFactor(
-               verticalDelta: event.scrollingDeltaY,
-               horizontalDelta: event.scrollingDeltaX,
-               hasPreciseDeltas: event.hasPreciseScrollingDeltas
-           ) {
+        switch CanvasScrollGesture.action(
+            commandHeld: event.modifierFlags.contains(.command),
+            isMomentum: event.momentumPhase != [],
+            verticalDelta: event.scrollingDeltaY,
+            horizontalDelta: event.scrollingDeltaX,
+            hasPreciseDeltas: event.hasPreciseScrollingDeltas
+        ) {
+        case let .zoom(factor):
             requestZoom(to: currentScale * factor, focalInWindow: event.locationInWindow)
-            return
+        case .pan:
+            // Pan by moving the clip origin directly. We can't defer to
+            // `super.scrollWheel`: NSScrollView's responsive scrolling ignores
+            // scrollWheel events delivered programmatically (as they are when the
+            // canvas hands off an over-image two-finger drag), so it would
+            // silently do nothing.
+            panContent(with: event)
+        case .ignore:
+            // A ⌘-scroll event with no usable scale change. Swallow it so one
+            // zoom gesture can't also shift the canvas.
+            break
         }
-        // Otherwise pan by moving the clip origin directly. We can't defer to
-        // `super.scrollWheel`: NSScrollView's responsive scrolling ignores
-        // scrollWheel events delivered programmatically (as they are when the
-        // canvas hands off an over-image two-finger drag), so it would silently
-        // do nothing.
-        panContent(with: event)
     }
 
     private func panContent(with event: NSEvent) {

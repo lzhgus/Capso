@@ -31,6 +31,19 @@ private enum SelectionAction {
     case decrementCounter
 }
 
+/// The parts of a scroll `NSEvent` a canvas owner needs to route the gesture
+/// itself. Used by surfaces with no enclosing `NSScrollView` (the inline
+/// editor), which have to implement pan / ⌘-scroll zoom on their own.
+struct CanvasScrollEvent {
+    let deltaX: CGFloat
+    let deltaY: CGFloat
+    /// Pointer location in the canvas's flipped, top-left coordinates.
+    let locationInView: CGPoint
+    let commandHeld: Bool
+    let isMomentum: Bool
+    let hasPreciseDeltas: Bool
+}
+
 private protocol PathEditableAnnotation: AnnotationObject {
     var start: CGPoint { get set }
     var end: CGPoint { get set }
@@ -87,6 +100,12 @@ final class AnnotationCanvasNSView: NSView {
     /// don't opt in (the main editor's scroll container, the all-in-one overlay)
     /// are unaffected.
     var onMagnify: ((_ magnification: CGFloat, _ locationInView: CGPoint) -> Void)?
+    /// Fired for each two-finger scroll / ⌘-scroll step. Owners that supply this
+    /// route the gesture themselves (pan vs zoom) via `CanvasScrollGesture`.
+    /// Optional: when nil, `scrollWheel(with:)` hands off to an enclosing scroll
+    /// view as before, so the main editor and the all-in-one overlay are
+    /// unaffected.
+    var onScroll: ((CanvasScrollEvent) -> Void)?
 
     func commitTextEditingIfNeeded() {
         commitTextEditing()
@@ -174,13 +193,25 @@ final class AnnotationCanvasNSView: NSView {
         onMagnify(event.magnification, location)
     }
 
-    // Two-finger scroll (pan). Like `magnify`, the SwiftUI hosting views don't
-    // reliably forward `scrollWheel` up the responder chain, so an over-image
-    // two-finger drag never reaches the enclosing scroll view. Hand it off
-    // explicitly so panning works over the image, not just the margins. The
-    // canvas itself has no use for scroll events. When there's no enclosing
-    // scroll view (inline / all-in-one overlays) we defer to the default.
+    // Two-finger scroll (pan) and ⌘-scroll (zoom). Like `magnify`, the SwiftUI
+    // hosting views don't reliably forward `scrollWheel` up the responder chain,
+    // so an over-image two-finger drag never reaches the enclosing scroll view.
+    // Hand it off explicitly so panning works over the image, not just the
+    // margins. The canvas itself has no use for scroll events.
     override func scrollWheel(with event: NSEvent) {
+        // An owner that routes the gesture itself (the inline editor, which has
+        // no scroll view to fall back on) gets it first.
+        if let onScroll {
+            onScroll(CanvasScrollEvent(
+                deltaX: event.scrollingDeltaX,
+                deltaY: event.scrollingDeltaY,
+                locationInView: convert(event.locationInWindow, from: nil),
+                commandHeld: event.modifierFlags.contains(.command),
+                isMomentum: event.momentumPhase != [],
+                hasPreciseDeltas: event.hasPreciseScrollingDeltas
+            ))
+            return
+        }
         if let scrollView = enclosingScrollView {
             scrollView.scrollWheel(with: event)
         } else {
