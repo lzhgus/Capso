@@ -636,7 +636,9 @@ final class CaptureOverlayView: NSView {
         )
     }
 
-    private var selectionRect: CGRect {
+    /// The live selection built from the drag anchors. Internal so interaction
+    /// tests can assert mid-drag state.
+    var selectionRect: CGRect {
         let x = min(dragStart.x, dragEnd.x)
         let y = min(dragStart.y, dragEnd.y)
         let w = abs(dragEnd.x - dragStart.x)
@@ -800,9 +802,16 @@ final class CaptureOverlayView: NSView {
     override func mouseDown(with event: NSEvent) {
         switch mode {
         case .area:
+            let loc = convert(event.locationInWindow, from: nil)
+            // Seed the pointer and Shift state before any early return so a
+            // Shift press that lands before the first mouseDragged recomputes
+            // from this press point instead of `.zero` or the previous drag's
+            // endpoint.
+            lastRawEnd = loc
+            squareLock = event.modifierFlags.contains(.shift)
+
             // Fixed-size: no drag — capture immediately centered on cursor
             if let fixedSize = activePreset.fixedPixelSize {
-                let loc = convert(event.locationInWindow, from: nil)
                 let fixedRect = CGRect(
                     x: loc.x - CGFloat(fixedSize.width) / 2,
                     y: loc.y - CGFloat(fixedSize.height) / 2,
@@ -815,7 +824,7 @@ final class CaptureOverlayView: NSView {
             }
 
             isDragging = true
-            dragStart = convert(event.locationInWindow, from: nil)
+            dragStart = loc
             dragEnd = dragStart
             needsDisplay = true
 
@@ -997,7 +1006,6 @@ final class CaptureOverlayView: NSView {
 
     override func flagsChanged(with event: NSEvent) {
         handleFlagsChanged(event)
-        updateSquareLockDuringDrag(with: event)
         super.flagsChanged(with: event)
     }
 
@@ -1014,8 +1022,10 @@ final class CaptureOverlayView: NSView {
     }
 
     /// Shared entry for both the view's `flagsChanged` and the window's local
-    /// flags monitor so Shift-release confirmation stays reliable.
+    /// flags monitor so Shift-release confirmation and the live square lock stay
+    /// reliable even when the dragging view is not first responder.
     func handleFlagsChanged(_ event: NSEvent, allowsNonKeyConfirmation: Bool = false) {
+        updateSquareLockDuringDrag(with: event)
         guard allowsMultiWindowSelection else { return }
         let shiftNow = event.modifierFlags.contains(.shift)
         if (isShiftHeld || allowsNonKeyConfirmation) && !shiftNow {
