@@ -96,6 +96,10 @@ final class AnnotationCanvasNSView: NSView {
 
     private var dragStart: CGPoint?
     private var dragCurrent: CGPoint?
+    /// Whether Shift is held, constraining the creation drag: box tools lock to
+    /// 1:1 and line tools snap to 45°. Seeded on mouse down so a Shift press
+    /// that precedes the drag is honored.
+    private var squareLock = false
     private var isDragging = false {
         didSet {
             guard isDragging != oldValue else { return }
@@ -332,7 +336,7 @@ final class AnnotationCanvasNSView: NSView {
                 }
             }
 
-            if let start = dragStart, let current = dragCurrent,
+            if let start = dragStart, let current = previewDragEnd,
                isDragging, activeResizeHandle == nil,
                currentTool != .select, currentTool != .freehand, currentTool != .text, currentTool != .highlighter {
                 drawPreview(ctx: ctx, from: start, to: current)
@@ -651,6 +655,22 @@ final class AnnotationCanvasNSView: NSView {
         return nil
     }
 
+    /// The drag endpoint after the active tool's Shift constraint. Both the live
+    /// preview and the committed object go through this, so a square preview can
+    /// never commit as a free rectangle.
+    private func constrainedCreationEnd(from start: CGPoint, to end: CGPoint) -> CGPoint {
+        guard squareLock else { return end }
+        return AnnotationDragConstraint.constrainedEnd(from: start, to: end, tool: currentTool)
+    }
+
+    /// The endpoint the in-progress preview is drawn to: the live pointer
+    /// position with the active tool's Shift constraint applied. Internal so
+    /// interaction tests can assert on what the user sees mid-drag.
+    var previewDragEnd: CGPoint? {
+        guard let start = dragStart, let current = dragCurrent else { return nil }
+        return constrainedCreationEnd(from: start, to: current)
+    }
+
     private func drawPreview(ctx: CGContext, from start: CGPoint, to end: CGPoint) {
         ctx.saveGState()
         ctx.setStrokeColor(currentStyle.color.cgColor)
@@ -715,6 +735,7 @@ final class AnnotationCanvasNSView: NSView {
         let point = toImagePoint(convert(event.locationInWindow, from: nil))
         dragStart = point
         dragCurrent = point
+        squareLock = event.modifierFlags.contains(.shift)
         isDragging = true
         activeResizeHandle = nil
         resizeOriginalTextFontSize = nil
@@ -815,6 +836,7 @@ final class AnnotationCanvasNSView: NSView {
     override func mouseDragged(with event: NSEvent) {
         let point = toImagePoint(convert(event.locationInWindow, from: nil))
         dragCurrent = point
+        squareLock = event.modifierFlags.contains(.shift)
 
         if isResizingTextEditor,
            let editor = textEditor,
@@ -995,7 +1017,11 @@ final class AnnotationCanvasNSView: NSView {
         guard let doc = document, let start = dragStart else {
             isDragging = false; return
         }
-        let end = toImagePoint(convert(event.locationInWindow, from: nil))
+        squareLock = event.modifierFlags.contains(.shift)
+        let end = constrainedCreationEnd(
+            from: start,
+            to: toImagePoint(convert(event.locationInWindow, from: nil))
+        )
 
         if activeResizeHandle != nil {
             dragObjectID = nil
@@ -1092,6 +1118,21 @@ final class AnnotationCanvasNSView: NSView {
         if currentTool != .select {
             onObjectCreated?()
         }
+    }
+
+    /// Holding or releasing Shift mid-drag re-runs the constraint against the
+    /// last pointer location, so the preview locks and unlocks live. The preview
+    /// is rebuilt from `dragStart`/`dragCurrent` on every draw, so a redraw is
+    /// all this needs.
+    override func flagsChanged(with event: NSEvent) {
+        let nextSquareLock = event.modifierFlags.contains(.shift)
+        if nextSquareLock != squareLock {
+            squareLock = nextSquareLock
+            if isDragging, AnnotationDragConstraint.kind(for: currentTool) != .none {
+                needsDisplay = true
+            }
+        }
+        super.flagsChanged(with: event)
     }
 
     override func keyDown(with event: NSEvent) {
