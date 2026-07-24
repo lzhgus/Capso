@@ -585,7 +585,8 @@ final class RecordingCoordinator {
                         tempURL: tempURL,
                         cursorTelemetryURL: cursorTelemetryURL,
                         showsCursor: settings.showCursor,
-                        recordingAreaSize: result.size
+                        recordingAreaSize: result.size,
+                        outputFormat: EditorOutputFormat(recordingFormat: format)
                     )
                 } else {
                     // Quick-preview flow: show thumbnail preview with Save/Copy/Discard
@@ -721,7 +722,8 @@ final class RecordingCoordinator {
         tempURL: URL,
         cursorTelemetryURL: URL?,
         showsCursor: Bool,
-        recordingAreaSize: CGSize
+        recordingAreaSize: CGSize,
+        outputFormat: EditorOutputFormat
     ) {
         Task {
             let asset = AVURLAsset(url: tempURL)
@@ -738,7 +740,7 @@ final class RecordingCoordinator {
                 recordingAreaSize: recordingAreaSize
             )
 
-            let coordinator = EditorCoordinator(project: project)
+            let coordinator = EditorCoordinator(project: project, outputFormat: outputFormat)
             coordinator.onClose = { [weak self] in
                 self?.editorWindow?.close()
                 self?.editorWindow = nil

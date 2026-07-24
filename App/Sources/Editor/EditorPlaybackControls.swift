@@ -97,9 +97,10 @@ struct EditorPlaybackControls: View {
     }
 
     private func exportToFile() {
+        let outputFormat = coordinator.outputFormat
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.mpeg4Movie]
-        panel.nameFieldStringValue = "Recording.mp4"
+        panel.allowedContentTypes = [outputFormat.contentType]
+        panel.nameFieldStringValue = outputFormat.defaultFilename
         panel.canCreateDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -107,7 +108,7 @@ struct EditorPlaybackControls: View {
         Task {
             do {
                 _ = try await coordinator.exportVideo(
-                    format: .mp4,
+                    format: outputFormat.exportFormat,
                     quality: .maximum,
                     destination: url
                 )
@@ -120,13 +121,16 @@ struct EditorPlaybackControls: View {
     }
 
     private func exportToClipboard() {
+        let outputFormat = coordinator.outputFormat
         let tempDir = FileManager.default.temporaryDirectory
-        let tempURL = tempDir.appendingPathComponent("\(UUID().uuidString).mp4")
+        let tempURL = tempDir
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(outputFormat.fileExtension)
 
         Task {
             do {
                 let url = try await coordinator.exportVideo(
-                    format: .mp4,
+                    format: outputFormat.exportFormat,
                     quality: .maximum,
                     destination: tempURL
                 )

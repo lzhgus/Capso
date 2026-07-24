@@ -13,6 +13,7 @@ final class EditorCoordinator {
     // MARK: - Project
 
     var project: RecordingProject
+    let outputFormat: EditorOutputFormat
 
     // MARK: - Playback
 
@@ -44,8 +45,9 @@ final class EditorCoordinator {
 
     // MARK: - Init
 
-    init(project: RecordingProject) {
+    init(project: RecordingProject, outputFormat: EditorOutputFormat) {
         self.project = project
+        self.outputFormat = outputFormat
         let asset = AVURLAsset(url: project.sourceVideoURL)
         self.playerItem = AVPlayerItem(asset: asset)
         self.player = AVPlayer(playerItem: playerItem)
@@ -529,8 +531,12 @@ final class EditorCoordinator {
             exportStatusMessage = nil
         }
 
+        if format == .gif {
+            return try await exportGIF(quality: quality, destination: destination)
+        }
+
         if hasCompositingEffects {
-            let rendered = try await exportWithCompositor(format: format, quality: quality, destination: destination)
+            let rendered = try await exportWithCompositor(quality: quality, destination: destination)
             if !project.trimRegions.isEmpty {
                 let cutDestination = destination
                 let uncutDestination = rendered.deletingLastPathComponent()
@@ -555,7 +561,7 @@ final class EditorCoordinator {
             }
             return rendered
         } else {
-            if format == .mp4, !project.trimRegions.isEmpty {
+            if !project.trimRegions.isEmpty {
                 return try await CutExporter.exportMP4(
                     source: project.sourceVideoURL,
                     trimRegions: project.trimRegions,
@@ -573,7 +579,7 @@ final class EditorCoordinator {
                 }
             }
 
-            let options = ExportOptions(format: format, quality: quality, destination: destination)
+            let options = ExportOptions(format: .mp4, quality: quality, destination: destination)
             return try await VideoExporter.export(
                 source: project.sourceVideoURL,
                 options: options
@@ -590,8 +596,62 @@ final class EditorCoordinator {
         }
     }
 
+    private func exportGIF(quality: ExportQuality, destination: URL) async throws -> URL {
+        var source = project.sourceVideoURL
+        var temporaryFiles: [URL] = []
+        defer {
+            for url in temporaryFiles {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+
+        if hasCompositingEffects {
+            let compositedURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString)-composited")
+                .appendingPathExtension("mp4")
+            temporaryFiles.append(compositedURL)
+            source = try await exportWithCompositor(quality: quality, destination: compositedURL)
+        }
+
+        if !project.trimRegions.isEmpty {
+            let trimmedURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString)-trimmed")
+                .appendingPathExtension("mp4")
+            temporaryFiles.append(trimmedURL)
+            source = try await CutExporter.exportMP4(
+                source: source,
+                trimRegions: project.trimRegions,
+                quality: quality,
+                destination: trimmedURL
+            ) { [weak self] progress in
+                Task { @MainActor in
+                    self?.exportProgress = progress
+                }
+            } status: { [weak self] status in
+                Task { @MainActor in
+                    self?.exportProgress = status.fractionCompleted
+                    self?.exportStatusMessage = status.stage.userDescription
+                }
+            }
+        }
+
+        let options = ExportOptions(format: .gif, quality: quality, destination: destination)
+        return try await VideoExporter.export(
+            source: source,
+            options: options
+        ) { [weak self] progress in
+            Task { @MainActor in
+                self?.exportProgress = progress
+            }
+        } status: { [weak self] status in
+            Task { @MainActor in
+                self?.exportProgress = status.fractionCompleted
+                self?.exportStatusMessage = status.stage.userDescription
+            }
+        }
+    }
+
     private func exportWithCompositor(
-        format: ExportFormat,
         quality: ExportQuality,
         destination: URL
     ) async throws -> URL {
