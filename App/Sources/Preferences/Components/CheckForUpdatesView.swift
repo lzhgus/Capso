@@ -18,6 +18,13 @@ final class UpdateManager: NSObject, ObservableObject {
 
     @Published private(set) var canCheckForUpdates = false
     @Published private(set) var status: Status?
+    @Published var automaticallyChecksForUpdates: Bool = true {
+        didSet {
+            guard oldValue != automaticallyChecksForUpdates else { return }
+            updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+        }
+    }
+
     @Published var automaticallyDownloadsUpdates: Bool = false {
         didSet {
             guard oldValue != automaticallyDownloadsUpdates else { return }
@@ -33,6 +40,7 @@ final class UpdateManager: NSObject, ObservableObject {
     private var manualCheckState: ManualCheckState = .none
     private var probeFoundValidUpdate = false
     private var canCheckObservation: NSKeyValueObservation?
+    private var autoCheckObservation: NSKeyValueObservation?
     private var autoDownloadObservation: NSKeyValueObservation?
     private var clearStatusTask: Task<Void, Never>?
 
@@ -46,10 +54,16 @@ final class UpdateManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        automaticallyChecksForUpdates = updater.automaticallyChecksForUpdates
         automaticallyDownloadsUpdates = updater.automaticallyDownloadsUpdates
         canCheckObservation = updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] updater, _ in
             Task { @MainActor in
                 self?.canCheckForUpdates = updater.canCheckForUpdates
+            }
+        }
+        autoCheckObservation = updater.observe(\.automaticallyChecksForUpdates, options: [.new]) { [weak self] updater, _ in
+            Task { @MainActor in
+                self?.automaticallyChecksForUpdates = updater.automaticallyChecksForUpdates
             }
         }
         autoDownloadObservation = updater.observe(\.automaticallyDownloadsUpdates, options: [.new]) { [weak self] updater, _ in

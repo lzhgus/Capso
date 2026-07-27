@@ -79,6 +79,14 @@ struct GeneralSettingsView: View {
             if let updateManager {
                 SettingGroup(title: "Updates") {
                     SettingCard {
+                        SettingRow(label: "Automatically Check for Updates", sublabel: "Check for new versions in the background daily") {
+                            Toggle("", isOn: Binding(
+                                get: { updateManager.automaticallyChecksForUpdates },
+                                set: { updateManager.automaticallyChecksForUpdates = $0 }
+                            ))
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                        }
                         SettingRow(label: "Automatically Install Updates", sublabel: "Install updates in the background when available") {
                             Toggle("", isOn: Binding(
                                 get: { updateManager.automaticallyDownloadsUpdates },
@@ -86,8 +94,9 @@ struct GeneralSettingsView: View {
                             ))
                             .toggleStyle(.switch)
                             .controlSize(.small)
+                            .disabled(!updateManager.automaticallyChecksForUpdates)
                         }
-                        SettingRow(label: "Check for Updates", sublabel: "Automatically checks daily", showDivider: true) {
+                        SettingRow(label: "Check for Updates", sublabel: "Manually check for a new version", showDivider: true) {
                             CheckForUpdatesView(updateManager: updateManager)
                         }
                     }
