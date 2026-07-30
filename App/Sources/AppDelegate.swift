@@ -247,6 +247,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             captureCoordinator.captureFullscreen()
         case .captureWindow:
             captureCoordinator.captureWindow()
+        case .captureAllInOne:
+            captureCoordinator.captureAllInOne()
         }
         logAutomationURL("Performed action \(String(describing: action))")
     }

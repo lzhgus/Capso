@@ -4,6 +4,7 @@ public enum AutomationURLAction: Equatable, Sendable {
     case captureArea
     case captureFullscreen
     case captureWindow
+    case captureAllInOne
 
     public init?(url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -21,6 +22,7 @@ public enum AutomationURLAction: Equatable, Sendable {
         case "/area": self = .captureArea
         case "/fullscreen": self = .captureFullscreen
         case "/window": self = .captureWindow
+        case "/all-in-one": self = .captureAllInOne
         default: return nil
         }
     }

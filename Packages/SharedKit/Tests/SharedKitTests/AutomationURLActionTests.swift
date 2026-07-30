@@ -10,6 +10,7 @@ struct AutomationURLActionTests {
             ("capso://grab/area", .captureArea),
             ("capso://grab/fullscreen", .captureFullscreen),
             ("capso://grab/window", .captureWindow),
+            ("capso://grab/all-in-one", .captureAllInOne),
             ("CAPSO://GRAB/area", .captureArea),
         ]
 

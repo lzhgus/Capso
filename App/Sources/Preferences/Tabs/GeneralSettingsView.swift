@@ -58,6 +58,7 @@ struct GeneralSettingsView: View {
                             Text(verbatim: "capso://grab/area")
                             Text(verbatim: "capso://grab/fullscreen")
                             Text(verbatim: "capso://grab/window")
+                            Text(verbatim: "capso://grab/all-in-one")
                         }
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
