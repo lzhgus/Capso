@@ -9,14 +9,12 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../SharedKit"),
-        .package(url: "https://github.com/soto-project/soto.git", exact: "7.14.0"),
     ],
     targets: [
         .target(
             name: "ShareKit",
             dependencies: [
                 "SharedKit",
-                .product(name: "SotoS3", package: "soto"),
             ]
         ),
         .testTarget(
