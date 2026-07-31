@@ -87,15 +87,22 @@ public struct ShareConfig: Sendable {
 
     public func publicURL(forObjectKey key: String) -> URL {
         let encoded = ShareConfig.encodeObjectKey(key)
-        return URL(string: "\(urlPrefix)/\(encoded)")!
+        if let url = URL(string: "\(urlPrefix)/\(encoded)") {
+            return url
+        }
+        // `urlPrefix` is validated via `validatePrefix`; this only guards against
+        // an unexpectedly unparseable encoded key.
+        return URL(string: urlPrefix) ?? URL(fileURLWithPath: "/")
     }
 
     /// Compose a public URL from a prefix, ID, and file extension.
-    /// - Precondition: `prefix` has passed `validatePrefix(_:)`. Calling this with an
-    ///   unvalidated user-supplied prefix can crash on the force-unwrap.
+    /// - Precondition: `prefix` has passed `validatePrefix(_:)`.
     public static func composePublicURL(prefix: String, id: String, ext: String) -> URL {
         let normalized = normalizePrefix(prefix)
-        return URL(string: "\(normalized)/\(id).\(ext)")!
+        if let url = URL(string: "\(normalized)/\(id).\(ext)") {
+            return url
+        }
+        return URL(string: normalized) ?? URL(fileURLWithPath: "/")
     }
 
     public static func normalizePrefix(_ prefix: String) -> String {

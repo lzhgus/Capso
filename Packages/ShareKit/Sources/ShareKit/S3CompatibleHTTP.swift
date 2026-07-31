@@ -1,43 +1,51 @@
 import CryptoKit
 import Foundation
 
-/// S3 / R2 transport ported from the working capcap uploader:
-/// `AWSV4Signer` + `S3Common` + `R2Uploader` / `S3Uploader`.
+/// Shared SigV4 + URLSession transport for Amazon S3 and S3-compatible stores (R2).
 ///
-/// Wire format matches that stack:
+/// Wire format:
 /// - SigV4 with the real payload SHA-256 (not `UNSIGNED-PAYLOAD`)
 /// - signed headers: `content-type;host;x-amz-content-sha256;x-amz-date`
-/// - Amazon virtual-hosted vs custom path-style endpoints
+/// - Amazon virtual-hosted vs custom path-style endpoints (scheme preserved)
 /// - R2 path-style on `<accountId>.r2.cloudflarestorage.com` with region `auto`
 ///
-/// Capso only changes the body transport: hash the file in chunks, then
-/// `URLSession.upload(fromFile:)` so recordings are not held as one `Data`.
+/// Uploads hash the file in chunks, then use `URLSession.upload(fromFile:)` so
+/// recordings are not held as one `Data` buffer.
 enum S3CompatibleHTTP {
     static let emptyPayloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-    struct Target: Sendable {
+    struct Target: Sendable, Equatable {
+        /// `http` or `https` — preserved from custom endpoints so LAN MinIO works.
+        let scheme: String
+        /// Host plus optional port only (no path).
         let host: String
         let canonicalURI: String
-    }
 
-    /// Mirrors capcap `S3Uploader` host / canonical URI selection.
-    static func amazonS3Target(bucket: String, objectKey: String, region: String, endpoint: String?) -> Target {
-        let encodedKey = encodePath(objectKey)
-        if let endpoint, let raw = nonEmpty(endpoint) {
-            // S3-compatible endpoint → path-style addressing (capcap `S3Common.stripScheme`).
-            let host = stripScheme(raw)
-            return Target(host: host, canonicalURI: "/\(bucket)/\(encodedKey)")
+        var requestURLString: String {
+            "\(scheme)://\(host)\(canonicalURI)"
         }
-        // Amazon S3 → virtual-hosted-style addressing.
-        let host = "\(bucket).s3.\(region).amazonaws.com"
-        return Target(host: host, canonicalURI: "/\(encodedKey)")
     }
 
-    /// Mirrors capcap `R2Uploader` host / canonical URI selection.
+    /// Amazon S3 virtual-hosted addressing, or path-style for a custom endpoint.
+    static func amazonS3Target(bucket: String, objectKey: String, region: String, endpoint: String?) -> Target {
+        let encodedKey = ShareConfig.encodeObjectKey(objectKey)
+        if let endpoint, let parsed = parseEndpoint(endpoint) {
+            let canonicalURI = "\(parsed.pathPrefix)/\(bucket)/\(encodedKey)"
+            return Target(scheme: parsed.scheme, host: parsed.host, canonicalURI: canonicalURI)
+        }
+        return Target(
+            scheme: "https",
+            host: "\(bucket).s3.\(region).amazonaws.com",
+            canonicalURI: "/\(encodedKey)"
+        )
+    }
+
+    /// Cloudflare R2 path-style addressing.
     static func r2Target(accountID: String, bucket: String, objectKey: String) -> Target {
-        let encodedKey = encodePath(objectKey)
+        let encodedKey = ShareConfig.encodeObjectKey(objectKey)
         let normalizedAccountID = normalizeAccountID(accountID)
         return Target(
+            scheme: "https",
             host: "\(normalizedAccountID).r2.cloudflarestorage.com",
             canonicalURI: "/\(bucket)/\(encodedKey)"
         )
@@ -51,10 +59,15 @@ enum S3CompatibleHTTP {
         secretAccessKey: String,
         contentType: String
     ) async throws {
-        let (payloadHash, contentLength) = try sha256File(file)
+        let (payloadHash, contentLength): (String, Int)
+        do {
+            (payloadHash, contentLength) = try sha256File(file)
+        } catch {
+            throw ShareError.unknown("Couldn't read file for upload: \(error.localizedDescription)")
+        }
+
         let request = try signedPutRequest(
-            host: target.host,
-            canonicalURI: target.canonicalURI,
+            target: target,
             region: region,
             accessKeyId: accessKeyId,
             secretAccessKey: secretAccessKey,
@@ -62,8 +75,15 @@ enum S3CompatibleHTTP {
             contentLength: contentLength,
             contentType: contentType
         )
-        let (body, response) = try await URLSession.shared.upload(for: request, fromFile: file)
-        try validate(response: response, body: body)
+
+        do {
+            let (body, response) = try await URLSession.shared.upload(for: request, fromFile: file)
+            try validate(response: response, body: body)
+        } catch let error as ShareError {
+            throw error
+        } catch {
+            throw ShareError.network(underlying: error.localizedDescription)
+        }
     }
 
     static func deleteObject(
@@ -73,20 +93,24 @@ enum S3CompatibleHTTP {
         secretAccessKey: String
     ) async throws {
         let request = try signedDeleteRequest(
-            host: target.host,
-            canonicalURI: target.canonicalURI,
+            target: target,
             region: region,
             accessKeyId: accessKeyId,
             secretAccessKey: secretAccessKey
         )
-        let (body, response) = try await URLSession.shared.data(for: request)
-        try validate(response: response, body: body)
+        do {
+            let (body, response) = try await URLSession.shared.data(for: request)
+            try validate(response: response, body: body)
+        } catch let error as ShareError {
+            throw error
+        } catch {
+            throw ShareError.network(underlying: error.localizedDescription)
+        }
     }
 
-    /// Empty-body DELETE SigV4 request (same empty payload hash as AWS docs).
+    /// Empty-body DELETE SigV4 request (AWS empty-payload hash).
     static func signedDeleteRequest(
-        host: String,
-        canonicalURI: String,
+        target: Target,
         region: String,
         accessKeyId: String,
         secretAccessKey: String,
@@ -94,8 +118,7 @@ enum S3CompatibleHTTP {
     ) throws -> URLRequest {
         try signedRequest(
             method: "DELETE",
-            host: host,
-            canonicalURI: canonicalURI,
+            target: target,
             region: region,
             accessKeyId: accessKeyId,
             secretAccessKey: secretAccessKey,
@@ -106,10 +129,8 @@ enum S3CompatibleHTTP {
         )
     }
 
-    /// capcap `AWSV4Signer.signedPutRequest` — same headers, same signature inputs.
     static func signedPutRequest(
-        host: String,
-        canonicalURI: String,
+        target: Target,
         region: String,
         accessKeyId: String,
         secretAccessKey: String,
@@ -120,8 +141,7 @@ enum S3CompatibleHTTP {
     ) throws -> URLRequest {
         var request = try signedRequest(
             method: "PUT",
-            host: host,
-            canonicalURI: canonicalURI,
+            target: target,
             region: region,
             accessKeyId: accessKeyId,
             secretAccessKey: secretAccessKey,
@@ -130,15 +150,13 @@ enum S3CompatibleHTTP {
             contentLength: contentLength,
             now: now
         )
-        // capcap sets Content-Length explicitly on the signed PUT.
         request.setValue("\(contentLength)", forHTTPHeaderField: "Content-Length")
         return request
     }
 
-    /// Deterministic helper for tests — same as hashing `payload` then calling `signedPutRequest`.
+    /// Convenience for tests — hash `payload` then sign.
     static func signedPutRequest(
-        host: String,
-        canonicalURI: String,
+        target: Target,
         region: String,
         accessKeyId: String,
         secretAccessKey: String,
@@ -147,8 +165,7 @@ enum S3CompatibleHTTP {
         now: Date = Date()
     ) throws -> URLRequest {
         try signedPutRequest(
-            host: host,
-            canonicalURI: canonicalURI,
+            target: target,
             region: region,
             accessKeyId: accessKeyId,
             secretAccessKey: secretAccessKey,
@@ -185,39 +202,72 @@ enum S3CompatibleHTTP {
         }
     }
 
-    // MARK: - Path / endpoint helpers (capcap)
+    // MARK: - Endpoint helpers
 
-    /// capcap `AWSV4Signer.encodePath`
-    static func encodePath(_ key: String) -> String {
-        key.split(separator: "/", omittingEmptySubsequences: false)
-            .map { String($0).sharePercentEncoded() }
-            .joined(separator: "/")
+    struct ParsedEndpoint: Equatable {
+        let scheme: String
+        let host: String
+        /// Empty or `"/" + encoded segments`, no trailing slash.
+        let pathPrefix: String
     }
 
-    /// capcap `S3Common.stripScheme`
-    static func stripScheme(_ raw: String) -> String {
+    /// Parses a user-supplied endpoint into scheme, host[:port], and optional path prefix.
+    static func parseEndpoint(_ raw: String) -> ParsedEndpoint? {
         var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.hasPrefix("https://") { value.removeFirst(8) }
-        if value.hasPrefix("http://") { value.removeFirst(7) }
-        while value.hasSuffix("/") { value.removeLast() }
-        return value
+        guard !value.isEmpty else { return nil }
+
+        let scheme: String
+        if value.lowercased().hasPrefix("https://") {
+            scheme = "https"
+            value.removeFirst("https://".count)
+        } else if value.lowercased().hasPrefix("http://") {
+            scheme = "http"
+            value.removeFirst("http://".count)
+        } else {
+            scheme = "https"
+        }
+
+        while value.hasSuffix("/") {
+            value.removeLast()
+        }
+        guard !value.isEmpty else { return nil }
+
+        let parts = value.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+        let host = String(parts[0])
+        guard !host.isEmpty, !host.contains(" ") else { return nil }
+
+        let pathPrefix: String
+        if parts.count > 1 {
+            let encoded = ShareConfig.encodeObjectKey(String(parts[1]))
+            pathPrefix = encoded.isEmpty ? "" : "/\(encoded)"
+        } else {
+            pathPrefix = ""
+        }
+
+        return ParsedEndpoint(scheme: scheme, host: host, pathPrefix: pathPrefix)
     }
 
-    /// capcap `R2Uploader.normalizeAccountId`
     static func normalizeAccountID(_ raw: String) -> String {
-        var value = stripScheme(raw)
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.lowercased().hasPrefix("https://") {
+            value.removeFirst("https://".count)
+        } else if value.lowercased().hasPrefix("http://") {
+            value.removeFirst("http://".count)
+        }
+        while value.hasSuffix("/") {
+            value.removeLast()
+        }
         if let range = value.range(of: ".r2.cloudflarestorage.com") {
             value = String(value[value.startIndex..<range.lowerBound])
         }
         return value
     }
 
-    // MARK: - Private
+    // MARK: - Signing
 
     static func signedRequest(
         method: String,
-        host: String,
-        canonicalURI: String,
+        target: Target,
         region: String,
         accessKeyId: String,
         secretAccessKey: String,
@@ -226,14 +276,14 @@ enum S3CompatibleHTTP {
         contentLength: Int?,
         now: Date = Date()
     ) throws -> URLRequest {
-        guard let url = URL(string: "https://\(host)\(canonicalURI)") else {
-            throw ShareError.notConfigured
+        guard let url = URL(string: target.requestURLString) else {
+            throw ShareError.unknown("Invalid S3 endpoint URL")
         }
 
         let (amzDate, dateStamp) = timestamps(now)
         let service = "s3"
+        let host = target.host
 
-        // Canonical headers must be sorted by lowercased name (capcap PUT order).
         let canonicalHeaders: String
         let signedHeaders: String
         if let contentType {
@@ -253,7 +303,7 @@ enum S3CompatibleHTTP {
 
         let canonicalRequest = [
             method,
-            canonicalURI,
+            target.canonicalURI,
             "",
             canonicalHeaders,
             signedHeaders,
@@ -274,7 +324,6 @@ enum S3CompatibleHTTP {
         let kSigning = hmacSHA256(key: kService, message: Data("aws4_request".utf8))
         let signature = ShareSigning.hex(hmacSHA256(key: kSigning, message: Data(stringToSign.utf8)))
 
-        // Exact Authorization formatting from capcap `AWSV4Signer`.
         let authorization = "AWS4-HMAC-SHA256 " +
             "Credential=\(accessKeyId)/\(scope), " +
             "SignedHeaders=\(signedHeaders), " +
@@ -337,11 +386,6 @@ enum S3CompatibleHTTP {
 
     private static func sha256Hex(_ data: Data) -> String {
         ShareSigning.hex(Data(SHA256.hash(data: data)))
-    }
-
-    private static func nonEmpty(_ raw: String) -> String? {
-        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
     }
 
     private static func xmlTag(_ xml: String, _ tag: String) -> String? {
