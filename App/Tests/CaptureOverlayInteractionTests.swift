@@ -291,6 +291,45 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 200, y: 426, width: 24, height: 24))
     }
 
+    func testAllInOneAnnotationModePassesThroughDragsStartingInsideNearEdge() throws {
+        let (view, _) = makeAllInOneOverlayView(activePreset: .freeform)
+        view.passesThroughSelectionBody = true
+
+        // Selection rect is (200, 160, 300, 200): top edge y = 360.
+        // A point 10pt inside the top edge belongs to the annotation canvas…
+        XCTAssertFalse(view.wantsMouseEvents(at: CGPoint(x: 350, y: 350)))
+        // …so does the selection body…
+        XCTAssertFalse(view.wantsMouseEvents(at: CGPoint(x: 350, y: 260)))
+        // …while pressing right on the border still resizes…
+        XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 350, y: 358)))
+        // …and the outside reach stays generous.
+        XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 350, y: 370)))
+    }
+
+    func testAllInOneAnnotationModeDragInsideNearEdgeDoesNotResizeSelection() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+        view.passesThroughSelectionBody = true
+
+        // Starting 10pt inside the top edge must not begin a resize; if the
+        // event is delivered directly it moves the selection instead of
+        // shrinking it.
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 350, y: 350)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 360, y: 340)))
+
+        XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 210, y: 150, width: 300, height: 200))
+    }
+
+    func testAllInOneAnnotationModeDragOnBorderStillResizesSelection() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+        view.passesThroughSelectionBody = true
+
+        // Pressing within 3pt of the border (inside) still grabs the top edge.
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 350, y: 358)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 350, y: 330)))
+
+        XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 200, y: 160, width: 300, height: 170))
+    }
+
     private func makeAreaOverlayView(
         settings: AppSettings,
         allowsMultiWindowSelection: Bool = true

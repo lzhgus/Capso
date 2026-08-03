@@ -87,6 +87,63 @@ struct CaptureSelectionGeometryTests {
         #expect(outside == nil)
     }
 
+    @Test("Asymmetric hit testing keeps the resize zone thin inside the selection")
+    func asymmetricHitTestingKeepsInnerZoneThin() {
+        let rect = CGRect(x: 100, y: 90, width: 120, height: 80)
+
+        func target(at point: CGPoint) -> CaptureSelectionHitTarget? {
+            CaptureSelectionGeometry.hitTarget(
+                at: point,
+                selectionRect: rect,
+                innerSlop: 3,
+                outerSlop: 12
+            )
+        }
+
+        // 10pt inside the top edge: belongs to the body (annotation), not resize.
+        #expect(target(at: CGPoint(x: 160, y: rect.maxY - 10)) == .move)
+        // 10pt inside a corner: still the body, not a corner resize.
+        #expect(target(at: CGPoint(x: rect.minX + 10, y: rect.maxY - 10)) == .move)
+        // Pressing right on the border resizes.
+        #expect(target(at: CGPoint(x: 160, y: rect.maxY - 1)) == .resize(.top))
+        #expect(target(at: CGPoint(x: rect.minX + 1, y: rect.maxY - 1)) == .resize(.topLeft))
+        // The outside reach stays generous.
+        #expect(target(at: CGPoint(x: 160, y: rect.maxY + 10)) == .resize(.top))
+        #expect(target(at: CGPoint(x: rect.minX - 10, y: rect.maxY + 10)) == .resize(.topLeft))
+        // Far outside hits nothing.
+        #expect(target(at: CGPoint(x: 160, y: rect.maxY + 20)) == nil)
+    }
+
+    @Test("Symmetric hitSlop matches the asymmetric form with equal slops")
+    func symmetricHitSlopMatchesAsymmetricForm() {
+        let rect = CGRect(x: 100, y: 90, width: 120, height: 80)
+        let probes = [
+            CGPoint(x: 110, y: 100),
+            CGPoint(x: 219, y: 169),
+            CGPoint(x: 160, y: 175),
+            CGPoint(x: 160, y: 165),
+            CGPoint(x: 95, y: 130),
+            CGPoint(x: 150, y: 120),
+            CGPoint(x: 20, y: 20),
+        ]
+
+        for probe in probes {
+            let symmetric = CaptureSelectionGeometry.hitTarget(
+                at: probe,
+                selectionRect: rect,
+                hitSlop: 12
+            )
+            let asymmetric = CaptureSelectionGeometry.hitTarget(
+                at: probe,
+                selectionRect: rect,
+                innerSlop: 12,
+                outerSlop: 12
+            )
+
+            #expect(symmetric == asymmetric)
+        }
+    }
+
     @Test("Fitting an aspect ratio keeps the selection centered")
     func fittingAspectRatioKeepsCenter() {
         let rect = CGRect(x: 100, y: 90, width: 200, height: 80)

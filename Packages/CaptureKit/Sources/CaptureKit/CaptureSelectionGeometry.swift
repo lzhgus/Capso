@@ -341,32 +341,58 @@ public enum CaptureSelectionGeometry {
         selectionRect: CGRect,
         hitSlop: CGFloat
     ) -> CaptureSelectionHitTarget? {
-        let rect = selectionRect.standardized
         let slop = max(1, hitSlop)
+        return hitTarget(
+            at: point,
+            selectionRect: selectionRect,
+            innerSlop: slop,
+            outerSlop: slop
+        )
+    }
 
-        if isNear(point, CGPoint(x: rect.minX, y: rect.maxY), slop: slop) {
+    /// Asymmetric hit test: `innerSlop` bounds how far the resize hot zone
+    /// reaches *inside* the selection, `outerSlop` how far it reaches outside
+    /// the border. Keeping the inner slop thin lets drags that start near—but
+    /// inside—the edge begin an annotation instead of a resize, while points
+    /// exactly on the border (or outside it) still resize.
+    public static func hitTarget(
+        at point: CGPoint,
+        selectionRect: CGRect,
+        innerSlop: CGFloat,
+        outerSlop: CGFloat
+    ) -> CaptureSelectionHitTarget? {
+        let rect = selectionRect.standardized
+        let inner = max(0, innerSlop)
+        let outer = max(0, outerSlop)
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+
+        if isNearCorner(point, corner: CGPoint(x: rect.minX, y: rect.maxY), toward: center, innerSlop: inner, outerSlop: outer) {
             return .resize(.topLeft)
         }
-        if isNear(point, CGPoint(x: rect.maxX, y: rect.maxY), slop: slop) {
+        if isNearCorner(point, corner: CGPoint(x: rect.maxX, y: rect.maxY), toward: center, innerSlop: inner, outerSlop: outer) {
             return .resize(.topRight)
         }
-        if isNear(point, CGPoint(x: rect.maxX, y: rect.minY), slop: slop) {
+        if isNearCorner(point, corner: CGPoint(x: rect.maxX, y: rect.minY), toward: center, innerSlop: inner, outerSlop: outer) {
             return .resize(.bottomRight)
         }
-        if isNear(point, CGPoint(x: rect.minX, y: rect.minY), slop: slop) {
+        if isNearCorner(point, corner: CGPoint(x: rect.minX, y: rect.minY), toward: center, innerSlop: inner, outerSlop: outer) {
             return .resize(.bottomLeft)
         }
-        if abs(point.y - rect.maxY) <= slop, point.x >= rect.minX, point.x <= rect.maxX {
-            return .resize(.top)
+        if point.x >= rect.minX, point.x <= rect.maxX {
+            if isNearEdge(inwardDistance: rect.maxY - point.y, innerSlop: inner, outerSlop: outer) {
+                return .resize(.top)
+            }
+            if isNearEdge(inwardDistance: point.y - rect.minY, innerSlop: inner, outerSlop: outer) {
+                return .resize(.bottom)
+            }
         }
-        if abs(point.x - rect.maxX) <= slop, point.y >= rect.minY, point.y <= rect.maxY {
-            return .resize(.right)
-        }
-        if abs(point.y - rect.minY) <= slop, point.x >= rect.minX, point.x <= rect.maxX {
-            return .resize(.bottom)
-        }
-        if abs(point.x - rect.minX) <= slop, point.y >= rect.minY, point.y <= rect.maxY {
-            return .resize(.left)
+        if point.y >= rect.minY, point.y <= rect.maxY {
+            if isNearEdge(inwardDistance: rect.maxX - point.x, innerSlop: inner, outerSlop: outer) {
+                return .resize(.right)
+            }
+            if isNearEdge(inwardDistance: point.x - rect.minX, innerSlop: inner, outerSlop: outer) {
+                return .resize(.left)
+            }
         }
         if rect.contains(point) {
             return .move
@@ -387,8 +413,30 @@ public enum CaptureSelectionGeometry {
         return Swift.min(Swift.max(value, minimum), maximum)
     }
 
-    private static func isNear(_ point: CGPoint, _ target: CGPoint, slop: CGFloat) -> Bool {
-        abs(point.x - target.x) <= slop && abs(point.y - target.y) <= slop
+    private static func isNearCorner(
+        _ point: CGPoint,
+        corner: CGPoint,
+        toward center: CGPoint,
+        innerSlop: CGFloat,
+        outerSlop: CGFloat
+    ) -> Bool {
+        let xIsInside = center.x >= corner.x ? point.x >= corner.x : point.x <= corner.x
+        let yIsInside = center.y >= corner.y ? point.y >= corner.y : point.y <= corner.y
+        let xSlop = xIsInside ? innerSlop : outerSlop
+        let ySlop = yIsInside ? innerSlop : outerSlop
+        return abs(point.x - corner.x) <= xSlop && abs(point.y - corner.y) <= ySlop
+    }
+
+    /// `inwardDistance` is the point's signed distance from the edge, positive
+    /// toward the inside of the selection.
+    private static func isNearEdge(
+        inwardDistance: CGFloat,
+        innerSlop: CGFloat,
+        outerSlop: CGFloat
+    ) -> Bool {
+        inwardDistance >= 0
+            ? inwardDistance <= innerSlop
+            : -inwardDistance <= outerSlop
     }
 
     private static func direction(
