@@ -1184,9 +1184,11 @@ final class AllInOneSelectionOverlayView: NSView {
     private let hitSlop: CGFloat = 26
     /// Resize hot-zone reach while annotating (`passesThroughSelectionBody`).
     /// The inner reach stays thin so a drag starting near—but inside—the edge
-    /// begins an annotation instead of a resize; the outer reach stays generous
-    /// because nothing outside the selection competes for those points.
-    private let annotationInnerHitSlop: CGFloat = 3
+    /// begins an annotation instead of a resize; it still covers the 3.5pt
+    /// inner radius of the drawn handle dots so clicking a visible handle
+    /// always resizes. The outer reach stays generous because nothing outside
+    /// the selection competes for those points.
+    private let annotationInnerHitSlop: CGFloat = 4
     private let annotationOuterHitSlop: CGFloat = 12
     private var dragOperation: DragOperation = .none
     private var trackingArea: NSTrackingArea?
@@ -1536,6 +1538,12 @@ final class AllInOneSelectionOverlayView: NSView {
 
     func wantsMouseEvents(at point: CGPoint) -> Bool {
         guard passesThroughSelectionBody else { return true }
+        // Keep capturing for the whole gesture once a drag starts: the window's
+        // ignoresMouseEvents is re-evaluated on every event, so without this a
+        // pointer that strays from the edge mid-resize (min-size clamping,
+        // aspect ratio, fast movement) would flip the window to click-through
+        // and the drag would lose its mouseUp.
+        if case .none = dragOperation {} else { return true }
 
         switch hitTarget(at: point) {
         case .resize:

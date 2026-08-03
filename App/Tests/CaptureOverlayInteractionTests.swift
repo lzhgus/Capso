@@ -302,8 +302,28 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         XCTAssertFalse(view.wantsMouseEvents(at: CGPoint(x: 350, y: 260)))
         // …while pressing right on the border still resizes…
         XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 350, y: 358)))
+        // …including the inner half of the drawn handle dot (radius 3.5pt)…
+        XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 350, y: 356.5)))
         // …and the outside reach stays generous.
         XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 350, y: 370)))
+    }
+
+    func testAllInOneAnnotationModeKeepsCapturingUntilMouseUpDuringResize() throws {
+        let (view, _) = makeAllInOneOverlayView(activePreset: .freeform)
+        view.passesThroughSelectionBody = true
+
+        // Grab the top edge right on the border.
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 350, y: 358)))
+
+        // Mid-drag the pointer may stray far from the edge (min-size clamping,
+        // fast movement); the overlay must keep capturing or it loses mouseUp.
+        XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 350, y: 200)))
+        XCTAssertTrue(view.wantsMouseEvents(at: CGPoint(x: 60, y: 500)))
+
+        view.mouseUp(with: try makeMouseEvent(.leftMouseUp, at: NSPoint(x: 350, y: 330)))
+
+        // After the gesture ends, pass-through behavior is restored.
+        XCTAssertFalse(view.wantsMouseEvents(at: CGPoint(x: 350, y: 260)))
     }
 
     func testAllInOneAnnotationModeDragInsideNearEdgeDoesNotResizeSelection() throws {
