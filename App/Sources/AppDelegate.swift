@@ -23,7 +23,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var shareCoordinator: ShareCoordinator?
     private var preferencesWindow: PreferencesWindow?
     private var automationURLRequestBuffer = AutomationURLRequestBuffer()
-    private var receivedAutomationURLDuringLaunch = false
     private var imageFileOpenBuffer = ImageFileOpenBuffer()
     /// Sparkle update coordinator used by preferences and manual update checks.
     let updateManager = UpdateManager()
@@ -77,15 +76,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         performPendingAutomationURLAction()
         performPendingImageFileOpen()
         historyCoordinator?.runCleanup()
-
-        // Safety net: if the menu bar icon is hidden, the user has no obvious
-        // way to access settings, so surface Preferences on launch.
-        if !settings.showMenuBarIcon {
-            DispatchQueue.main.async { [weak self] in
-                guard let self, !receivedAutomationURLDuringLaunch else { return }
-                showPreferences()
-            }
-        }
 
         NotificationCenter.default.addObserver(
             forName: .openScreenshotSettings,
@@ -219,7 +209,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        receivedAutomationURLDuringLaunch = true
         automationURLRequestBuffer.enqueue(action)
         performPendingAutomationURLAction()
     }
@@ -258,9 +247,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DiagnosticLogger.append(message, category: "AutomationURL")
     }
 
-    /// Called when the user double-clicks the app while it's already running
-    /// (Spotlight, Launchpad, Finder). For an LSUIElement app with the menu
-    /// bar icon hidden, this is the user's only way back into Preferences.
+    /// Called when the user reopens the app while it's already running
+    /// (Spotlight, Launchpad, Finder). Launch — including Launch at Login —
+    /// stays silent. When the menu bar icon is hidden, reopen is the way back
+    /// into Preferences.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !settings.showMenuBarIcon {
             showPreferences()
