@@ -75,11 +75,8 @@ public final class ScrollStitcher: @unchecked Sendable {
         // CGContext origin is bottom-left.
         //
         // Canvas layout:
-        //   top:    merged image (non-overlapping portion)
-        //   bottom: entire new frame (covers overlap zone + new content)
-        //
-        // The overlap region is overwritten by the new frame's data,
-        // which is pixel-perfect for the current scroll position.
+        //   top:    existing merged image
+        //   bottom: newly revealed rows from the current frame
 
         // 1. Draw existing merged image at the top
         ctx.draw(mergedImage, in: CGRect(
@@ -89,35 +86,22 @@ public final class ScrollStitcher: @unchecked Sendable {
             height: totalHeight
         ))
 
-        // 2. Prepare the new frame (exclude sticky header if detected)
-        let drawFrame: CGImage
-        let drawHeight: Int
-
-        if headerHeight > 0 && headerHeight < frameHeight {
-            // Crop header from the new frame
-            let contentHeight = frameHeight - headerHeight
-            if let cropped = newFrame.cropping(to: CGRect(
-                x: 0, y: headerHeight, width: newFrame.width, height: contentHeight
-            )) {
-                drawFrame = cropped
-                drawHeight = contentHeight
-            } else {
-                drawFrame = newFrame
-                drawHeight = frameHeight
-            }
-        } else {
-            drawFrame = newFrame
-            drawHeight = frameHeight
+        // 2. Append only the newly revealed bottom rows. Re-drawing the full
+        //    frame would also re-draw fixed page elements whenever header
+        //    detection misses a dynamic pixel.
+        guard let newContent = newFrame.cropping(to: CGRect(
+            x: 0,
+            y: frameHeight - clampedRows,
+            width: newFrame.width,
+            height: clampedRows
+        )) else {
+            return .alignmentFailed
         }
-
-        // 3. Draw the entire new frame at the bottom of the canvas.
-        //    This naturally overlaps with the merged image in the overlap zone,
-        //    replacing it with the latest pixel data.
-        ctx.draw(drawFrame, in: CGRect(
+        ctx.draw(newContent, in: CGRect(
             x: 0,
             y: 0,
             width: mergedWidth,
-            height: drawHeight
+            height: clampedRows
         ))
 
         if let result = ctx.makeImage() {
