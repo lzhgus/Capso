@@ -2,6 +2,7 @@
 import AppKit
 import SharedKit
 import ShareKit
+import OCRKit
 import KeyboardShortcuts
 import Sparkle
 
@@ -101,6 +102,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Task {
             await permissionManager.checkScreenRecordingPermission()
+        }
+        // Load Vision's OCR models off the critical path so the first
+        // "Capture Text" of a session doesn't stall on one-time model setup.
+        Task.detached(priority: .utility) {
+            await TextRecognizer.prewarm()
         }
     }
 

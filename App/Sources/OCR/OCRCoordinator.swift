@@ -34,7 +34,10 @@ final class OCRCoordinator {
     }
 
     private func beginInstantOCRFlow() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        // Defer one run loop turn so the triggering event (menu click / global
+        // hotkey) fully settles before the overlay becomes key — without the
+        // previous fixed 150 ms wait on every invocation.
+        DispatchQueue.main.async { [weak self] in
             self?.showOverlayForOCR()
         }
     }

@@ -12,4 +12,10 @@ final class OCRKitTests: XCTestCase {
 
         XCTAssertEqual(value, "first")
     }
+
+    /// Prewarm must complete without throwing or crashing, even though it
+    /// recognizes a blank image with no text in it.
+    func testPrewarmCompletes() async {
+        await TextRecognizer.prewarm()
+    }
 }

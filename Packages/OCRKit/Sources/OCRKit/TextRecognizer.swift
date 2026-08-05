@@ -98,6 +98,31 @@ public enum TextRecognizer {
         }
     }
 
+    /// Prewarm Vision's text-recognition models so the first real OCR request
+    /// doesn't pay the one-time model-loading cost. Runs a throwaway request
+    /// (with the same configuration as a real call) on a blank image.
+    /// Safe to call from a background task at app launch; errors are ignored.
+    public static func prewarm() async {
+        guard let image = makeBlankImage() else { return }
+        _ = try? await recognize(image: image, level: .accurate, detectURLs: false)
+    }
+
+    private static func makeBlankImage() -> CGImage? {
+        let size = 64
+        guard let context = CGContext(
+            data: nil,
+            width: size,
+            height: size,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        return context.makeImage()
+    }
+
     /// Convenience: recognize and return joined text string.
     public static func recognizeText(
         image: CGImage,
