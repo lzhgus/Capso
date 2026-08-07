@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import SharedKit
 
 public final class TextObject: AnnotationObject, @unchecked Sendable {
     private static let glyphTraceStrokeWidth: CGFloat = 3.0
@@ -39,7 +40,7 @@ public final class TextObject: AnnotationObject, @unchecked Sendable {
     }
 
     private var fillAttributes: [NSAttributedString.Key: Any] {
-        let font = NSFont(name: fontName, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        let font = NSFont(name: fontName, size: fontSize) ?? NSFont.safeSystemFont(ofSize: fontSize, weight: .medium)
         return [
             .font: font,
             .foregroundColor: style.color.nsColor.withAlphaComponent(style.opacity),

@@ -2,6 +2,7 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import SharedKit
 
 public final class CounterObject: AnnotationObject, @unchecked Sendable {
     public let id = ObjectID()
@@ -94,7 +95,7 @@ public final class CounterObject: AnnotationObject, @unchecked Sendable {
 
         let text = "\(number)" as NSString
         let fontSize: CGFloat = number < 10 ? radius * 1.1 : radius * 0.85
-        let font = NSFont.systemFont(ofSize: fontSize, weight: .bold)
+        let font = NSFont.safeSystemFont(ofSize: fontSize, weight: .bold)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.white,

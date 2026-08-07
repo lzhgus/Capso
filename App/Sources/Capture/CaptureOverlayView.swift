@@ -82,7 +82,7 @@ final class CaptureOverlayView: NSView {
     private let selectionInnerStrokeColor = NSColor.white.withAlphaComponent(0.30)
     private let windowHighlightColor = NSColor.systemBlue.withAlphaComponent(0.3)
     private let windowBorderColor = NSColor.systemBlue
-    private let dimensionFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
+    private let dimensionFont = NSFont.safeMonospacedSystemFont(ofSize: 12, weight: .medium)
     private let dimensionBgColor = NSColor.black.withAlphaComponent(0.7)
     private let dimensionTextColor = NSColor.white
 
@@ -398,8 +398,8 @@ final class CaptureOverlayView: NSView {
         let hintText = "   R to change"
         let fullText = "\(presetName)\(hintText)"
 
-        let presetFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        let hintFont = NSFont.systemFont(ofSize: 12, weight: .regular)
+        let presetFont = NSFont.safeSystemFont(ofSize: 12, weight: .semibold)
+        let hintFont = NSFont.safeSystemFont(ofSize: 12, weight: .regular)
 
         let presetAttrs: [NSAttributedString.Key: Any] = [
             .font: presetFont,
@@ -542,7 +542,7 @@ final class CaptureOverlayView: NSView {
     }
 
     private func drawBottomHintBadge(text: String, in context: CGContext) {
-        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        let font = NSFont.safeSystemFont(ofSize: 13, weight: .medium)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: dimensionTextColor
@@ -571,7 +571,7 @@ final class CaptureOverlayView: NSView {
     }
 
     private func drawWindowLabel(name: String, for rect: CGRect, in context: CGContext) {
-        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        let font = NSFont.safeSystemFont(ofSize: 13, weight: .medium)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: dimensionTextColor
@@ -665,7 +665,7 @@ final class CaptureOverlayView: NSView {
         if let badge = activePreset.badgeText {
             badgeText = badge
             badgeColor = activePreset.isFixedSize ? .systemGreen : .systemBlue
-            let badgeFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
+            let badgeFont = NSFont.safeMonospacedSystemFont(ofSize: 10, weight: .semibold)
             let badgeAttrs: [NSAttributedString.Key: Any] = [.font: badgeFont]
             let badgeSize = (badge as NSString).size(withAttributes: badgeAttrs)
             badgeWidth = badgeSize.width + 8
@@ -689,7 +689,7 @@ final class CaptureOverlayView: NSView {
 
         // Draw preset badge pill
         if let badge = badgeText {
-            let badgeFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
+            let badgeFont = NSFont.safeMonospacedSystemFont(ofSize: 10, weight: .semibold)
             let badgeTextAttrs: [NSAttributedString.Key: Any] = [
                 .font: badgeFont,
                 .foregroundColor: NSColor.white
@@ -748,7 +748,7 @@ final class CaptureOverlayView: NSView {
         let x = Int(point.x)
         let y = Int(bounds.height - point.y) // flip to screen coordinates
         let text = "\(x), \(y)"
-        let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        let font = NSFont.safeMonospacedSystemFont(ofSize: 11, weight: .regular)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.white.withAlphaComponent(0.8)
@@ -1201,7 +1201,7 @@ final class CaptureOverlayView: NSView {
 
     /// Create a non-interactive section header menu item.
     private func makeHeaderItem(_ title: String) -> NSMenuItem {
-        let font = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        let font = NSFont.safeSystemFont(ofSize: 10, weight: .semibold)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.secondaryLabelColor

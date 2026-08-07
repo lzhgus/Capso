@@ -1,5 +1,6 @@
 // App/Sources/AnnotationEditor/AnnotationTextEditor.swift
 import AppKit
+import SharedKit
 
 @MainActor
 protocol AnnotationTextEditorDelegate: AnyObject {
@@ -161,7 +162,7 @@ final class AnnotationTextEditor: NSScrollView {
     private var attributes: [NSAttributedString.Key: Any] {
         let effective = max(1, fontSize * zoomScale)
         let font = NSFont(name: fontName, size: effective)
-            ?? NSFont.systemFont(ofSize: effective, weight: .medium)
+            ?? NSFont.safeSystemFont(ofSize: effective, weight: .medium)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: textColor,
@@ -173,7 +174,7 @@ final class AnnotationTextEditor: NSScrollView {
         guard let glyphStrokeColor, !text.isEmpty else { return }
         let effective = max(1, fontSize * zoomScale)
         let font = NSFont(name: fontName, size: effective)
-            ?? NSFont.systemFont(ofSize: effective, weight: .medium)
+            ?? NSFont.safeSystemFont(ofSize: effective, weight: .medium)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.clear,

@@ -119,7 +119,7 @@ public enum ScreenshotTimestampRenderer {
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
         defer { NSGraphicsContext.restoreGraphicsState() }
 
-        let font = NSFont.monospacedDigitSystemFont(ofSize: CGFloat(options.fontSize), weight: .medium)
+        let font = NSFont.safeMonospacedDigitSystemFont(ofSize: CGFloat(options.fontSize), weight: .medium)
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.65)
         shadow.shadowBlurRadius = max(2, CGFloat(options.fontSize) * 0.16)

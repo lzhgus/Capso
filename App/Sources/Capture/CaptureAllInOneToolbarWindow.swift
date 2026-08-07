@@ -1634,7 +1634,7 @@ final class AllInOneSelectionOverlayView: NSView {
 
     private func drawDimensionHUD(in context: CGContext, selectionRect: CGRect) {
         let text = CaptureSelectionChromeLayout.dimensionText(for: selectionRect.size) as NSString
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        let font = NSFont.safeMonospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.white,

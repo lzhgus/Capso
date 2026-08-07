@@ -1,6 +1,7 @@
 // App/Sources/AnnotationEditor/Crop/CropAreaNSView.swift
 import AppKit
 import AnnotationKit
+import SharedKit
 
 final class CropAreaNSView: NSView {
     var cropRect: CGRect = .zero { didSet { needsDisplay = true } }
@@ -48,7 +49,7 @@ final class CropAreaNSView: NSView {
 
     private func drawDimensionBadge(ctx: CGContext, cropViewRect: CGRect) {
         let text = "\(Int(cropRect.width)) × \(Int(cropRect.height))"
-        let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
+        let font = NSFont.safeMonospacedSystemFont(ofSize: 11, weight: .semibold)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: NSColor.white
