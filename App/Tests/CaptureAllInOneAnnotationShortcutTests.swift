@@ -34,7 +34,7 @@ final class CaptureAllInOneAnnotationShortcutTests: XCTestCase {
         wait(for: [copied], timeout: 1)
     }
 
-    func testCommandCDoesNotCopyTheRenderedImageWhileAnnotationOverlayIsActive() throws {
+    func testCommandCFallsBackToCopyRenderedImageWhenNoAnnotationIsSelected() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let toolbar = CaptureAllInOneToolbarWindow(
             selectionRect: CGRect(x: 100, y: 100, width: 240, height: 160),
@@ -45,8 +45,9 @@ final class CaptureAllInOneAnnotationShortcutTests: XCTestCase {
         )
         defer { toolbar.close() }
 
-        let copied = expectation(description: "Rendered annotation image is not copied")
-        copied.isInverted = true
+        // Frozen All-in-One always has an annotation overlay, but with no
+        // object selected ⌘C should fall back to copy-image-and-close (Issue #237).
+        let copied = expectation(description: "Rendered annotation image copied with ⌘C fallback")
         toolbar.onCopyRendered = { _, _ in copied.fulfill() }
         toolbar.show()
 
@@ -58,7 +59,56 @@ final class CaptureAllInOneAnnotationShortcutTests: XCTestCase {
         )
         NSApp.sendEvent(event)
 
-        wait(for: [copied], timeout: 0.1)
+        wait(for: [copied], timeout: 1)
+    }
+
+    func testCommandCCopiesSelectedAnnotationObjectFromFrozenOverlay() throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
+        defer { overlay.close() }
+        overlay.show(
+            sourceImage: try makeImage(size: CGSize(width: 240, height: 160)),
+            selectionRect: CGRect(x: 100, y: 100, width: 240, height: 160),
+            avoidingFrame: nil
+        )
+
+        let document = try XCTUnwrap(overlay.annotationDocument)
+        let source = RectangleObject(rect: CGRect(x: 20, y: 30, width: 80, height: 50))
+        document.addObject(source)
+
+        let event = try commandEvent(
+            character: "c",
+            keyCode: 8,
+            modifiers: .command,
+            windowNumber: NSApp.keyWindow?.windowNumber ?? 0
+        )
+        // Selected object → consume ⌘C as annotation clipboard (no image fallback).
+        XCTAssertTrue(overlay.performAnnotationClipboardShortcut(with: event))
+
+        let destination = AnnotationDocument(imageSize: CGSize(width: 400, height: 300))
+        XCTAssertTrue(AnnotationClipboard.shared.paste(into: destination, offset: .zero))
+        let pasted = try XCTUnwrap(destination.objects.first as? RectangleObject)
+        XCTAssertEqual(pasted.rect, source.rect)
+    }
+
+    func testCommandCReturnsFalseFromFrozenOverlayWhenNothingIsSelected() throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let overlay = CaptureAllInOneAnnotationOverlay(screen: screen)
+        defer { overlay.close() }
+        overlay.show(
+            sourceImage: try makeImage(size: CGSize(width: 240, height: 160)),
+            selectionRect: CGRect(x: 100, y: 100, width: 240, height: 160),
+            avoidingFrame: nil
+        )
+
+        let event = try commandEvent(
+            character: "c",
+            keyCode: 8,
+            modifiers: .command,
+            windowNumber: NSApp.keyWindow?.windowNumber ?? 0
+        )
+        // No selection → do not consume; toolbar falls back to copy-image-and-close.
+        XCTAssertFalse(overlay.performAnnotationClipboardShortcut(with: event))
     }
 
     func testCommandCStillCopiesASelectionWithoutAnAnnotationOverlay() throws {

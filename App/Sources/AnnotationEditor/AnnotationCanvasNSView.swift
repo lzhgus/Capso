@@ -1242,6 +1242,13 @@ final class AnnotationCanvasNSView: NSView {
         }
     }
 
+    /// Handles annotation-object clipboard shortcuts (⌘C / ⌘V / ⌘D).
+    ///
+    /// - Returns: `true` when the event was consumed as an annotation action.
+    ///   For ⌘C, returns `true` only when a selected object was actually copied
+    ///   so callers can fall back to copy-image-and-close when nothing is selected.
+    ///   ⌘V / ⌘D always consume the chord while the canvas is active (even if
+    ///   the pasteboard/selection is empty), matching standard editor behavior.
     func performAnnotationClipboardShortcut(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
         guard modifiers == .command, textEditor == nil, let document else { return false }
@@ -1251,9 +1258,8 @@ final class AnnotationCanvasNSView: NSView {
         let changed: Bool
 
         switch event.keyCode {
-        case 8: // C
-            _ = annotationClipboard.copySelection(from: document)
-            return true
+        case 8: // C — only consume when a selection was copied; otherwise let callers fall back
+            return annotationClipboard.copySelection(from: document)
         case 9: // V
             changed = annotationClipboard.paste(into: document, offset: offset)
         case 2: // D

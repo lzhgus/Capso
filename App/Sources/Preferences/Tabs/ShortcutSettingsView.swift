@@ -32,20 +32,23 @@ struct ShortcutSettingsView: View {
         let id: String
         let scope: LocalizedStringKey
         let action: LocalizedStringKey
-        let shortcut: String
+        /// One or more keycaps to render for this action. `.copy` in
+        /// All-in-One lists all three bindings (⌘C, Return, ⌘⇧C) so users
+        /// discover Return and ⌘⇧C alongside ⌘C — see issue #237.
+        let shortcuts: [String]
     }
 
     private let contextualShortcuts: [ContextualShortcut] = [
-        ContextualShortcut(id: "all-in-one-copy", scope: "All-in-One", action: "Copy selected area", shortcut: "⌘C"),
-        ContextualShortcut(id: "all-in-one-save", scope: "All-in-One", action: "Save selected area", shortcut: "⌘S"),
-        ContextualShortcut(id: "all-in-one-pin", scope: "All-in-One", action: "Pin selected area", shortcut: "⌘P"),
-        ContextualShortcut(id: "all-in-one-cancel", scope: "All-in-One", action: "Cancel", shortcut: "Esc"),
-        ContextualShortcut(id: "window-multi-select", scope: "Window Capture", action: "Select multiple windows", shortcut: "⇧ + click"),
-        ContextualShortcut(id: "window-multi-confirm", scope: "Window Capture", action: "Capture selected windows", shortcut: "Release ⇧"),
-        ContextualShortcut(id: "quick-access-copy", scope: "Quick Access", action: "Copy", shortcut: "⌘C"),
-        ContextualShortcut(id: "quick-access-save", scope: "Quick Access", action: "Save", shortcut: "⌘S"),
-        ContextualShortcut(id: "quick-access-annotate", scope: "Quick Access", action: "Annotate", shortcut: "⌘E"),
-        ContextualShortcut(id: "quick-access-pin", scope: "Quick Access", action: "Pin", shortcut: "⌘P")
+        ContextualShortcut(id: "all-in-one-copy", scope: "All-in-One", action: "Copy selected area", shortcuts: ["⌘C", "⏎", "⌘⇧C"]),
+        ContextualShortcut(id: "all-in-one-save", scope: "All-in-One", action: "Save selected area", shortcuts: ["⌘S"]),
+        ContextualShortcut(id: "all-in-one-pin", scope: "All-in-One", action: "Pin selected area", shortcuts: ["⌘P"]),
+        ContextualShortcut(id: "all-in-one-cancel", scope: "All-in-One", action: "Cancel", shortcuts: ["Esc"]),
+        ContextualShortcut(id: "window-multi-select", scope: "Window Capture", action: "Select multiple windows", shortcuts: ["⇧ + click"]),
+        ContextualShortcut(id: "window-multi-confirm", scope: "Window Capture", action: "Capture selected windows", shortcuts: ["Release ⇧"]),
+        ContextualShortcut(id: "quick-access-copy", scope: "Quick Access", action: "Copy", shortcuts: ["⌘C"]),
+        ContextualShortcut(id: "quick-access-save", scope: "Quick Access", action: "Save", shortcuts: ["⌘S"]),
+        ContextualShortcut(id: "quick-access-annotate", scope: "Quick Access", action: "Annotate", shortcuts: ["⌘E"]),
+        ContextualShortcut(id: "quick-access-pin", scope: "Quick Access", action: "Pin", shortcuts: ["⌘P"])
     ]
 
     var body: some View {
@@ -128,7 +131,11 @@ struct ShortcutSettingsView: View {
 
     private func contextualShortcutRow(_ item: ContextualShortcut, showDivider: Bool = false) -> some View {
         SettingRow(label: item.action, sublabel: item.scope, showDivider: showDivider) {
-            ShortcutKeycap(text: item.shortcut)
+            HStack(spacing: 6) {
+                ForEach(Array(item.shortcuts.enumerated()), id: \.offset) { _, shortcut in
+                    ShortcutKeycap(text: shortcut)
+                }
+            }
         }
     }
 }

@@ -34,6 +34,27 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         XCTAssertEqual(destinationDocument.selectedObjectID, duplicate.id)
     }
 
+    func testCommandCReturnsFalseWhenNothingIsSelected() throws {
+        let document = AnnotationDocument(imageSize: CGSize(width: 400, height: 300))
+        let canvas = AnnotationCanvasNSView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        canvas.document = document
+        canvas.annotationClipboard = AnnotationClipboard()
+
+        let event = try commandEvent(character: "c", keyCode: 8)
+        XCTAssertFalse(canvas.performAnnotationClipboardShortcut(with: event))
+    }
+
+    func testCommandCReturnsTrueWhenSelectionIsCopied() throws {
+        let document = AnnotationDocument(imageSize: CGSize(width: 400, height: 300))
+        document.addObject(RectangleObject(rect: CGRect(x: 20, y: 30, width: 80, height: 50)))
+        let canvas = AnnotationCanvasNSView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        canvas.document = document
+        canvas.annotationClipboard = AnnotationClipboard()
+
+        let event = try commandEvent(character: "c", keyCode: 8)
+        XCTAssertTrue(canvas.performAnnotationClipboardShortcut(with: event))
+    }
+
     func testFullEditorDispatchesCommandCToTheCanvasSelection() throws {
         let clipboard = AnnotationClipboard()
         var copiedRenderedImage = false

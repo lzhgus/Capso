@@ -516,13 +516,19 @@ final class CaptureAllInOneToolbarWindow {
 
         guard modifiers == .command else { return event }
 
+        // Prefer annotation-object clipboard when a canvas object is selected.
+        // ⌘C returns false when nothing is selected so we can fall back below.
         if annotationOverlay?.performAnnotationClipboardShortcut(with: event) == true {
             return nil
         }
 
         switch event.charactersIgnoringModifiers?.lowercased() {
         case "c":
-            guard annotationOverlay == nil else { return event }
+            // Fall back to copy-image-and-close when no annotation object is
+            // selected. While editing text, leave ⌘C to the native text field.
+            if annotationOverlay?.isEditingText == true {
+                return event
+            }
             performCopyAction()
             return nil
         case "s":
@@ -1113,8 +1119,21 @@ private struct CaptureAllInOneToolbarView: View {
         }
     }
 
+    /// Shortcut string used inside the hover tooltip. Copy advertises every
+    /// binding that maps to copy-and-close — ⌘C (falls back when no annotation
+    /// object is selected), Return, and ⌘⇧C — so users can discover the
+    /// alternatives without having to guess (issue #237).
+    private func utilityHelpShortcut(for kind: UtilityAction) -> String? {
+        switch kind {
+        case .copy:
+            return "⌘C · ⏎ · ⌘⇧C"
+        case .save, .pin, .cancel, .annotate, .overflow:
+            return utilityShortcut(for: kind)
+        }
+    }
+
     private func utilityHelp(for kind: UtilityAction, fallback: LocalizedStringKey) -> Text {
-        guard let shortcut = utilityShortcut(for: kind) else {
+        guard let shortcut = utilityHelpShortcut(for: kind) else {
             return Text(fallback)
         }
 
