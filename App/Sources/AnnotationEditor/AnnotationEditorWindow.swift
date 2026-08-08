@@ -8,10 +8,16 @@ import SharedKit
 final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
     /// Internal (not private) so tests can assert on document state.
     let document: AnnotationDocument
+    /// Frame computed from image pixels + anchor screen. Re-applied in `show()`
+    /// because AppKit can still nudge `.titled` panels after init.
+    private let preferredFrame: NSRect
     private var alphaValueBeforeDrag: CGFloat?
     private let onCloseCallback: () -> Void
     /// Injectable so tests never present a real modal alert.
     var confirmDiscard: () -> Bool = { false }
+
+    private static let style: NSWindow.StyleMask = [.titled, .closable, .resizable, .miniaturizable]
+    private static let chromeHeight: CGFloat = 110
 
     init(
         image: CGImage,
@@ -36,25 +42,26 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
         // always open the editor on the primary display, even when the capture
         // came from a secondary one.
         let screen = anchorScreen ?? NSScreen.main ?? NSScreen.screens.first!
-        let maxW = screen.visibleFrame.width * 0.8
-        let maxH = screen.visibleFrame.height * 0.8
-        let chromeH: CGFloat = 110
-
-        let scale = min(1.0, min(maxW / imgW, (maxH - chromeH) / imgH))
-        let winW = imgW * scale
-        let winH = imgH * scale + chromeH
-
-        // Center inside the target screen's visibleFrame. `visibleFrame` is
-        // already in absolute desktop coordinates, so this puts the window on
-        // the correct display even when that display isn't the primary one.
-        let x = screen.visibleFrame.midX - winW / 2
-        let y = screen.visibleFrame.midY - winH / 2
-
-        let targetFrame = NSRect(x: x, y: y, width: winW, height: winH)
+        let contentSize = AnnotationEditorWindowGeometry.contentSize(
+            imagePixelSize: CGSize(width: imgW, height: imgH),
+            backingScaleFactor: screen.backingScaleFactor,
+            visibleSize: screen.visibleFrame.size,
+            chromeHeight: Self.chromeHeight
+        )
+        // `contentSize` is the content-area size. Convert to a full window frame
+        // (including titlebar) before centering so the visible chrome is what
+        // ends up mid-screen, not just the content rect.
+        let contentRect = NSRect(origin: .zero, size: contentSize)
+        let frameSize = NSWindow.frameRect(forContentRect: contentRect, styleMask: Self.style).size
+        let targetFrame = AnnotationEditorWindowGeometry.centeredFrame(
+            size: frameSize,
+            in: screen.visibleFrame
+        )
+        self.preferredFrame = targetFrame
 
         super.init(
-            contentRect: targetFrame,
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            contentRect: NSWindow.contentRect(forFrameRect: targetFrame, styleMask: Self.style),
+            styleMask: Self.style,
             backing: .buffered,
             defer: false
         )
@@ -71,10 +78,10 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
         self.acceptsMouseMovedEvents = true
         // AppKit re-applies window restoration + may snap `.titled` panels
         // back to main display on multi-monitor setups, ignoring the
-        // contentRect passed to init. Disable restoration and explicitly
-        // re-apply the target frame so we actually land on the right screen.
+        // contentRect passed to init. Disable restoration and re-apply the
+        // target frame after installing content (hosting views can resize
+        // the window) so we actually land centered on the right screen.
         self.isRestorable = false
-        self.setFrame(targetFrame, display: false)
 
         self.confirmDiscard = { [weak self] in
             AnnotationEditorCloseGuard.presentDiscardAlert(above: self)
@@ -126,6 +133,9 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
         )
 
         self.contentView = NSHostingView(rootView: view)
+        // Hosting the SwiftUI tree can resize the panel; re-assert the
+        // centered frame computed from the capture's pixel size.
+        self.setFrame(targetFrame, display: false)
     }
 
     /// Closes if there's nothing to lose, otherwise confirms with the user
@@ -165,6 +175,10 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
     }
 
     func show() {
+        // Re-apply the centered frame on show. Some AppKit path repositions
+        // titled panels between init and first presentation, which left the
+        // Annotate window off-center (issue #236).
+        setFrame(preferredFrame, display: false)
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
