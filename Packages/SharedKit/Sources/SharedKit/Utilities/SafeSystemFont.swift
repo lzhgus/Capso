@@ -47,6 +47,18 @@ public extension NSFont {
         )
     }
 
+    /// Wraps `menuFont(ofSize:)`. A size of 0 asks for the default menu font
+    /// size, so the fallback chain resolves it to the standard menu size first.
+    static func safeMenuFont(ofSize size: CGFloat) -> NSFont {
+        let effective = size > 0 ? size : NSFont.systemFontSize(for: .regular)
+        return resolve(
+            NSFont.menuFont(ofSize: size),
+            NSFont.systemFont(ofSize: effective),
+            fallbackName: "Helvetica",
+            size: effective
+        )
+    }
+
     private static func resolve(
         _ primary: @autoclosure () -> NSFont?,
         _ secondary: @autoclosure () -> NSFont?,

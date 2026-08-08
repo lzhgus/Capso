@@ -222,12 +222,12 @@ final class MenuBarController: NSObject {
         let duration = "\(settings.selfTimerDurationSeconds)s"
         let attributed = NSMutableAttributedString(
             string: label,
-            attributes: [.font: NSFont.menuFont(ofSize: 0)]
+            attributes: [.font: NSFont.safeMenuFont(ofSize: 0)]
         )
         attributed.append(NSAttributedString(
             string: "   \(duration)",
             attributes: [
-                .font: NSFont.menuFont(ofSize: 0),
+                .font: NSFont.safeMenuFont(ofSize: 0),
                 .foregroundColor: NSColor.tertiaryLabelColor,
             ]
         ))
