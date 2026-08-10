@@ -188,14 +188,14 @@ final class ScrollCaptureOverlay {
         // Try below the selection first
         var controlsY = screenRect.origin.y - controlsHeight - gap
 
-        // If not enough space below (off-screen), show above the selection
-        if controlsY < screen.frame.origin.y {
+        // If not enough space below (off-screen or under the Dock), show above the selection
+        if controlsY < screen.visibleFrame.origin.y {
             controlsY = screenRect.maxY + gap
         }
 
         // If still off-screen (selection fills entire height), show inside at the bottom
-        if controlsY + controlsHeight > screen.frame.maxY {
-            controlsY = screenRect.origin.y + 8
+        if controlsY + controlsHeight > screen.visibleFrame.maxY {
+            controlsY = max(screen.visibleFrame.origin.y, screenRect.origin.y + 8)
         }
 
         let controlsRect = NSRect(
