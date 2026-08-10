@@ -61,7 +61,7 @@ final class QuickAccessWindow: NSPanel {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = false
-        self.collectionBehavior = [.canJoinAllSpaces, .transient]
+        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         self.isMovableByWindowBackground = true
         self.animationBehavior = .utilityWindow
         self.hidesOnDeactivate = false
@@ -137,7 +137,8 @@ final class QuickAccessWindow: NSPanel {
         setFrame(startFrame, display: false)
         alphaValue = 0
 
-        makeKeyAndOrderFront(nil)
+        orderFrontRegardless()
+        makeKey()
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.3
