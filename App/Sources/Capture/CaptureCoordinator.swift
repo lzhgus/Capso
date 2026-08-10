@@ -1176,12 +1176,20 @@ final class CaptureCoordinator {
 
     private func startScrollingCapture(rect: CGRect, screen: NSScreen) {
         let screenFrame = screen.frame
-        // Convert from bottom-left (NSView) to top-left (ScreenCaptureKit) coordinates
-        scrollCaptureRect = CGRect(
-            x: rect.origin.x,
-            y: screenFrame.height - rect.origin.y - rect.height,
-            width: rect.width,
-            height: rect.height
+        let clampedSelection = ScrollCaptureGeometry.clampedScreenLocalSelection(
+            selectionRect: rect,
+            screenFrame: screenFrame,
+            visibleFrame: screen.visibleFrame
+        )
+        guard !clampedSelection.isNull,
+              clampedSelection.width >= 2,
+              clampedSelection.height >= 2 else {
+            return
+        }
+
+        scrollCaptureRect = ScrollCaptureGeometry.topLeftCaptureRect(
+            screenLocalSelection: clampedSelection,
+            screenHeight: screenFrame.height
         )
         scrollCaptureDisplayID = screen.displayID
 
@@ -1201,7 +1209,7 @@ final class CaptureCoordinator {
             self?.cancelScrollingCapture()
         }
 
-        overlay.show(selectionRect: rect, screen: screen)
+        overlay.show(selectionRect: clampedSelection, screen: screen)
     }
 
     /// Called when user clicks Start — begins the capture loop.

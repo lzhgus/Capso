@@ -143,13 +143,21 @@ public final class ScrollCaptureController: @unchecked Sendable {
                     return nil
                 }
 
-                // Exclude all Capso windows (our overlay panels)
-                let myBundleID = Bundle.main.bundleIdentifier ?? ""
-                let myWindows = content.windows.filter {
-                    $0.owningApplication?.bundleIdentifier == myBundleID
+                let excludedBundleIDs: Set<String> = [
+                    Bundle.main.bundleIdentifier ?? "",
+                    "com.apple.dock",
+                    "com.apple.controlcenter",
+                    "com.apple.notificationcenterui",
+                    "com.apple.Spotlight",
+                ]
+                let excludedWindows = content.windows.filter { window in
+                    guard let bundleID = window.owningApplication?.bundleIdentifier else {
+                        return false
+                    }
+                    return excludedBundleIDs.contains(bundleID)
                 }
 
-                let filter = SCContentFilter(display: display, excludingWindows: myWindows)
+                let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
                 let streamConfig = SCStreamConfiguration()
                 streamConfig.captureResolution = .best
                 streamConfig.showsCursor = false

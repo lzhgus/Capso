@@ -2,6 +2,7 @@
 import AppKit
 import SwiftUI
 import CaptureKit
+import SharedKit
 
 /// Persistent overlay shown during scrolling capture.
 /// Shows: selection border, live preview on the left, Cancel/Start/Done at the bottom.
@@ -181,28 +182,9 @@ final class ScrollCaptureOverlay {
     // MARK: - Controls
 
     private func showControls(screenRect: NSRect, screen: NSScreen) {
-        let controlsWidth: CGFloat = 300
-        let controlsHeight: CGFloat = 52
-        let gap: CGFloat = 10
-
-        // Try below the selection first
-        var controlsY = screenRect.origin.y - controlsHeight - gap
-
-        // If not enough space below (off-screen), show above the selection
-        if controlsY < screen.frame.origin.y {
-            controlsY = screenRect.maxY + gap
-        }
-
-        // If still off-screen (selection fills entire height), show inside at the bottom
-        if controlsY + controlsHeight > screen.frame.maxY {
-            controlsY = screenRect.origin.y + 8
-        }
-
-        let controlsRect = NSRect(
-            x: screenRect.midX - controlsWidth / 2,
-            y: controlsY,
-            width: controlsWidth,
-            height: controlsHeight
+        let controlsRect = ScrollCaptureOverlayPlacement.controlsFrame(
+            selectionRect: screenRect,
+            visibleFrame: screen.visibleFrame
         )
 
         let panel = NSPanel(
@@ -232,18 +214,10 @@ final class ScrollCaptureOverlay {
     // MARK: - Preview
 
     private func showPreview(screenRect: NSRect, screen: NSScreen) {
-        let previewWidth: CGFloat = 180
-        let previewHeight: CGFloat = min(screenRect.height, 400)
-        let previewX = screenRect.origin.x - previewWidth - 12
-
-        guard previewX >= screen.frame.origin.x else { return }
-
-        let previewRect = NSRect(
-            x: previewX,
-            y: screenRect.midY - previewHeight / 2,
-            width: previewWidth,
-            height: previewHeight
-        )
+        guard let previewRect = ScrollCaptureOverlayPlacement.previewFrame(
+            selectionRect: screenRect,
+            visibleFrame: screen.visibleFrame
+        ) else { return }
 
         let panel = NSPanel(
             contentRect: previewRect,
