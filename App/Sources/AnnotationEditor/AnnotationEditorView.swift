@@ -12,7 +12,7 @@ struct AnnotationEditorView: View {
     let sourceAppName: String?
     let sourceWindowTitle: String?
     let captureDate: Date
-    let screenshotOutputPreset: ScreenshotOutputPreset
+    let screenshotOutput: ScreenshotOutputOptions
     let screenshotFilenameTemplate: String
     let onSave: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
@@ -32,7 +32,7 @@ struct AnnotationEditorView: View {
         sourceAppName: String?,
         sourceWindowTitle: String?,
         captureDate: Date,
-        screenshotOutputPreset: ScreenshotOutputPreset,
+        screenshotOutput: ScreenshotOutputOptions,
         screenshotFilenameTemplate: String,
         onSave: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
@@ -46,7 +46,7 @@ struct AnnotationEditorView: View {
         self.sourceAppName = sourceAppName
         self.sourceWindowTitle = sourceWindowTitle
         self.captureDate = captureDate
-        self.screenshotOutputPreset = screenshotOutputPreset
+        self.screenshotOutput = screenshotOutput
         self.screenshotFilenameTemplate = screenshotFilenameTemplate
         self.onSave = onSave
         self.onCopy = onCopy
@@ -628,7 +628,7 @@ struct AnnotationEditorView: View {
             let fileURL = try dragFileStore.fileURL(
                 for: cache.renderedImage,
                 id: dragFileID,
-                preset: screenshotOutputPreset,
+                output: screenshotOutput,
                 date: captureDate,
                 sourceAppName: sourceAppName,
                 sourceWindowTitle: sourceWindowTitle,

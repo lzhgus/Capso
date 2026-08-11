@@ -1713,7 +1713,7 @@ final class CaptureCoordinator {
             sourceAppName: result.appName,
             sourceWindowTitle: result.windowName,
             captureDate: result.timestamp,
-            screenshotOutputPreset: settings.screenshotOutputPreset,
+            screenshotOutput: settings.screenshotOutputOptions,
             screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
             onSave: { [weak self] (rendered: CGImage) -> Bool in
                 guard let self else { return false }
@@ -1921,7 +1921,7 @@ final class CaptureCoordinator {
             try temporaryFileStore.fileURL(
                 for: image,
                 id: UUID(),
-                preset: self.settings.screenshotOutputPreset,
+                output: self.settings.screenshotOutputOptions,
                 template: self.settings.screenshotFilenameTemplate
             )
         }
@@ -1948,7 +1948,7 @@ final class CaptureCoordinator {
             return try temporaryFileStore.fileURL(
                 for: result.image,
                 id: entryID,
-                preset: self.settings.screenshotOutputPreset,
+                output: self.settings.screenshotOutputOptions,
                 date: result.timestamp,
                 sourceAppName: result.appName,
                 sourceWindowTitle: result.windowName,
@@ -2010,7 +2010,7 @@ final class CaptureCoordinator {
         let url = FileNaming.generateFileURL(
             in: directory,
             type: .screenshot,
-            format: encoded.format,
+            format: encoded.format.fileFormat,
             date: date,
             sourceAppName: sourceAppName,
             sourceWindowTitle: sourceWindowTitle,
@@ -2025,18 +2025,12 @@ final class CaptureCoordinator {
         }
     }
 
-    private func screenshotData(from image: CGImage) -> (data: Data, format: FileFormat)? {
-        let preset = settings.screenshotOutputPreset
-        let data: Data? = switch preset.fileFormat {
-        case .png:
-            ImageUtilities.pngData(from: image)
-        case .jpeg:
-            ImageUtilities.jpegData(from: image, quality: preset.jpegQuality ?? 0.85)
-        case .mp4, .gif, .mov:
-            nil
-        }
-        guard let data else { return nil }
-        return (data, preset.fileFormat)
+    private func screenshotData(from image: CGImage) -> (data: Data, format: ScreenshotOutputFormat)? {
+        let output = settings.screenshotOutputOptions
+        guard let data = ImageEncoders.default.encode(
+            image, format: output.format, quality: output.quality
+        ) else { return nil }
+        return (data, output.format)
     }
 
     private func saveRenderedImage(
@@ -2076,14 +2070,17 @@ final class CaptureCoordinator {
         coord: ShareCoordinator
     ) async {
         let image = result.image
+        let output = settings.screenshotOutputOptions
 
-        // Encode + write off the main actor so large PNGs don't block the UI.
+        // Encode + write off the main actor so large images don't block the UI.
         logDiagnostic("Cloud Share encode starting size=\(image.width)x\(image.height)")
         let tempURL: URL? = await Task.detached(priority: .userInitiated) { () -> URL? in
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("png")
-            guard let data = ImageUtilities.pngData(from: image) else { return nil }
+                .appendingPathExtension(output.format.fileFormat.rawValue)
+            guard let data = ImageEncoders.default.encode(
+                image, format: output.format, quality: output.quality
+            ) else { return nil }
             do {
                 try data.write(to: url)
                 return url
@@ -2104,7 +2101,7 @@ final class CaptureCoordinator {
 
         do {
             logDiagnostic("Cloud Share upload starting")
-            let url = try await coord.upload(file: tempURL, contentType: "image/png")
+            let url = try await coord.upload(file: tempURL, contentType: output.format.mimeType)
             // ShareCoordinator already copied the URL to clipboard on success.
             logDiagnostic("Cloud Share upload succeeded host=\(url.host ?? "unknown")")
             historyCoordinator?.setCloudURL(id: entryID, url: url.absoluteString)

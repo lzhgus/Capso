@@ -2979,6 +2979,50 @@
         }
       }
     },
+    "HEIC" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC"
+          }
+        }
+      }
+    },
+    "HEIC produces the smallest files; PNG is lossless" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC が最小のファイルサイズになります。PNG は劣化なしです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC가 파일 크기가 가장 작고, PNG는 무손실입니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HEIC 生成的文件最小；PNG 为无损"
+          }
+        }
+      }
+    },
     "JPEG" : {
       "localizations" : {
         "ja" : {
@@ -4030,7 +4074,6 @@
       }
     },
     "Screenshot Format" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

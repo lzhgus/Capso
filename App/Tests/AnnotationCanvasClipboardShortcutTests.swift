@@ -1,5 +1,6 @@
 import AnnotationKit
 import AppKit
+import SharedKit
 import XCTest
 
 @testable import Capso
@@ -60,7 +61,7 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         var copiedRenderedImage = false
         let window = AnnotationEditorWindow(
             image: try makeImage(),
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in copiedRenderedImage = true },
@@ -132,7 +133,7 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         let copied = expectation(description: "Full editor image copied with ⌘C")
         let window = AnnotationEditorWindow(
             image: try makeImage(),
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in copied.fulfill() },
@@ -176,7 +177,7 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         copied.isInverted = true
         let window = AnnotationEditorWindow(
             image: try makeImage(),
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in copied.fulfill() },
@@ -201,7 +202,7 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         let copied = expectation(description: "Full editor image copied with Return")
         let window = AnnotationEditorWindow(
             image: try makeImage(),
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in copied.fulfill() },
@@ -247,7 +248,7 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
 
         let window = AnnotationEditorWindow(
             image: try makeImage(),
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in },

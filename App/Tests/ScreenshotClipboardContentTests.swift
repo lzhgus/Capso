@@ -9,7 +9,7 @@ final class ScreenshotClipboardContentTests: XCTestCase {
     func testFilePathContentCopiesReadableManagedFileWithoutPreview() throws {
         let settings = makeSettings()
         settings.screenshotClipboardContent = .filePath
-        settings.screenshotOutputPreset = .losslessPNG
+        settings.screenshotOutputFormat = .png
         let coordinator = CaptureCoordinator(settings: settings)
         let pasteboard = makePasteboard()
 

@@ -110,6 +110,28 @@ struct ImageFileReaderTests {
         return try #require(context.makeImage())
     }
 
+    /// Overwriting an opened image reuses its own extension, so a readable format Capso
+    /// cannot write would produce bytes that disagree with the file name.
+    @Test("Every readable format can also be written")
+    func everyReadableFormatIsWritable() throws {
+        let image = try makeImage(width: 8, height: 8)
+
+        for type in ImageFileReader.supportedContentTypes {
+            let ext = try #require(type.preferredFilenameExtension)
+            let url = URL(fileURLWithPath: "/tmp/capso-invariant.\(ext)")
+
+            guard let data = ImageFileWriter.data(from: image, matchingFormatOf: url) else {
+                // Absent codec, as on Intel Macs without HEVC.
+                continue
+            }
+            let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+            let written = try #require(CGImageSourceGetType(source) as String?)
+            let writtenType = try #require(UTType(written))
+
+            #expect(writtenType.conforms(to: type), "\(ext) was written as \(written)")
+        }
+    }
+
     private func writeImage(_ cgImage: CGImage, extension ext: String, using type: NSBitmapImageRep.FileType) throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("capso-imagefile-\(UUID().uuidString)")

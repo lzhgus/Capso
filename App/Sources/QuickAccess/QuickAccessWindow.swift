@@ -80,7 +80,7 @@ final class QuickAccessWindow: NSPanel {
             capturedAt: result.timestamp,
             sourceAppName: result.appName,
             sourceWindowTitle: result.windowName,
-            screenshotOutputPreset: settings.screenshotOutputPreset,
+            screenshotOutput: settings.screenshotOutputOptions,
             screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
             targetLanguageDisplay: targetDisplay,
             shareCoordinator: shareCoordinator,

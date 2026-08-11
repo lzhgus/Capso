@@ -2,6 +2,7 @@
 import AppKit
 import AVFoundation
 import ImageIO
+import UniformTypeIdentifiers
 import Observation
 import CaptureKit
 import ExportKit
@@ -156,7 +157,12 @@ final class HistoryCoordinator {
             fileExtension = "gif"
             contentType = "image/gif"
         case .area, .fullscreen, .window:
-            return PreparedUpload(url: sourceURL, contentType: "image/png", temporaryURL: nil)
+            let type = UTType(filenameExtension: sourceURL.pathExtension.lowercased())
+            return PreparedUpload(
+                url: sourceURL,
+                contentType: type?.preferredMIMEType ?? "image/png",
+                temporaryURL: nil
+            )
         }
 
         let quality = settings.exportQuality
@@ -405,7 +411,7 @@ final class HistoryCoordinator {
               let fullURL = fullImageURL(for: entry) else { return }
 
         let id = entry.id
-        let preset = settings.screenshotOutputPreset
+        let output = settings.screenshotOutputOptions
         let date = entry.createdAt
         let sourceAppName = entry.sourceAppName
         let sourceWindowTitle = entry.sourceWindowTitle
@@ -418,7 +424,7 @@ final class HistoryCoordinator {
                 return try? store.fileURL(
                     for: image,
                     id: id,
-                    preset: preset,
+                    output: output,
                     date: date,
                     sourceAppName: sourceAppName,
                     sourceWindowTitle: sourceWindowTitle,
@@ -464,7 +470,7 @@ final class HistoryCoordinator {
             let fileURL = try dragFileStore.fileURL(
                 for: image,
                 id: entry.id,
-                preset: settings.screenshotOutputPreset,
+                output: settings.screenshotOutputOptions,
                 date: entry.createdAt,
                 sourceAppName: entry.sourceAppName,
                 sourceWindowTitle: entry.sourceWindowTitle,
@@ -492,7 +498,7 @@ final class HistoryCoordinator {
             sourceAppName: entry.sourceAppName,
             sourceWindowTitle: entry.sourceWindowTitle,
             captureDate: entry.createdAt,
-            screenshotOutputPreset: settings.screenshotOutputPreset,
+            screenshotOutput: settings.screenshotOutputOptions,
             screenshotFilenameTemplate: settings.screenshotFilenameTemplate,
             onSave: { [weak self] rendered in
                 self?.replaceImage(for: entry, with: rendered)
@@ -620,7 +626,7 @@ final class HistoryCoordinator {
             return try temporaryFileStore.fileURL(
                 for: image,
                 id: UUID(),
-                preset: self.settings.screenshotOutputPreset,
+                output: self.settings.screenshotOutputOptions,
                 template: self.settings.screenshotFilenameTemplate
             )
         }
@@ -661,16 +667,10 @@ final class HistoryCoordinator {
         sourceWindowTitle: String?,
         date: Date
     ) {
-        let preset = settings.screenshotOutputPreset
-        let data: Data? = switch preset.fileFormat {
-        case .png:
-            ImageUtilities.pngData(from: image)
-        case .jpeg:
-            ImageUtilities.jpegData(from: image, quality: preset.jpegQuality ?? 0.85)
-        case .mp4, .gif, .mov:
-            nil
-        }
-        guard let data else { return }
+        let output = settings.screenshotOutputOptions
+        guard let data = ImageEncoders.default.encode(
+            image, format: output.format, quality: output.quality
+        ) else { return }
 
         let directory = settings.screenshotMonthlyFolders
             ? FileNaming.monthlyDirectory(in: settings.exportLocation)
@@ -678,7 +678,7 @@ final class HistoryCoordinator {
         let url = FileNaming.generateFileURL(
             in: directory,
             type: .screenshot,
-            format: preset.fileFormat,
+            format: output.format.fileFormat,
             date: date,
             sourceAppName: sourceAppName,
             sourceWindowTitle: sourceWindowTitle,
@@ -799,7 +799,7 @@ final class HistoryCoordinator {
             } else {
                 try await exportVideo(from: sourceURL, to: destinationURL, format: .mp4, exportQuality: exportQuality)
             }
-        case .png, .jpeg, .mov:
+        case .png, .jpeg, .heic, .mov:
             try copyItemReplacingExisting(from: sourceURL, to: destinationURL)
         }
     }

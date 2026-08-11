@@ -17,24 +17,121 @@ struct AppSettingsTests {
         #expect(settings.screenshotFormat == .png)
     }
 
-    @Test("Default screenshot output preset is lossless PNG")
-    func defaultScreenshotOutputPreset() {
-        let suite = "test.screenshotOutputPreset.default"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
-        let settings = AppSettings(defaults: defaults)
+    @Test("Screenshot output defaults to lossless PNG at 85% quality")
+    func defaultScreenshotOutput() {
+        let settings = makeSettings("test.screenshotOutput.default")
 
-        #expect(settings.screenshotOutputPreset == .losslessPNG)
-        #expect(settings.screenshotOutputPreset.fileFormat == .png)
-        #expect(settings.screenshotOutputPreset.jpegQuality == nil)
+        #expect(settings.screenshotOutputFormat == .png)
+        #expect(settings.screenshotOutputQualityPercent == 85)
+        #expect(settings.screenshotOutputOptions == ScreenshotOutputOptions(format: .png, quality: 0.85))
     }
 
-    @Test("Screenshot output presets expose JPEG quality")
-    func screenshotOutputPresetJPEGQuality() {
-        #expect(ScreenshotOutputPreset.standardJPEG.fileFormat == .jpeg)
-        #expect(ScreenshotOutputPreset.standardJPEG.jpegQuality == 0.85)
-        #expect(ScreenshotOutputPreset.compactJPEG.fileFormat == .jpeg)
-        #expect(ScreenshotOutputPreset.compactJPEG.jpegQuality == 0.70)
+    @Test("Screenshot output format and quality persist")
+    func screenshotOutputPersists() {
+        let suite = "test.screenshotOutput.persist"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        first.screenshotOutputFormat = .heic
+        first.screenshotOutputQualityPercent = 60
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.screenshotOutputFormat == .heic)
+        #expect(second.screenshotOutputQualityPercent == 60)
+        #expect(second.screenshotOutputOptions.quality == 0.6)
+    }
+
+    @Test("Screenshot output migrates from the legacy preset", arguments: [
+        (ScreenshotOutputPreset.losslessPNG, ScreenshotOutputFormat.png, 85),
+        (.standardJPEG, .jpeg, 85),
+        (.compactJPEG, .jpeg, 70),
+    ])
+    func screenshotOutputMigratesFromPreset(
+        preset: ScreenshotOutputPreset,
+        format: ScreenshotOutputFormat,
+        percent: Int
+    ) {
+        let suite = "test.screenshotOutput.migrate.\(preset.rawValue)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(preset.rawValue, forKey: "screenshotOutputPreset")
+
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(settings.screenshotOutputFormat == format)
+        #expect(settings.screenshotOutputQualityPercent == percent)
+    }
+
+    @Test("Screenshot output quality clamps to the supported range")
+    func screenshotOutputQualityClamps() {
+        let settings = makeSettings("test.screenshotOutput.clamp")
+
+        settings.screenshotOutputQualityPercent = 0
+        #expect(settings.screenshotOutputQualityPercent == ScreenshotOutputFormat.qualityPercentRange.lowerBound)
+
+        settings.screenshotOutputQualityPercent = 500
+        #expect(settings.screenshotOutputQualityPercent == ScreenshotOutputFormat.qualityPercentRange.upperBound)
+    }
+
+    @Test("Screenshot output format ignores an unrecognized stored value")
+    func screenshotOutputFormatIgnoresUnknownValue() {
+        let suite = "test.screenshotOutput.unknown"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set("webp", forKey: "screenshotOutputFormat")
+
+        #expect(AppSettings(defaults: defaults).screenshotOutputFormat == .png)
+    }
+
+    @Test("Screenshot output format falls back to PNG when the codec is unavailable")
+    func screenshotOutputFormatRejectsUnavailableCodec() {
+        let resolved = AppSettings.resolvedOutputFormat(
+            stored: "heic",
+            legacy: nil,
+            isAvailable: { $0 != .heic }
+        )
+
+        #expect(resolved == .png)
+    }
+
+    @Test("Screenshot output format honours an available stored codec")
+    func screenshotOutputFormatHonoursAvailableCodec() {
+        let resolved = AppSettings.resolvedOutputFormat(
+            stored: "heic",
+            legacy: nil,
+            isAvailable: { _ in true }
+        )
+
+        #expect(resolved == .heic)
+    }
+
+    @Test("Screenshot output format falls back to PNG when a migrated codec is unavailable")
+    func screenshotOutputFormatRejectsUnavailableMigratedCodec() {
+        let resolved = AppSettings.resolvedOutputFormat(
+            stored: nil,
+            legacy: .standardJPEG,
+            isAvailable: { $0 != .jpeg }
+        )
+
+        #expect(resolved == .png)
+    }
+
+    @Test("Setting the screenshot output format keeps the legacy format key in sync")
+    func screenshotOutputFormatWritesLegacyKey() {
+        let settings = makeSettings("test.screenshotOutput.legacyWriteBack")
+
+        settings.screenshotOutputFormat = .heic
+        #expect(settings.screenshotFormat == .jpeg)
+
+        settings.screenshotOutputFormat = .png
+        #expect(settings.screenshotFormat == .png)
+    }
+
+    private func makeSettings(_ suite: String) -> AppSettings {
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return AppSettings(defaults: defaults)
     }
 
     @Test("Screenshot clipboard format defaults to PNG and persists")
@@ -67,16 +164,14 @@ struct AppSettingsTests {
         #expect(second.screenshotClipboardContent == .filePath)
     }
 
-    @Test("Screenshot output preset falls back to legacy JPEG format")
-    func screenshotOutputPresetLegacyFormatFallback() {
-        let suite = "test.screenshotOutputPreset.legacy"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
-        let settings = AppSettings(defaults: defaults)
+    @Test("Screenshot output format falls back to the legacy JPEG format key")
+    func screenshotOutputFormatLegacyFallback() {
+        let settings = makeSettings("test.screenshotOutput.legacyRead")
 
         settings.screenshotFormat = .jpeg
 
-        #expect(settings.screenshotOutputPreset == .standardJPEG)
+        #expect(settings.screenshotOutputFormat == .jpeg)
+        #expect(settings.screenshotOutputQualityPercent == 85)
     }
 
     @Test("Default screenshot filename template matches FileNaming default")
@@ -396,7 +491,16 @@ struct AppSettingsTests {
         #expect(FileFormat(pathExtension: "gif") == .gif)
         #expect(FileFormat(pathExtension: "mp4") == .mp4)
         #expect(FileFormat(pathExtension: "mov") == .mov)
+        #expect(FileFormat(pathExtension: "heic") == .heic)
+        #expect(FileFormat(pathExtension: "HEIC") == .heic)
+        #expect(FileFormat(pathExtension: "heif") == .heic)
         #expect(FileFormat(pathExtension: "webm") == nil)
+        #expect(FileFormat(pathExtension: "webp") == nil)
+    }
+
+    @Test("HEIC maps to the public.heic content type")
+    func heicContentType() {
+        #expect(FileFormat.heic.contentType == .heic)
     }
 
     @Test("Generated file names preserve the requested extension")
@@ -411,6 +515,9 @@ struct AppSettingsTests {
         )
         #expect(
             FileNaming.generateFileName(for: .recording, format: .mov, date: date).hasSuffix(".mov")
+        )
+        #expect(
+            FileNaming.generateFileName(for: .screenshot, format: .heic, date: date).hasSuffix(".heic")
         )
     }
 

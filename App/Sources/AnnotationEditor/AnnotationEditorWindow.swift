@@ -29,7 +29,7 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
         sourceAppName: String? = nil,
         sourceWindowTitle: String? = nil,
         captureDate: Date = Date(),
-        screenshotOutputPreset: ScreenshotOutputPreset,
+        screenshotOutput: ScreenshotOutputOptions,
         screenshotFilenameTemplate: String,
         onSave: @escaping (CGImage) -> Bool,
         onCopy: @escaping (CGImage) -> Void,
@@ -96,7 +96,7 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
             sourceAppName: sourceAppName,
             sourceWindowTitle: sourceWindowTitle,
             captureDate: captureDate,
-            screenshotOutputPreset: screenshotOutputPreset,
+            screenshotOutput: screenshotOutput,
             screenshotFilenameTemplate: screenshotFilenameTemplate,
             onSave: { [weak self] rendered in
                 // `onSave` may cancel (e.g. the user dismisses an "overwrite

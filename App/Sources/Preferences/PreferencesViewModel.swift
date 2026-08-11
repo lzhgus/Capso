@@ -137,14 +137,25 @@ final class PreferencesViewModel {
             }
         }
     }
-    var screenshotOutputPreset: ScreenshotOutputPreset {
+    var screenshotOutputFormat: ScreenshotOutputFormat {
         get {
-            access(keyPath: \.screenshotOutputPreset)
-            return settings.screenshotOutputPreset
+            access(keyPath: \.screenshotOutputFormat)
+            return settings.screenshotOutputFormat
         }
         set {
-            withMutation(keyPath: \.screenshotOutputPreset) {
-                settings.screenshotOutputPreset = newValue
+            withMutation(keyPath: \.screenshotOutputFormat) {
+                settings.screenshotOutputFormat = newValue
+            }
+        }
+    }
+    var screenshotOutputQualityPercent: Int {
+        get {
+            access(keyPath: \.screenshotOutputQualityPercent)
+            return settings.screenshotOutputQualityPercent
+        }
+        set {
+            withMutation(keyPath: \.screenshotOutputQualityPercent) {
+                settings.screenshotOutputQualityPercent = newValue
             }
         }
     }
@@ -570,7 +581,7 @@ final class PreferencesViewModel {
     var screenshotFilenamePreview: String {
         FileNaming.generateFileName(
             for: .screenshot,
-            format: screenshotOutputPreset.fileFormat,
+            format: screenshotOutputFormat.fileFormat,
             date: Self.filenamePreviewDate,
             sourceAppName: "Safari",
             sourceWindowTitle: "Example Window",

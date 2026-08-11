@@ -1,6 +1,8 @@
 // Packages/SharedKit/Tests/SharedKitTests/QuickAccessDragFileStoreTests.swift
 import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 import Testing
 @testable import SharedKit
 
@@ -22,8 +24,8 @@ struct QuickAccessDragFileStoreTests {
         #expect(data.starts(with: [0x89, 0x50, 0x4E, 0x47]))
     }
 
-    @Test("uses screenshot export preset and filename template")
-    func usesExportPresetAndFilenameTemplate() throws {
+    @Test("uses screenshot output options and filename template")
+    func usesOutputOptionsAndFilenameTemplate() throws {
         let directory = temporaryDirectory()
         defer { remove(directory) }
         let store = QuickAccessDragFileStore(directory: directory)
@@ -32,7 +34,7 @@ struct QuickAccessDragFileStoreTests {
         let url = try store.fileURL(
             for: image,
             id: UUID(),
-            preset: .standardJPEG,
+            output: ScreenshotOutputOptions(format: .jpeg, quality: 0.85),
             date: Date(timeIntervalSince1970: 1_800),
             sourceAppName: "Safari",
             sourceWindowTitle: "Example",
@@ -43,6 +45,27 @@ struct QuickAccessDragFileStoreTests {
         #expect(url.lastPathComponent == "Drag Safari Example.jpeg")
         let data = try Data(contentsOf: url)
         #expect(data.starts(with: [0xFF, 0xD8]))
+    }
+
+    @Test("writes HEIC bytes when the output format is HEIC")
+    func writesHEICOutput() throws {
+        guard ScreenshotOutputFormat.heic.isAvailable else { return }
+        let directory = temporaryDirectory()
+        defer { remove(directory) }
+        let store = QuickAccessDragFileStore(directory: directory)
+        let image = try makeImage()
+
+        let url = try store.fileURL(
+            for: image,
+            id: UUID(),
+            output: ScreenshotOutputOptions(format: .heic, quality: 0.85),
+            date: Date(timeIntervalSince1970: 1_800),
+            template: "Drag"
+        )
+
+        #expect(url.lastPathComponent == "Drag.heic")
+        let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
+        #expect(CGImageSourceGetType(source) as String? == UTType.heic.identifier)
     }
 
     @Test("returns the same readable file for repeated access")
@@ -99,29 +122,30 @@ struct QuickAccessDragFileStoreTests {
         #expect(secondURL.lastPathComponent == "Same Name 2.png")
     }
 
-    @Test("prunes stale PNG files while preserving active drag files")
+    @Test("prunes every stale output format while preserving active drag files")
     func prunesStaleFiles() throws {
         let directory = temporaryDirectory()
         defer { remove(directory) }
         let now = Date(timeIntervalSince1970: 2_000)
         let store = QuickAccessDragFileStore(directory: directory, staleFileAge: 60)
         let activeURL = try store.fileURL(for: try makeImage(), id: UUID())
-        let staleURL = directory.appendingPathComponent("stale.png")
-        let staleJPEGURL = directory.appendingPathComponent("stale.jpeg")
+        let staleURLs = ["stale.png", "stale.jpeg", "stale.jpg", "stale.heic"]
+            .map { directory.appendingPathComponent($0) }
         let recentURL = directory.appendingPathComponent("recent.png")
-        try Data([1]).write(to: staleURL)
-        try Data([1]).write(to: staleJPEGURL)
+        for url in staleURLs {
+            try Data([1]).write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-120)], ofItemAtPath: url.path)
+        }
         try Data([2]).write(to: recentURL)
-        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-120)], ofItemAtPath: staleURL.path)
-        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-120)], ofItemAtPath: staleJPEGURL.path)
         try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-10)], ofItemAtPath: recentURL.path)
         try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-120)], ofItemAtPath: activeURL.path)
 
         let removed = try store.pruneStaleFiles(referenceDate: now)
 
-        #expect(removed.map(\.lastPathComponent).sorted() == [staleJPEGURL.lastPathComponent, staleURL.lastPathComponent].sorted())
-        #expect(!FileManager.default.fileExists(atPath: staleURL.path))
-        #expect(!FileManager.default.fileExists(atPath: staleJPEGURL.path))
+        #expect(removed.map(\.lastPathComponent).sorted() == staleURLs.map(\.lastPathComponent).sorted())
+        for url in staleURLs {
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
         #expect(FileManager.default.fileExists(atPath: recentURL.path))
         #expect(FileManager.default.fileExists(atPath: activeURL.path))
     }

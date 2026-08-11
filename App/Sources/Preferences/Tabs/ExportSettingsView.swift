@@ -11,6 +11,11 @@ struct ExportSettingsView: View {
         viewModel.exportLocation.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
+    /// Hides formats this Mac has no encoder for, as on Intel models lacking HEVC.
+    private var availableScreenshotFormats: [ScreenshotOutputFormat] {
+        ScreenshotOutputFormat.allCases.filter(\.isAvailable)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Export")
@@ -27,14 +32,38 @@ struct ExportSettingsView: View {
                         .pickerStyle(.segmented)
                         .frame(width: 220)
                     }
-                    SettingRow(label: "Screenshot Quality", sublabel: "Applies to screenshot files", showDivider: true) {
-                        Picker("", selection: $viewModel.screenshotOutputPreset) {
-                            Text("PNG").tag(ScreenshotOutputPreset.losslessPNG)
-                            Text("JPEG 85%").tag(ScreenshotOutputPreset.standardJPEG)
-                            Text("JPEG 70%").tag(ScreenshotOutputPreset.compactJPEG)
+                    SettingRow(
+                        label: "Screenshot Format",
+                        sublabel: "HEIC produces the smallest files; PNG is lossless",
+                        showDivider: true
+                    ) {
+                        Picker("", selection: $viewModel.screenshotOutputFormat) {
+                            ForEach(availableScreenshotFormats, id: \.self) { format in
+                                switch format {
+                                case .png: Text("PNG").tag(format)
+                                case .jpeg: Text("JPEG").tag(format)
+                                case .heic: Text("HEIC").tag(format)
+                                }
+                            }
                         }
-                        .pickerStyle(.segmented)
-                        .frame(width: 240)
+                        .pickerStyle(.menu)
+                        .frame(width: 120)
+                    }
+                    if viewModel.screenshotOutputFormat.isLossy {
+                        SettingRow(label: "Screenshot Quality", showDivider: true) {
+                            HStack(spacing: 8) {
+                                Text("\(viewModel.screenshotOutputQualityPercent) %")
+                                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                                    .frame(minWidth: 42, alignment: .trailing)
+                                Stepper(
+                                    "",
+                                    value: $viewModel.screenshotOutputQualityPercent,
+                                    in: ScreenshotOutputFormat.qualityPercentRange,
+                                    step: 5
+                                )
+                                .labelsHidden()
+                            }
+                        }
                     }
                 }
             }

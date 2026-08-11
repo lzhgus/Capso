@@ -10,6 +10,7 @@ public enum CaptureType: Sendable {
 public enum FileFormat: String, Sendable {
     case png
     case jpeg
+    case heic
     case mp4
     case gif
     case mov
@@ -20,6 +21,8 @@ public enum FileFormat: String, Sendable {
             self = .png
         case "jpg", "jpeg":
             self = .jpeg
+        case "heic", "heif":
+            self = .heic
         case "mp4":
             self = .mp4
         case "gif":
@@ -37,6 +40,8 @@ public enum FileFormat: String, Sendable {
             return .png
         case .jpeg:
             return .jpeg
+        case .heic:
+            return .heic
         case .mp4:
             return .mpeg4Movie
         case .gif:

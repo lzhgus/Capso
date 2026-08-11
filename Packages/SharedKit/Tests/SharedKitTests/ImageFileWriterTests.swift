@@ -59,6 +59,27 @@ struct ImageFileWriterTests {
         #expect(writtenFormatUTI(data) == UTType.heic.identifier)
     }
 
+    @Test("matches HEIC format for a .heif URL when an encoder is available")
+    func matchesHEICFormatForHEIFURLWhenEncoderAvailable() throws {
+        let image = try makeImage(width: 4, height: 4)
+        let url = URL(fileURLWithPath: "/tmp/photo.heif")
+
+        guard let data = ImageFileWriter.data(from: image, matchingFormatOf: url) else { return }
+
+        #expect(writtenFormatUTI(data) == UTType.heic.identifier)
+    }
+
+    @Test("honours the requested quality for lossy destinations")
+    func honoursQualityForLossyDestinations() throws {
+        let image = try makeImage(width: 128, height: 128)
+        let url = URL(fileURLWithPath: "/tmp/photo.jpg")
+
+        let low = try #require(ImageFileWriter.data(from: image, matchingFormatOf: url, quality: 0.3))
+        let high = try #require(ImageFileWriter.data(from: image, matchingFormatOf: url, quality: 1))
+
+        #expect(low.count < high.count)
+    }
+
     @Test("falls back to PNG for an unrecognized extension")
     func fallsBackToPNGForUnknownExtension() throws {
         let image = try makeImage(width: 4, height: 4)

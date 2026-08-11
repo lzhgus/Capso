@@ -24,7 +24,7 @@ final class AnnotationEditorWindowCloseTests: XCTestCase {
     private func makeWindow(onClose: @escaping () -> Void) throws -> AnnotationEditorWindow {
         AnnotationEditorWindow(
             image: try makeTestImage(),
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in },

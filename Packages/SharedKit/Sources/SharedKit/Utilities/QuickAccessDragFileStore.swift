@@ -36,7 +36,7 @@ public final class QuickAccessDragFileStore {
     public func fileURL(
         for image: CGImage,
         id: UUID,
-        preset: ScreenshotOutputPreset = .losslessPNG,
+        output: ScreenshotOutputOptions = ScreenshotOutputOptions(format: .png, quality: 0.85),
         date: Date = Date(),
         sourceAppName: String? = nil,
         sourceWindowTitle: String? = nil,
@@ -48,14 +48,14 @@ public final class QuickAccessDragFileStore {
             return cachedURL
         }
 
-        guard let data = encodedData(from: image, preset: preset) else {
+        guard let data = encodedData(from: image, output: output) else {
             throw QuickAccessDragFileStoreError.encodingFailed
         }
 
         let preferredURL = FileNaming.generateFileURL(
             in: directory,
             type: .screenshot,
-            format: preset.fileFormat,
+            format: output.format.fileFormat,
             date: date,
             sourceAppName: sourceAppName,
             sourceWindowTitle: sourceWindowTitle,
@@ -109,21 +109,15 @@ public final class QuickAccessDragFileStore {
         try fileManager.removeItem(at: fileURL)
     }
 
-    private static let prunableExtensions: Set<String> = ["png", "jpg", "jpeg"]
+    private static let prunableExtensions: Set<String> = Set(
+        ScreenshotOutputFormat.allCases.map { $0.fileFormat.rawValue }
+    ).union(["jpg"])
 
-    private func encodedData(from image: CGImage, preset: ScreenshotOutputPreset) -> Data? {
+    private func encodedData(from image: CGImage, output: ScreenshotOutputOptions) -> Data? {
         if let encoder {
             return encoder(image)
         }
-
-        switch preset.fileFormat {
-        case .png:
-            return ImageUtilities.pngData(from: image)
-        case .jpeg:
-            return ImageUtilities.jpegData(from: image, quality: preset.jpegQuality ?? 0.85)
-        case .mp4, .gif, .mov:
-            return nil
-        }
+        return ImageEncoders.default.encode(image, format: output.format, quality: output.quality)
     }
 
     private func availableFileURL(for preferredURL: URL) -> URL {

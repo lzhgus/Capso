@@ -164,7 +164,7 @@ final class AnnotationEditorWindowCenteringTests: XCTestCase {
         AnnotationEditorWindow(
             image: try makeImage(width: pixelWidth, height: pixelHeight),
             anchorScreen: screen,
-            screenshotOutputPreset: .losslessPNG,
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
             screenshotFilenameTemplate: "Screenshot",
             onSave: { _ in true },
             onCopy: { _ in },

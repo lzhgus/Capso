@@ -12,7 +12,7 @@ struct QuickAccessView: View {
     let capturedAt: Date
     let sourceAppName: String?
     let sourceWindowTitle: String?
-    let screenshotOutputPreset: ScreenshotOutputPreset
+    let screenshotOutput: ScreenshotOutputOptions
     let screenshotFilenameTemplate: String
     let targetLanguageDisplay: String?  // e.g. "Simplified Chinese"
     let shareCoordinator: ShareCoordinator?
@@ -357,7 +357,7 @@ struct QuickAccessView: View {
             let url = try dragFileStore.fileURL(
                 for: captureImage,
                 id: dragFileID,
-                preset: screenshotOutputPreset,
+                output: screenshotOutput,
                 date: capturedAt,
                 sourceAppName: sourceAppName,
                 sourceWindowTitle: sourceWindowTitle,
@@ -380,7 +380,7 @@ struct QuickAccessView: View {
 
         let image = captureImage
         let id = dragFileID
-        let preset = screenshotOutputPreset
+        let output = screenshotOutput
         let date = capturedAt
         let sourceAppName = sourceAppName
         let sourceWindowTitle = sourceWindowTitle
@@ -393,7 +393,7 @@ struct QuickAccessView: View {
                     let url = try store.fileURL(
                         for: image,
                         id: id,
-                        preset: preset,
+                        output: output,
                         date: date,
                         sourceAppName: sourceAppName,
                         sourceWindowTitle: sourceWindowTitle,
@@ -448,13 +448,16 @@ struct QuickAccessView: View {
         defer { uploadAttemptGate.finish() }
 
         let image = captureImage  // capture into local for the detached closure
+        let output = screenshotOutput
 
-        // Encode + write off main actor — large PNGs block UI for hundreds of ms otherwise
+        // Encode + write off main actor — large images block UI for hundreds of ms otherwise
         let tempURL: URL? = await Task.detached(priority: .userInitiated) { () -> URL? in
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("png")
-            guard let data = ImageUtilities.pngData(from: image) else { return nil }
+                .appendingPathExtension(output.format.fileFormat.rawValue)
+            guard let data = ImageEncoders.default.encode(
+                image, format: output.format, quality: output.quality
+            ) else { return nil }
             do {
                 try data.write(to: url)
                 return url
@@ -471,7 +474,7 @@ struct QuickAccessView: View {
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
         do {
-            let cloudURL = try await coord.upload(file: tempURL, contentType: "image/png")
+            let cloudURL = try await coord.upload(file: tempURL, contentType: output.format.mimeType)
             onUploadSucceeded?(cloudURL.absoluteString)
             visualState = .succeeded
             try? await Task.sleep(for: .seconds(3))
