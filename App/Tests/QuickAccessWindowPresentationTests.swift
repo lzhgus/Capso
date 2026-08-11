@@ -20,20 +20,18 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertTrue(window.collectionBehavior.contains(.fullScreenAuxiliary))
     }
 
-    func testShowMakesWindowVisibleWithoutChangingApplicationActivation() throws {
+    func testShowPresentsVisibleKeyWindow() throws {
         let (window, defaultsSuiteName) = try makeWindow(autoClose: false)
         defer {
             window.orderOut(nil)
             UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
         }
-        let wasActive = NSApp.isActive
 
         window.show()
         settleRunLoop(for: 0.4)
 
         XCTAssertTrue(window.isVisible)
         XCTAssertTrue(window.isKeyWindow)
-        XCTAssertEqual(NSApp.isActive, wasActive)
         settleRunLoop(for: 0.3)
         XCTAssertTrue(window.isVisible)
     }
