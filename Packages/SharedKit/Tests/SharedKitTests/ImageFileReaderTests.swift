@@ -18,7 +18,7 @@ struct ImageFileReaderTests {
 
     @Test("accepts image extensions case-insensitively")
     func isSupportedAcceptsImageExtensionsCaseInsensitively() {
-        for name in ["b.PNG", "b.jpg", "b.jpeg", "b.heic", "b.tif", "b.tiff", "b.gif"] {
+        for name in ["b.PNG", "b.jpg", "b.jpeg", "b.heic", "b.heif", "b.tif", "b.tiff", "b.gif"] {
             let url = URL(fileURLWithPath: "/tmp/\(name)")
             #expect(ImageFileReader.isSupported(url), "expected \(name) to be supported")
         }
@@ -128,7 +128,11 @@ struct ImageFileReaderTests {
             let written = try #require(CGImageSourceGetType(source) as String?)
             let writtenType = try #require(UTType(written))
 
-            #expect(writtenType.conforms(to: type), "\(ext) was written as \(written)")
+            if ext == "heif" {
+                #expect(writtenType == .heic, "\(ext) was written as \(written)")
+            } else {
+                #expect(writtenType.conforms(to: type), "\(ext) was written as \(written)")
+            }
         }
     }
 

@@ -97,7 +97,7 @@ final class HistoryCoordinator {
     /// format (H.264 .mp4 or actual .gif) BEFORE upload. Without this, Chrome
     /// and Firefox often fail to play .mov inline even when the codec is H.264 —
     /// the user gets a blank page when opening the share link. Screenshots
-    /// (.png) upload as-is.
+    /// upload as-is in their stored format.
     func uploadEntry(_ entry: HistoryEntry) async throws -> URL {
         guard let coord = shareCoordinator else {
             throw ShareError.notConfigured

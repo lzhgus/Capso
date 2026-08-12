@@ -3,7 +3,14 @@ import AppKit
 import UniformTypeIdentifiers
 
 public enum ImageFileReader {
-    public static let supportedContentTypes: [UTType] = [.png, .jpeg, .heic, .tiff, .gif]
+    public static let supportedContentTypes: [UTType] = {
+        var types: [UTType] = [.png, .jpeg, .heic]
+        if let heif = UTType(filenameExtension: "heif") {
+            types.append(heif)
+        }
+        types.append(contentsOf: [.tiff, .gif])
+        return types
+    }()
 
     public static func isSupported(_ url: URL) -> Bool {
         guard url.isFileURL,

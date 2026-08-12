@@ -77,7 +77,7 @@ public struct ScreenshotOutputOptions: Equatable, Sendable {
 }
 
 /// Superseded by `ScreenshotOutputFormat` plus a quality percentage; retained to migrate
-/// defaults written by 1.0.1 and earlier.
+/// defaults written by 1.0.1 and earlier and kept in sync for downgrade compatibility.
 public enum ScreenshotOutputPreset: String, CaseIterable, Sendable {
     case losslessPNG
     case standardJPEG
@@ -331,7 +331,12 @@ public final class AppSettings: @unchecked Sendable {
             )
         }
         set {
+            let qualityPercent = screenshotOutputQualityPercent
+            if defaults.object(forKey: "screenshotOutputQualityPercent") == nil {
+                defaults.set(qualityPercent, forKey: "screenshotOutputQualityPercent")
+            }
             defaults.set(newValue.rawValue, forKey: "screenshotOutputFormat")
+            writeLegacyOutputPreset(format: newValue, qualityPercent: qualityPercent)
             screenshotFormat = newValue == .png ? .png : .jpeg
         }
     }
@@ -343,7 +348,14 @@ public final class AppSettings: @unchecked Sendable {
             }
             return Self.clampedQualityPercent(stored)
         }
-        set { defaults.set(Self.clampedQualityPercent(newValue), forKey: "screenshotOutputQualityPercent") }
+        set {
+            let qualityPercent = Self.clampedQualityPercent(newValue)
+            defaults.set(qualityPercent, forKey: "screenshotOutputQualityPercent")
+            writeLegacyOutputPreset(
+                format: screenshotOutputFormat,
+                qualityPercent: qualityPercent
+            )
+        }
     }
 
     public var screenshotOutputOptions: ScreenshotOutputOptions {
@@ -360,7 +372,10 @@ public final class AppSettings: @unchecked Sendable {
         legacy: ScreenshotOutputPreset?,
         isAvailable: (ScreenshotOutputFormat) -> Bool
     ) -> ScreenshotOutputFormat {
-        if let stored, let value = ScreenshotOutputFormat(rawValue: stored), isAvailable(value) {
+        if let stored {
+            guard let value = ScreenshotOutputFormat(rawValue: stored), isAvailable(value) else {
+                return .png
+            }
             return value
         }
         let migrated = legacy?.outputFormat ?? .png
@@ -376,7 +391,34 @@ public final class AppSettings: @unchecked Sendable {
         )
     }
 
-    /// Defaults written by 1.0.1 and earlier, used only until the new keys are written.
+    private static func downgradeOutputPreset(
+        format: ScreenshotOutputFormat,
+        qualityPercent: Int
+    ) -> ScreenshotOutputPreset {
+        guard format != .png else { return .losslessPNG }
+        return qualityPercent < standardJPEGDowngradeQualityThreshold
+            ? .compactJPEG
+            : .standardJPEG
+    }
+
+    /// The midpoint between the two lossy presets supported by 1.0.1 and earlier.
+    private static let standardJPEGDowngradeQualityThreshold = (
+        ScreenshotOutputPreset.compactJPEG.qualityPercent
+            + ScreenshotOutputPreset.standardJPEG.qualityPercent
+            + 1
+    ) / 2
+
+    private func writeLegacyOutputPreset(
+        format: ScreenshotOutputFormat,
+        qualityPercent: Int
+    ) {
+        defaults.set(
+            Self.downgradeOutputPreset(format: format, qualityPercent: qualityPercent).rawValue,
+            forKey: "screenshotOutputPreset"
+        )
+    }
+
+    /// Defaults written by 1.0.1 and earlier, also maintained as a downgrade projection.
     private var legacyOutputPreset: ScreenshotOutputPreset? {
         if let raw = defaults.string(forKey: "screenshotOutputPreset"),
            let preset = ScreenshotOutputPreset(rawValue: raw) {

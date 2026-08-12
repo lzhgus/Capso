@@ -33,11 +33,11 @@ struct AppSettingsTests {
         defaults.removePersistentDomain(forName: suite)
 
         let first = AppSettings(defaults: defaults)
-        first.screenshotOutputFormat = .heic
+        first.screenshotOutputFormat = .jpeg
         first.screenshotOutputQualityPercent = 60
 
         let second = AppSettings(defaults: defaults)
-        #expect(second.screenshotOutputFormat == .heic)
+        #expect(second.screenshotOutputFormat == .jpeg)
         #expect(second.screenshotOutputQualityPercent == 60)
         #expect(second.screenshotOutputOptions.quality == 0.6)
     }
@@ -95,6 +95,17 @@ struct AppSettingsTests {
         #expect(resolved == .png)
     }
 
+    @Test("An unavailable stored format does not revive a legacy preset")
+    func screenshotOutputFormatRejectsUnavailableCodecBeforeLegacyFallback() {
+        let resolved = AppSettings.resolvedOutputFormat(
+            stored: "heic",
+            legacy: .standardJPEG,
+            isAvailable: { $0 != .heic }
+        )
+
+        #expect(resolved == .png)
+    }
+
     @Test("Screenshot output format honours an available stored codec")
     func screenshotOutputFormatHonoursAvailableCodec() {
         let resolved = AppSettings.resolvedOutputFormat(
@@ -126,6 +137,64 @@ struct AppSettingsTests {
 
         settings.screenshotOutputFormat = .png
         #expect(settings.screenshotFormat == .png)
+    }
+
+    @Test("Changing the screenshot output format replaces a stale legacy preset")
+    func screenshotOutputFormatReplacesLegacyPreset() {
+        let suite = "test.screenshotOutput.legacyPresetWriteBack"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(ScreenshotOutputPreset.compactJPEG.rawValue, forKey: "screenshotOutputPreset")
+        let settings = AppSettings(defaults: defaults)
+
+        settings.screenshotOutputFormat = .png
+
+        #expect(defaults.string(forKey: "screenshotOutputPreset") == ScreenshotOutputPreset.losslessPNG.rawValue)
+        #expect(settings.screenshotFormat == .png)
+    }
+
+    @Test("Changing the screenshot output format preserves migrated quality")
+    func screenshotOutputFormatPreservesMigratedQuality() {
+        let suite = "test.screenshotOutput.migratedQualityWriteBack"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(ScreenshotOutputPreset.compactJPEG.rawValue, forKey: "screenshotOutputPreset")
+        let settings = AppSettings(defaults: defaults)
+
+        settings.screenshotOutputFormat = .png
+
+        #expect(settings.screenshotOutputQualityPercent == 70)
+        #expect(defaults.object(forKey: "screenshotOutputQualityPercent") as? Int == 70)
+    }
+
+    @Test("Changing screenshot quality keeps the legacy preset in sync")
+    func screenshotOutputQualityWritesLegacyPreset() {
+        let suite = "test.screenshotOutput.legacyQualityWriteBack"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        settings.screenshotOutputFormat = .jpeg
+
+        settings.screenshotOutputQualityPercent = 70
+        #expect(defaults.string(forKey: "screenshotOutputPreset") == ScreenshotOutputPreset.compactJPEG.rawValue)
+
+        settings.screenshotOutputQualityPercent = 85
+        #expect(defaults.string(forKey: "screenshotOutputPreset") == ScreenshotOutputPreset.standardJPEG.rawValue)
+    }
+
+    @Test("Legacy preset quality projection changes at the midpoint")
+    func screenshotOutputQualityUsesNearestLegacyPreset() {
+        let suite = "test.screenshotOutput.legacyQualityBoundary"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+        settings.screenshotOutputFormat = .jpeg
+
+        settings.screenshotOutputQualityPercent = 77
+        #expect(defaults.string(forKey: "screenshotOutputPreset") == ScreenshotOutputPreset.compactJPEG.rawValue)
+
+        settings.screenshotOutputQualityPercent = 78
+        #expect(defaults.string(forKey: "screenshotOutputPreset") == ScreenshotOutputPreset.standardJPEG.rawValue)
     }
 
     private func makeSettings(_ suite: String) -> AppSettings {
