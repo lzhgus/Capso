@@ -128,6 +128,7 @@ final class CaptureAllInOneToolbarWindow {
             activePreset: activePreset
         )
         overlayView.passesThroughSelectionBody = frozenImage != nil
+        overlayView.squareCenterLockShortcut = AppSettings().squareCenterLockShortcut
         overlayView.onSelectionPreviewChanged = { [weak self] selectionRect in
             self?.updateSelection(selectionRect, phase: .live)
         }
@@ -468,7 +469,7 @@ final class CaptureAllInOneToolbarWindow {
             guard event.keyCode == 53 else { return }
             Task { @MainActor in self?.onCancel?() }
         }
-        localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
             self?.handleKeyboardEvent(event)
         }
         // The toolbar panel can be key while the selection is being dragged, so
@@ -496,6 +497,10 @@ final class CaptureAllInOneToolbarWindow {
     }
 
     private func handleKeyboardEvent(_ event: NSEvent) -> NSEvent? {
+        if selectionOverlayView?.handleCenterLockKeyEvent(event) == true {
+            return nil
+        }
+        guard event.type == .keyDown else { return event }
         if event.keyCode == 53 {
             onCancel?()
             return nil
@@ -1213,6 +1218,10 @@ final class AllInOneSelectionOverlayView: NSView {
     private var trackingArea: NSTrackingArea?
     /// Whether Shift is currently held, locking the drag to a 1:1 square.
     private var squareLock = false
+    /// Whether the configurable extra key (default C) is held.
+    private var centerLockKeyHeld = false
+    /// Extra key that, with Shift, grows a create-drag from the click center.
+    var squareCenterLockShortcut = SquareCenterLockShortcut.default
     /// Last pointer location during a drag, so a live Shift toggle can recompute.
     private var lastDragPoint: CGPoint = .zero
 
@@ -1360,6 +1369,7 @@ final class AllInOneSelectionOverlayView: NSView {
         // previous drag's endpoint.
         lastDragPoint = point
         squareLock = event.modifierFlags.contains(.shift)
+        centerLockKeyHeld = isCenterLockKeyPressed(alongside: event)
 
         if let fixedSize = activePreset.fixedPixelSize {
             if hitTarget(at: point) != nil {
@@ -1417,6 +1427,51 @@ final class AllInOneSelectionOverlayView: NSView {
         updateSelectionForDrag(to: lastDragPoint)
     }
 
+    /// Shared entry for key-down/up from the view and the window's local
+    /// monitor. Returns `true` when the extra key was handled and should not
+    /// propagate (so ⌘⇧C can still copy).
+    @discardableResult
+    func handleCenterLockKeyEvent(_ event: NSEvent) -> Bool {
+        guard event.keyCode == squareCenterLockShortcut.keyCode, !event.isARepeat else {
+            return false
+        }
+
+        if event.type == .keyUp {
+            centerLockKeyHeld = false
+            if case .create = dragOperation {
+                updateSelectionForDrag(to: lastDragPoint)
+            }
+            return event.modifierFlags.contains(.shift) || isCreateDrag
+        }
+
+        if !event.modifierFlags.intersection([.command, .option, .control]).isEmpty {
+            return false
+        }
+
+        let shouldConsume = event.modifierFlags.contains(.shift) || isCreateDrag
+        guard shouldConsume else { return false }
+
+        centerLockKeyHeld = true
+        if case .create = dragOperation {
+            updateSelectionForDrag(to: lastDragPoint)
+        }
+        return true
+    }
+
+    private var isCreateDrag: Bool {
+        if case .create = dragOperation { return true }
+        return false
+    }
+
+    private func isCenterLockKeyPressed(alongside event: NSEvent) -> Bool {
+        event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+            && squareCenterLockShortcut.isHardwareKeyPressed
+    }
+
+    private var isCenterLocked: Bool {
+        squareLock && centerLockKeyHeld
+    }
+
     /// Applies the active drag operation for a pointer location, honoring the
     /// resolved aspect ratio (Shift locks to 1:1, otherwise the preset ratio).
     private func updateSelectionForDrag(to point: CGPoint) {
@@ -1460,7 +1515,8 @@ final class AllInOneSelectionOverlayView: NSView {
                     to: point,
                     in: bounds,
                     minSize: minSelectionSize,
-                    aspectRatio: ratio
+                    aspectRatio: ratio,
+                    centered: isCenterLocked
                 )
             } else {
                 selectionRect = CaptureSelectionGeometry.rect(
@@ -1493,12 +1549,22 @@ final class AllInOneSelectionOverlayView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if handleCenterLockKeyEvent(event) {
+            return
+        }
         guard event.keyCode == 53 else {
             super.keyDown(with: event)
             return
         }
 
         onCancel?()
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if handleCenterLockKeyEvent(event) {
+            return
+        }
+        super.keyUp(with: event)
     }
 
     override func draw(_ dirtyRect: NSRect) {

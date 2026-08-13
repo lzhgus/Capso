@@ -63,12 +63,18 @@ public enum CaptureSelectionGeometry {
         return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
+    /// Creates an aspect-ratio-locked selection from `startPoint` to `currentPoint`.
+    ///
+    /// When `centered` is `false` (the default), `startPoint` stays a corner.
+    /// When `centered` is `true`, `startPoint` is the midpoint and the pointer
+    /// distance is the half-extent.
     public static func rect(
         from startPoint: CGPoint,
         to currentPoint: CGPoint,
         in bounds: CGRect,
         minSize: CGSize,
-        aspectRatio: CGFloat
+        aspectRatio: CGFloat,
+        centered: Bool = false
     ) -> CGRect {
         guard aspectRatio > 0 else {
             return rect(
@@ -81,6 +87,20 @@ public enum CaptureSelectionGeometry {
 
         let start = clamp(startPoint, to: bounds)
         let current = clamp(currentPoint, to: bounds)
+        let targetWidth = abs(current.x - start.x)
+        let targetHeight = abs(current.y - start.y)
+
+        if centered {
+            return centeredAspectRatioRect(
+                centeredAt: start,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                aspectRatio: aspectRatio,
+                in: bounds,
+                minSize: minSize
+            )
+        }
+
         let horizontalDirection = direction(
             from: start.x,
             to: current.x,
@@ -98,8 +118,8 @@ public enum CaptureSelectionGeometry {
             anchoredAt: start,
             horizontalDirection: horizontalDirection,
             verticalDirection: verticalDirection,
-            targetWidth: abs(current.x - start.x),
-            targetHeight: abs(current.y - start.y),
+            targetWidth: targetWidth,
+            targetHeight: targetHeight,
             aspectRatio: aspectRatio,
             in: bounds,
             minSize: minSize
@@ -455,6 +475,42 @@ public enum CaptureSelectionGeometry {
             return 1
         }
         return -1
+    }
+
+    /// Grows an aspect-ratio box from `center` so the pointer distance is the
+    /// half-extent. Clamps the half-extent so the box stays inside `bounds`
+    /// without sliding the center. A zero-length drag stays empty at `center`
+    /// rather than jumping to `minSize`.
+    private static func centeredAspectRatioRect(
+        centeredAt center: CGPoint,
+        targetWidth: CGFloat,
+        targetHeight: CGFloat,
+        aspectRatio: CGFloat,
+        in bounds: CGRect,
+        minSize: CGSize
+    ) -> CGRect {
+        let desiredHalfHeight = max(targetHeight, targetWidth / aspectRatio)
+        guard desiredHalfHeight > 0 else {
+            return CGRect(x: center.x, y: center.y, width: 0, height: 0)
+        }
+
+        let maximumHalfWidth = min(center.x - bounds.minX, bounds.maxX - center.x)
+        let maximumHalfHeight = min(center.y - bounds.minY, bounds.maxY - center.y)
+        let maximumRatioHalfHeight = min(maximumHalfHeight, maximumHalfWidth / aspectRatio)
+        let minimum = aspectRatioMinimumSize(aspectRatio: aspectRatio, minSize: minSize)
+        let halfHeight = constrainedDimension(
+            desiredHalfHeight,
+            minimum: minimum.height / 2,
+            maximum: maximumRatioHalfHeight
+        )
+        let halfWidth = halfHeight * aspectRatio
+
+        return CGRect(
+            x: center.x - halfWidth,
+            y: center.y - halfHeight,
+            width: halfWidth * 2,
+            height: halfHeight * 2
+        )
     }
 
     private static func aspectRatioRect(

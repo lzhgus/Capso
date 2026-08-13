@@ -27,20 +27,56 @@ public enum AnnotationDragConstraint {
     }
 
     /// The drag endpoint to use for `tool` when Shift is held. Returns `end`
-    /// unchanged for tools Shift does not constrain.
+    /// unchanged for tools Shift does not constrain. Equivalent to
+    /// `constrainedDrag(..., centerLock: false).end`.
     public static func constrainedEnd(
         from start: CGPoint,
         to end: CGPoint,
         tool: AnnotationTool
     ) -> CGPoint {
+        constrainedDrag(from: start, to: end, tool: tool, centerLock: false).end
+    }
+
+    /// The start and end of a creation drag after Shift constraints.
+    ///
+    /// When `centerLock` is `true` and the tool honors Shift, `start` is the
+    /// midpoint and `end` is mirrored through it so the live preview and the
+    /// committed object share one pair of points.
+    public static func constrainedDrag(
+        from start: CGPoint,
+        to end: CGPoint,
+        tool: AnnotationTool,
+        centerLock: Bool = false
+    ) -> (start: CGPoint, end: CGPoint) {
+        let constrained: CGPoint
         switch kind(for: tool) {
         case .square:
-            return squaredEnd(from: start, to: end)
+            constrained = squaredEnd(from: start, to: end)
         case .angle:
-            return angleSnappedEnd(from: start, to: end)
+            constrained = angleSnappedEnd(from: start, to: end)
         case .none:
-            return end
+            return (start: start, end: end)
         }
+
+        guard centerLock else {
+            return (start: start, end: constrained)
+        }
+
+        return mirroredDrag(around: start, to: constrained)
+    }
+
+    /// Reflects `end` through `center` so `center` is the segment midpoint.
+    private static func mirroredDrag(
+        around center: CGPoint,
+        to end: CGPoint
+    ) -> (start: CGPoint, end: CGPoint) {
+        (
+            start: CGPoint(
+                x: center.x - (end.x - center.x),
+                y: center.y - (end.y - center.y)
+            ),
+            end: end
+        )
     }
 
     /// Moves `end` so the box anchored at `start` is square, keeping the drag's

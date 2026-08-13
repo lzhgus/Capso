@@ -1,4 +1,5 @@
 import Testing
+import SharedKit
 @testable import AnnotationKit
 
 @Suite("AnnotationToolShortcut")
@@ -51,5 +52,29 @@ struct AnnotationToolShortcutTests {
         #expect(AnnotationToolShortcut.tool(for: "A") == .arrow)
         #expect(AnnotationToolShortcut.tool(for: " ") == nil)
         #expect(AnnotationToolShortcut.tool(for: "save") == nil)
+    }
+
+    @Test("Shift plus the center-lock key does not select a tool")
+    func shiftPlusCenterLockKeyDoesNotSelectTool() {
+        #expect(
+            AnnotationToolShortcut.tool(
+                for: "c",
+                keyCode: 8,
+                shiftHeld: true,
+                centerLockShortcut: .default
+            ) == nil
+        )
+    }
+
+    @Test("C without Shift still selects the counter")
+    func cWithoutShiftSelectsCounter() {
+        #expect(
+            AnnotationToolShortcut.tool(
+                for: "c",
+                keyCode: 8,
+                shiftHeld: false,
+                centerLockShortcut: .default
+            ) == .counter
+        )
     }
 }

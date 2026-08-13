@@ -132,4 +132,69 @@ struct AnnotationDragConstraintTests {
     func angleSnapWithoutMovement() {
         #expect(AnnotationDragConstraint.angleSnappedEnd(from: start, to: start) == start)
     }
+
+    // MARK: - Center lock
+
+    @Test("Center lock on a box tool mirrors opposite corners through the click")
+    func centerLockSquaresAroundClick() {
+        for tool in [AnnotationTool.rectangle, .ellipse, .pixelate] {
+            let drag = AnnotationDragConstraint.constrainedDrag(
+                from: start,
+                to: CGPoint(x: 260, y: 140),
+                tool: tool,
+                centerLock: true
+            )
+
+            #expect(drag.start == CGPoint(x: -60, y: -60))
+            #expect(drag.end == CGPoint(x: 260, y: 260))
+            #expect((drag.start.x + drag.end.x) / 2 == start.x)
+            #expect((drag.start.y + drag.end.y) / 2 == start.y)
+            #expect(abs(drag.end.x - drag.start.x) == abs(drag.end.y - drag.start.y))
+        }
+    }
+
+    @Test("Center lock on a line keeps the click as the midpoint")
+    func centerLockSnapsAngleAroundClick() {
+        let pointer = CGPoint(x: 300, y: 112)
+        let drag = AnnotationDragConstraint.constrainedDrag(
+            from: start,
+            to: pointer,
+            tool: .line,
+            centerLock: true
+        )
+        let halfLength = hypot(pointer.x - start.x, pointer.y - start.y)
+
+        #expect(abs((drag.start.x + drag.end.x) / 2 - start.x) < 0.0001)
+        #expect(abs((drag.start.y + drag.end.y) / 2 - start.y) < 0.0001)
+        #expect(abs(drag.end.y - drag.start.y) < 0.0001)
+        #expect(abs(hypot(drag.end.x - drag.start.x, drag.end.y - drag.start.y) - halfLength * 2) < 0.0001)
+    }
+
+    @Test("Center lock does not constrain freehand, text, counter or select")
+    func centerLockIsNoOpForUnconstrainedTools() {
+        let end = CGPoint(x: 260, y: 140)
+        for tool in [AnnotationTool.select, .text, .freehand, .highlighter, .counter] {
+            let drag = AnnotationDragConstraint.constrainedDrag(
+                from: start,
+                to: end,
+                tool: tool,
+                centerLock: true
+            )
+            #expect(drag.start == start)
+            #expect(drag.end == end)
+        }
+    }
+
+    @Test("Center lock off matches the existing corner-anchored square")
+    func centerLockOffKeepsCornerAnchor() {
+        let drag = AnnotationDragConstraint.constrainedDrag(
+            from: start,
+            to: CGPoint(x: 340, y: 190),
+            tool: .rectangle,
+            centerLock: false
+        )
+
+        #expect(drag.start == start)
+        #expect(drag.end == CGPoint(x: 340, y: 340))
+    }
 }

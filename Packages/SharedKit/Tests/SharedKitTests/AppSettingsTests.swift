@@ -825,4 +825,40 @@ struct AppSettingsTests {
         settings.openedImageSaveBehavior = .copy
         #expect(settings.openedImageSaveBehavior == .copy)
     }
+
+    @Test("Square center-lock shortcut defaults to Shift+C")
+    func squareCenterLockShortcutDefaultsToC() {
+        let settings = makeSettings("test.squareCenterLock.default")
+        #expect(settings.squareCenterLockShortcut == .default)
+        #expect(settings.squareCenterLockShortcut.displayCharacter == "C")
+    }
+
+    @Test("Square center-lock shortcut persists across AppSettings instances")
+    func squareCenterLockShortcutPersists() {
+        let suite = "test.squareCenterLock.persist"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        first.squareCenterLockShortcut = SquareCenterLockShortcut(
+            keyCode: 7,
+            displayCharacter: "X"
+        )
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.squareCenterLockShortcut.keyCode == 7)
+        #expect(second.squareCenterLockShortcut.displayCharacter == "X")
+    }
+
+    @Test("An invalid stored square center-lock shortcut falls back to C")
+    func squareCenterLockShortcutFallsBackWhenInvalid() {
+        let suite = "test.squareCenterLock.invalid"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(53, forKey: "squareCenterLockKeyCode")
+        defaults.set("C", forKey: "squareCenterLockDisplayCharacter")
+
+        let settings = AppSettings(defaults: defaults)
+        #expect(settings.squareCenterLockShortcut == .default)
+    }
 }

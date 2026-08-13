@@ -235,6 +235,67 @@ struct CaptureSelectionGeometryTests {
         #expect(created == CGRect(x: 100, y: 100, width: 130, height: 130))
     }
 
+    @Test("Centered create keeps the click as the square's midpoint")
+    func centeredCreateKeepsClickAsMidpoint() {
+        let created = CaptureSelectionGeometry.rect(
+            from: CGPoint(x: 180, y: 140),
+            to: CGPoint(x: 300, y: 200),
+            in: bounds,
+            minSize: minSize,
+            aspectRatio: 1,
+            centered: true
+        )
+
+        #expect(created == CGRect(x: 60, y: 20, width: 240, height: 240))
+        #expect(created.midX == 180)
+        #expect(created.midY == 140)
+    }
+
+    @Test("Centered create near an edge shrinks without sliding the center")
+    func centeredCreateNearEdgeShrinksWithoutSliding() {
+        let created = CaptureSelectionGeometry.rect(
+            from: CGPoint(x: 10, y: 10),
+            to: CGPoint(x: 50, y: 50),
+            in: bounds,
+            minSize: minSize,
+            aspectRatio: 1,
+            centered: true
+        )
+
+        #expect(created == CGRect(x: 0, y: 0, width: 20, height: 20))
+        #expect(created.midX == 10)
+        #expect(created.midY == 10)
+        #expect(bounds.contains(created))
+    }
+
+    @Test("Centered create with no movement stays empty at the click")
+    func centeredCreateWithoutMovementStaysAtClick() {
+        let created = CaptureSelectionGeometry.rect(
+            from: CGPoint(x: 100, y: 100),
+            to: CGPoint(x: 100, y: 100),
+            in: bounds,
+            minSize: minSize,
+            aspectRatio: 1,
+            centered: true
+        )
+
+        #expect(created == CGRect(x: 100, y: 100, width: 0, height: 0))
+    }
+
+    @Test("Centered false still anchors the aspect-ratio create at the drag start")
+    func centeredFalseKeepsDragStartAnchored() {
+        let created = CaptureSelectionGeometry.rect(
+            from: CGPoint(x: 100, y: 100),
+            to: CGPoint(x: 230, y: 170),
+            in: bounds,
+            minSize: minSize,
+            aspectRatio: 1,
+            centered: false
+        )
+
+        #expect(created == CGRect(x: 100, y: 100, width: 130, height: 130))
+    }
+
     @Test("Fixed size presets stay inside bounds")
     func fixedSizePresetStaysInsideBounds() {
         let fixed = CaptureSelectionGeometry.fixedSize(

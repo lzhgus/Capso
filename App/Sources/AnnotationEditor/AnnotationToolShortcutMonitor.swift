@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import AnnotationKit
+import SharedKit
 
 private struct AnnotationToolShortcutMonitor: NSViewRepresentable {
     @Binding var currentTool: AnnotationTool
@@ -51,7 +52,12 @@ private struct AnnotationToolShortcutMonitor: NSViewRepresentable {
                   !isTextInputActive(in: event.window),
                   allowsToolShortcutModifiers(event.modifierFlags),
                   let key = event.charactersIgnoringModifiers,
-                  let tool = AnnotationToolShortcut.tool(for: key) else {
+                  let tool = AnnotationToolShortcut.tool(
+                    for: key,
+                    keyCode: event.keyCode,
+                    shiftHeld: event.modifierFlags.contains(.shift),
+                    centerLockShortcut: AppSettings().squareCenterLockShortcut
+                  ) else {
                 return event
             }
 

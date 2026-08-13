@@ -251,6 +251,149 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
     }
 
+    func testShiftPlusCDuringDragCentersSelectionOnClick() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
+
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 60, y: 20, width: 240, height: 240))
+    }
+
+    func testReleasingCRestoresCornerAnchoredSquare() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200), modifierFlags: .shift))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 60, y: 20, width: 240, height: 240))
+
+        view.handleCenterLockKeyEvent(try makeKeyEvent(
+            type: .keyUp,
+            keyCode: 8,
+            characters: "c",
+            modifierFlags: .shift
+        ))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
+    }
+
+    func testReleasingShiftRestoresFreeDragWhileCIsHeld() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: []))
+
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 60))
+    }
+
+    func testCWithoutShiftDoesNotCenter() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: []))
+
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 60))
+    }
+
+    func testCommandShiftCDoesNotCenter() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(
+            keyCode: 8,
+            characters: "c",
+            modifierFlags: [.command, .shift]
+        ))
+
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
+    }
+
+    func testCustomCenterLockKeyIsHonored() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+        settings.squareCenterLockShortcut = SquareCenterLockShortcut(keyCode: 7, displayCharacter: "X")
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 200)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 180, y: 140, width: 120, height: 120))
+
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 7, characters: "x", modifierFlags: .shift))
+        XCTAssertEqual(view.selectionRect, CGRect(x: 60, y: 20, width: 240, height: 240))
+    }
+
+    func testCenterLockKeyIsIgnoredInWindowSelectionMode() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let view = makeAreaOverlayView(settings: settings)
+        view.setMode(.windowSelection([]))
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 180, y: 140)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+
+        XCTAssertEqual(view.selectionRect, .zero)
+    }
+
+    func testAllInOneShiftPlusCCreateCentersOnClick() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 50, y: 50)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 90, y: 70)))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 50, y: 50, width: 40, height: 40))
+
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(try XCTUnwrap(previews.last), CGRect(x: 10, y: 10, width: 80, height: 80))
+    }
+
+    func testAllInOneResizeIgnoresCenterLockKey() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 500, y: 360)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 560, y: 420), modifierFlags: .shift))
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        let squared = try XCTUnwrap(previews.last)
+
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(previews.last, squared)
+    }
+
+    func testAllInOneMoveIgnoresCenterLockKey() throws {
+        let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
+
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 350, y: 260)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 370, y: 280)))
+        let moved = try XCTUnwrap(previews.last)
+        XCTAssertEqual(moved.size, CGSize(width: 300, height: 200))
+
+        view.handleFlagsChanged(try makeFlagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(try makeKeyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(previews.last, moved)
+    }
+
     func testAllInOneShiftBeforeFirstDragCreatesSquareAtPressPoint() throws {
         let (view, previews) = makeAllInOneOverlayView(activePreset: .freeform)
 
@@ -454,6 +597,26 @@ final class CaptureOverlayInteractionTests: XCTestCase {
             context: nil,
             characters: "",
             charactersIgnoringModifiers: "",
+            isARepeat: false,
+            keyCode: keyCode
+        ))
+    }
+
+    private func makeKeyEvent(
+        type: NSEvent.EventType = .keyDown,
+        keyCode: UInt16,
+        characters: String,
+        modifierFlags: NSEvent.ModifierFlags
+    ) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.keyEvent(
+            with: type,
+            location: .zero,
+            modifierFlags: modifierFlags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
             isARepeat: false,
             keyCode: keyCode
         ))

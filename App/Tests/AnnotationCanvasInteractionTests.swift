@@ -92,6 +92,87 @@ final class AnnotationCanvasInteractionTests: XCTestCase {
         XCTAssertEqual(rect.width, rect.height, accuracy: 0.001)
     }
 
+    func testShiftPlusCCommitsARectangleCenteredOnClick() throws {
+        let (view, document) = makeCanvas(tool: .rectangle)
+
+        view.mouseDown(with: mouseEvent(.leftMouseDown, at: NSPoint(x: 100, y: 400), modifierFlags: .shift))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 320), modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(keyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        view.mouseUp(with: mouseEvent(.leftMouseUp, at: NSPoint(x: 300, y: 320), modifierFlags: .shift))
+
+        let rect = try XCTUnwrap(document.objects.first as? RectangleObject).rect
+        XCTAssertEqual(rect.origin.x, -100, accuracy: 0.001)
+        XCTAssertEqual(rect.origin.y, 0, accuracy: 0.001)
+        XCTAssertEqual(rect.width, 400, accuracy: 0.001)
+        XCTAssertEqual(rect.height, 400, accuracy: 0.001)
+        XCTAssertEqual(rect.midX, 100, accuracy: 0.001)
+        XCTAssertEqual(rect.midY, 200, accuracy: 0.001)
+    }
+
+    func testShiftPlusCCommitsACircularEllipseCenteredOnClick() throws {
+        let (view, document) = makeCanvas(tool: .ellipse)
+
+        view.mouseDown(with: mouseEvent(.leftMouseDown, at: NSPoint(x: 120, y: 420), modifierFlags: .shift))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: NSPoint(x: 260, y: 380), modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(keyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        view.mouseUp(with: mouseEvent(.leftMouseUp, at: NSPoint(x: 260, y: 380), modifierFlags: .shift))
+
+        let rect = try XCTUnwrap(document.objects.first as? EllipseObject).rect
+        XCTAssertEqual(rect.width, rect.height, accuracy: 0.001)
+        XCTAssertEqual(rect.midX, 120, accuracy: 0.001)
+        XCTAssertEqual(rect.midY, 180, accuracy: 0.001)
+    }
+
+    func testShiftPlusCCommitsALineCenteredOnClick() throws {
+        let (view, document) = makeCanvas(tool: .line)
+
+        view.mouseDown(with: mouseEvent(.leftMouseDown, at: NSPoint(x: 100, y: 300), modifierFlags: .shift))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: NSPoint(x: 280, y: 288), modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(keyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        view.mouseUp(with: mouseEvent(.leftMouseUp, at: NSPoint(x: 280, y: 288), modifierFlags: .shift))
+
+        let line = try XCTUnwrap(document.objects.first as? LineObject)
+        let click = CGPoint(x: 100, y: 300)
+        XCTAssertEqual((line.start.x + line.end.x) / 2, click.x, accuracy: 0.001)
+        XCTAssertEqual((line.start.y + line.end.y) / 2, click.y, accuracy: 0.001)
+        XCTAssertEqual(line.end.y, line.start.y, accuracy: 0.001)
+    }
+
+    func testTogglingCMidDragRecentersThePreviewLive() throws {
+        let (view, _) = makeCanvas(tool: .rectangle)
+
+        view.mouseDown(with: mouseEvent(.leftMouseDown, at: NSPoint(x: 100, y: 400)))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 320)))
+        view.flagsChanged(with: flagsChangedEvent(modifierFlags: .shift))
+
+        let cornerStart = try XCTUnwrap(view.previewDragStart)
+        XCTAssertEqual(cornerStart.x, 100, accuracy: 0.001)
+        XCTAssertEqual(cornerStart.y, 200, accuracy: 0.001)
+
+        view.handleCenterLockKeyEvent(keyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        let centeredStart = try XCTUnwrap(view.previewDragStart)
+        let centeredEnd = try XCTUnwrap(view.previewDragEnd)
+        XCTAssertEqual((centeredStart.x + centeredEnd.x) / 2, 100, accuracy: 0.001)
+        XCTAssertEqual((centeredStart.y + centeredEnd.y) / 2, 200, accuracy: 0.001)
+
+        view.handleCenterLockKeyEvent(keyEvent(type: .keyUp, keyCode: 8, characters: "c", modifierFlags: .shift))
+        let restored = try XCTUnwrap(view.previewDragStart)
+        XCTAssertEqual(restored.x, cornerStart.x, accuracy: 0.001)
+        XCTAssertEqual(restored.y, cornerStart.y, accuracy: 0.001)
+    }
+
+    func testShiftPlusCDoesNotConstrainFreehand() throws {
+        let (view, _) = makeCanvas(tool: .freehand)
+
+        view.mouseDown(with: mouseEvent(.leftMouseDown, at: NSPoint(x: 100, y: 400)))
+        view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 320)))
+        let free = try XCTUnwrap(view.previewDragEnd)
+
+        view.flagsChanged(with: flagsChangedEvent(modifierFlags: .shift))
+        view.handleCenterLockKeyEvent(keyEvent(keyCode: 8, characters: "c", modifierFlags: .shift))
+        XCTAssertEqual(try XCTUnwrap(view.previewDragEnd), free)
+    }
+
     // MARK: - Helpers
 
     private func makeCanvas(tool: AnnotationTool) -> (AnnotationCanvasNSView, AnnotationDocument) {
@@ -152,6 +233,26 @@ final class AnnotationCanvasInteractionTests: XCTestCase {
             charactersIgnoringModifiers: "",
             isARepeat: false,
             keyCode: 56
+        )!
+    }
+
+    private func keyEvent(
+        type: NSEvent.EventType = .keyDown,
+        keyCode: UInt16,
+        characters: String,
+        modifierFlags: NSEvent.ModifierFlags
+    ) -> NSEvent {
+        NSEvent.keyEvent(
+            with: type,
+            location: .zero,
+            modifierFlags: modifierFlags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: keyCode
         )!
     }
 }

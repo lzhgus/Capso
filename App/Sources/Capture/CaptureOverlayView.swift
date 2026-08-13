@@ -48,6 +48,9 @@ final class CaptureOverlayView: NSView {
     private var dragEnd: NSPoint = .zero
     /// Whether Shift is currently held, locking the area drag to a 1:1 square.
     private var squareLock = false
+    /// Whether the configurable extra key (default C) is held. Center lock is
+    /// `squareLock && centerLockKeyHeld`.
+    private var centerLockKeyHeld = false
     /// Last raw (unconstrained) pointer location during an area drag, so a live
     /// Shift toggle can recompute the constrained corner.
     private var lastRawEnd: NSPoint = .zero
@@ -179,6 +182,7 @@ final class CaptureOverlayView: NSView {
         currentMouseLocation = nil
         selectedWindowIDs = []
         isShiftHeld = false
+        centerLockKeyHeld = false
         needsDisplay = true
     }
 
@@ -639,11 +643,25 @@ final class CaptureOverlayView: NSView {
     /// The live selection built from the drag anchors. Internal so interaction
     /// tests can assert mid-drag state.
     var selectionRect: CGRect {
+        if isCenterLocked {
+            return CaptureSelectionGeometry.rect(
+                from: dragStart,
+                to: lastRawEnd,
+                in: bounds,
+                minSize: .zero,
+                aspectRatio: 1,
+                centered: true
+            )
+        }
         let x = min(dragStart.x, dragEnd.x)
         let y = min(dragStart.y, dragEnd.y)
         let w = abs(dragEnd.x - dragStart.x)
         let h = abs(dragEnd.y - dragStart.y)
         return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    private var isCenterLocked: Bool {
+        squareLock && centerLockKeyHeld
     }
 
     private func drawDimensionLabel(for rect: CGRect, in context: CGContext) {
@@ -809,6 +827,7 @@ final class CaptureOverlayView: NSView {
             // endpoint.
             lastRawEnd = loc
             squareLock = event.modifierFlags.contains(.shift)
+            centerLockKeyHeld = isCenterLockKeyPressed(alongside: event)
 
             // Fixed-size: no drag — capture immediately centered on cursor
             if let fixedSize = activePreset.fixedPixelSize {
@@ -915,7 +934,7 @@ final class CaptureOverlayView: NSView {
         squareLock = event.modifierFlags.contains(.shift)
         dragEnd = constrainedDragEnd(rawEnd: rawEnd)
         // Reticle tracks the constrained corner so it stays on the selection edge
-        currentMouseLocation = dragEnd
+        currentMouseLocation = reticlePoint
 
         // Ensure cursor stays hidden during drag (it can reappear on screen edges)
         if !cursorHidden {
@@ -990,6 +1009,9 @@ final class CaptureOverlayView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if handleCenterLockKeyEvent(event) {
+            return
+        }
         if event.keyCode == 53 { // ESC
             if !handleEscapeKey() {
                 cancelOverlay()
@@ -1004,6 +1026,13 @@ final class CaptureOverlayView: NSView {
         }
     }
 
+    override func keyUp(with event: NSEvent) {
+        if handleCenterLockKeyEvent(event) {
+            return
+        }
+        super.keyUp(with: event)
+    }
+
     override func flagsChanged(with event: NSEvent) {
         handleFlagsChanged(event)
         super.flagsChanged(with: event)
@@ -1016,9 +1045,49 @@ final class CaptureOverlayView: NSView {
         let shiftNow = event.modifierFlags.contains(.shift)
         guard shiftNow != squareLock else { return }
         squareLock = shiftNow
+        recomputeConstrainedSelection()
+    }
+
+    /// Shared entry for key-down/up from the view and the window's local
+    /// monitor so center lock toggles live even when this view is not first
+    /// responder. Returns `true` when the extra key was handled and should
+    /// not propagate (for example to ⌘C).
+    @discardableResult
+    func handleCenterLockKeyEvent(_ event: NSEvent) -> Bool {
+        let shortcut = settings.squareCenterLockShortcut
+        guard event.keyCode == shortcut.keyCode, !event.isARepeat else { return false }
+
+        if event.type == .keyUp {
+            centerLockKeyHeld = false
+        } else if event.modifierFlags.intersection([.command, .option, .control]).isEmpty {
+            centerLockKeyHeld = true
+        } else {
+            return false
+        }
+
+        recomputeConstrainedSelection()
+        return true
+    }
+
+    private func isCenterLockKeyPressed(alongside event: NSEvent) -> Bool {
+        event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+            && settings.squareCenterLockShortcut.isHardwareKeyPressed
+    }
+
+    private func recomputeConstrainedSelection() {
+        guard case .area = mode, isDragging else { return }
         dragEnd = constrainedDragEnd(rawEnd: lastRawEnd)
-        currentMouseLocation = dragEnd
+        currentMouseLocation = reticlePoint
         needsDisplay = true
+    }
+
+    private var reticlePoint: NSPoint {
+        guard isCenterLocked else { return dragEnd }
+        let rect = selectionRect
+        return NSPoint(
+            x: lastRawEnd.x >= dragStart.x ? rect.maxX : rect.minX,
+            y: lastRawEnd.y >= dragStart.y ? rect.maxY : rect.minY
+        )
     }
 
     /// Shared entry for both the view's `flagsChanged` and the window's local

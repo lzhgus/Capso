@@ -2,6 +2,7 @@
 import SwiftUI
 import AppKit
 import AnnotationKit
+import SharedKit
 
 struct AnnotationCanvasView: NSViewRepresentable {
     let document: AnnotationDocument
@@ -75,6 +76,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         // of swallowing it in a no-op wrapper.
         view.onMagnify = onMagnify
         view.onScroll = onScroll
+        view.squareCenterLockShortcut = AppSettings().squareCenterLockShortcut
         return view
     }
 
@@ -106,6 +108,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         nsView.onTextEditingEnded = { onTextEditingEnded?() }
         nsView.onMagnify = onMagnify
         nsView.onScroll = onScroll
+        nsView.squareCenterLockShortcut = AppSettings().squareCenterLockShortcut
         if context.coordinator.lastCommitEditingTrigger != commitEditingTrigger {
             context.coordinator.lastCommitEditingTrigger = commitEditingTrigger
             nsView.commitTextEditingIfNeeded()

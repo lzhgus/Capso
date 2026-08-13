@@ -1,6 +1,8 @@
 // App/Sources/Preferences/Tabs/ShortcutSettingsView.swift
 import SwiftUI
+import AppKit
 import KeyboardShortcuts
+import SharedKit
 
 extension KeyboardShortcuts.Name {
     static let captureAllInOne = Self("captureAllInOne")
@@ -28,6 +30,7 @@ extension KeyboardShortcuts.Name {
 }
 
 struct ShortcutSettingsView: View {
+    @Bindable var viewModel: PreferencesViewModel
     private struct ContextualShortcut: Identifiable {
         let id: String
         let scope: LocalizedStringKey
@@ -102,12 +105,30 @@ struct ShortcutSettingsView: View {
 
             SettingGroup(title: "Contextual Shortcuts") {
                 SettingCard {
-                    ForEach(Array(contextualShortcuts.enumerated()), id: \.element.id) { index, item in
-                        contextualShortcutRow(item, showDivider: index > 0)
+                    centerLockRow
+                    ForEach(Array(contextualShortcuts.enumerated()), id: \.element.id) { _, item in
+                        contextualShortcutRow(item, showDivider: true)
                     }
                 }
             }
         }
+    }
+
+    private var centerLockRow: some View {
+        SettingRow(
+            label: "Center 1:1 from click",
+            sublabel: "Selection",
+            showDivider: false
+        ) {
+            HStack(spacing: 6) {
+                ShortcutKeycap(text: "⇧")
+                Text("+")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                SquareCenterLockKeyRecorder(shortcut: $viewModel.squareCenterLockShortcut)
+            }
+        }
+        .help("Hold Shift for 1:1, then this extra key to grow from the click as the center. Shift cannot be changed.")
     }
 
     @ViewBuilder
@@ -135,6 +156,99 @@ struct ShortcutSettingsView: View {
                 ForEach(Array(item.shortcuts.enumerated()), id: \.offset) { _, shortcut in
                     ShortcutKeycap(text: shortcut)
                 }
+            }
+        }
+    }
+}
+
+private struct SquareCenterLockKeyRecorder: View {
+    @Binding var shortcut: SquareCenterLockShortcut
+    @State private var isRecording = false
+
+    var body: some View {
+        Button {
+            isRecording.toggle()
+        } label: {
+            Text(isRecording ? "…" : shortcut.displayCharacter)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(isRecording ? Color.accentColor : Color.secondary)
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+                .background(
+                    Color.primary.opacity(isRecording ? 0.12 : 0.08),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(
+                            isRecording ? Color.accentColor : Color.primary.opacity(0.10),
+                            lineWidth: isRecording ? 1.5 : 0.5
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Extra key for centered 1:1")
+        .accessibilityValue(shortcut.displayCharacter)
+        .help("Click to record a different extra key")
+        .background {
+            if isRecording {
+                CenterLockKeyCapture { event in
+                    if event.keyCode == 53 {
+                        isRecording = false
+                        return
+                    }
+                    if let recorded = SquareCenterLockShortcut(event: event) {
+                        shortcut = recorded
+                        isRecording = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Local key-down monitor used only while the extra-key recorder is listening.
+private struct CenterLockKeyCapture: NSViewRepresentable {
+    var onKeyDown: (NSEvent) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onKeyDown: onKeyDown)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.install()
+        return NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onKeyDown = onKeyDown
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    @MainActor
+    final class Coordinator {
+        var onKeyDown: (NSEvent) -> Void
+        private var monitor: Any?
+
+        init(onKeyDown: @escaping (NSEvent) -> Void) {
+            self.onKeyDown = onKeyDown
+        }
+
+        func install() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.onKeyDown(event)
+                return nil
+            }
+        }
+
+        func uninstall() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
             }
         }
     }

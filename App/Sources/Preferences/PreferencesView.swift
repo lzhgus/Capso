@@ -141,7 +141,7 @@ struct PreferencesView: View {
                 case .ocr:
                     TextAndTranslationSettingsView(viewModel: viewModel)
                 case .shortcuts:
-                    ShortcutSettingsView()
+                    ShortcutSettingsView(viewModel: viewModel)
                 }
             }
             .padding(.horizontal, 28)

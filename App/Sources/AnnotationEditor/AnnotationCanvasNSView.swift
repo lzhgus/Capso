@@ -2,6 +2,7 @@
 import AppKit
 import CoreGraphics
 import AnnotationKit
+import SharedKit
 
 /// Which visible handle is being dragged for resize or path adjustment.
 private enum ResizeHandle {
@@ -151,6 +152,10 @@ final class AnnotationCanvasNSView: NSView {
     /// 1:1 and line tools snap to 45°. Seeded on mouse down so a Shift press
     /// that precedes the drag is honored.
     private var squareLock = false
+    /// Whether the configurable extra key (default C) is held.
+    private var centerLockKeyHeld = false
+    /// Extra key that, with Shift, grows a constrained creation from the click.
+    var squareCenterLockShortcut = SquareCenterLockShortcut.default
     private var isDragging = false
     private var dragObjectID: ObjectID?
     private var activeResizeHandle: ResizeHandle?
@@ -430,10 +435,10 @@ final class AnnotationCanvasNSView: NSView {
                 }
             }
 
-            if let start = dragStart, let current = previewDragEnd,
+            if let drag = previewDrag,
                isDragging, activeResizeHandle == nil,
                currentTool != .select, currentTool != .freehand, currentTool != .text, currentTool != .highlighter {
-                drawPreview(ctx: ctx, from: start, to: current)
+                drawPreview(ctx: ctx, from: drag.start, to: drag.end)
             }
         }
 
@@ -749,21 +754,33 @@ final class AnnotationCanvasNSView: NSView {
         return nil
     }
 
-    /// The drag endpoint after the active tool's Shift constraint. Both the live
-    /// preview and the committed object go through this, so a square preview can
-    /// never commit as a free rectangle.
-    private func constrainedCreationEnd(from start: CGPoint, to end: CGPoint) -> CGPoint {
-        guard squareLock else { return end }
-        return AnnotationDragConstraint.constrainedEnd(from: start, to: end, tool: currentTool)
+    /// The start and end of a creation drag after Shift / center-lock
+    /// constraints. Both the live preview and the committed object go through
+    /// this, so a centered square preview can never commit as a corner square.
+    private func constrainedCreationDrag(
+        from start: CGPoint,
+        to end: CGPoint
+    ) -> (start: CGPoint, end: CGPoint) {
+        guard squareLock else { return (start: start, end: end) }
+        return AnnotationDragConstraint.constrainedDrag(
+            from: start,
+            to: end,
+            tool: currentTool,
+            centerLock: centerLockKeyHeld
+        )
     }
 
     /// The endpoint the in-progress preview is drawn to: the live pointer
     /// position with the active tool's Shift constraint applied. Internal so
     /// interaction tests can assert on what the user sees mid-drag.
-    var previewDragEnd: CGPoint? {
+    var previewDrag: (start: CGPoint, end: CGPoint)? {
         guard let start = dragStart, let current = dragCurrent else { return nil }
-        return constrainedCreationEnd(from: start, to: current)
+        return constrainedCreationDrag(from: start, to: current)
     }
+
+    var previewDragStart: CGPoint? { previewDrag?.start }
+
+    var previewDragEnd: CGPoint? { previewDrag?.end }
 
     private func drawPreview(ctx: CGContext, from start: CGPoint, to end: CGPoint) {
         ctx.saveGState()
@@ -830,6 +847,8 @@ final class AnnotationCanvasNSView: NSView {
         dragStart = point
         dragCurrent = point
         squareLock = event.modifierFlags.contains(.shift)
+        centerLockKeyHeld = event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+            && squareCenterLockShortcut.isHardwareKeyPressed
         isDragging = true
         activeResizeHandle = nil
         resizeOriginalTextFontSize = nil
@@ -1108,14 +1127,16 @@ final class AnnotationCanvasNSView: NSView {
             return
         }
 
-        guard let doc = document, let start = dragStart else {
+        guard let doc = document, let origin = dragStart else {
             isDragging = false; return
         }
         squareLock = event.modifierFlags.contains(.shift)
-        let end = constrainedCreationEnd(
-            from: start,
+        let drag = constrainedCreationDrag(
+            from: origin,
             to: toImagePoint(convert(event.locationInWindow, from: nil))
         )
+        let start = drag.start
+        let end = drag.end
 
         if activeResizeHandle != nil {
             dragObjectID = nil
@@ -1230,6 +1251,9 @@ final class AnnotationCanvasNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if handleCenterLockKeyEvent(event) {
+            return
+        }
         if performAnnotationClipboardShortcut(with: event) {
             return
         }
@@ -1240,6 +1264,35 @@ final class AnnotationCanvasNSView: NSView {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if handleCenterLockKeyEvent(event) {
+            return
+        }
+        super.keyUp(with: event)
+    }
+
+    /// Shared entry for key-down/up so center lock toggles live. Returns `true`
+    /// when the extra key was handled and should not propagate.
+    @discardableResult
+    func handleCenterLockKeyEvent(_ event: NSEvent) -> Bool {
+        guard event.keyCode == squareCenterLockShortcut.keyCode, !event.isARepeat else {
+            return false
+        }
+
+        if event.type == .keyUp {
+            centerLockKeyHeld = false
+        } else if event.modifierFlags.intersection([.command, .option, .control]).isEmpty {
+            centerLockKeyHeld = true
+        } else {
+            return false
+        }
+
+        if isDragging, AnnotationDragConstraint.kind(for: currentTool) != .none {
+            needsDisplay = true
+        }
+        return true
     }
 
     /// Handles annotation-object clipboard shortcuts (⌘C / ⌘V / ⌘D).

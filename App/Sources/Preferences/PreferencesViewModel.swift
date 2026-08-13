@@ -316,6 +316,19 @@ final class PreferencesViewModel {
             }
         }
     }
+
+    var squareCenterLockShortcut: SquareCenterLockShortcut {
+        get {
+            access(keyPath: \.squareCenterLockShortcut)
+            return settings.squareCenterLockShortcut
+        }
+        set {
+            withMutation(keyPath: \.squareCenterLockShortcut) {
+                settings.squareCenterLockShortcut = newValue
+            }
+        }
+    }
+
     var customCapturePresets: [CapturePreset] {
         get {
             access(keyPath: \.customCapturePresets)

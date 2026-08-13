@@ -862,6 +862,21 @@ public final class AppSettings: @unchecked Sendable {
         return builtins + customCapturePresets
     }
 
+    /// Extra key that, with Shift, grows a 1:1 selection from the click center.
+    /// Shift itself is not stored and cannot be changed.
+    public var squareCenterLockShortcut: SquareCenterLockShortcut {
+        get {
+            SquareCenterLockShortcut(
+                storedKeyCode: defaults.object(forKey: "squareCenterLockKeyCode") as? Int,
+                storedDisplayCharacter: defaults.string(forKey: "squareCenterLockDisplayCharacter")
+            )
+        }
+        set {
+            defaults.set(Int(newValue.keyCode), forKey: "squareCenterLockKeyCode")
+            defaults.set(newValue.displayCharacter, forKey: "squareCenterLockDisplayCharacter")
+        }
+    }
+
     // MARK: History
     public var historyEnabled: Bool {
         get { defaults.object(forKey: "historyEnabled") as? Bool ?? true }
