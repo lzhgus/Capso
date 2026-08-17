@@ -71,6 +71,38 @@ struct TranslationProviderRequestTests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     }
 
+    @Test("Keyed providers reject cleartext endpoints")
+    func keyedProviderRequiresHTTPS() {
+        #expect(throws: ProviderTranslationError.badEndpoint) {
+            try ProviderTranslationService.makeRequest(
+                text: "Hello",
+                target: "zh-Hans",
+                provider: .openAICompatible,
+                config: TranslationProviderConfiguration(
+                    apiKey: "secret",
+                    endpoint: "http://example.com/v1/chat/completions",
+                    model: "test-model"
+                )
+            )
+        }
+    }
+
+    @Test("Custom cleartext endpoints are limited to loopback")
+    func customHTTPRequiresLoopback() {
+        #expect(throws: ProviderTranslationError.badEndpoint) {
+            try ProviderTranslationService.makeRequest(
+                text: "Hello",
+                target: "zh-Hans",
+                provider: .custom,
+                config: TranslationProviderConfiguration(
+                    apiKey: "",
+                    endpoint: "http://192.168.1.20:8317/v1/chat/completions",
+                    model: "local-model"
+                )
+            )
+        }
+    }
+
     @Test("DeepSeek uses its official compatible endpoint and disables thinking")
     func deepSeekRequest() throws {
         let request = try ProviderTranslationService.makeRequest(
@@ -169,14 +201,36 @@ struct TranslationProviderRequestTests {
         #expect(result.detectedSource == "en")
     }
 
-    @Test("SSE parser extracts chat deltas and ignores completion markers")
+    @Test("SSE parser distinguishes chat deltas from completion markers")
     func chatStreamEvents() throws {
         let delta = try ProviderTranslationService.parseStreamLine(
             #"data: {"choices":[{"delta":{"content":"你"}}]}"#
         )
         let done = try ProviderTranslationService.parseStreamLine("data: [DONE]")
 
-        #expect(delta == "你")
-        #expect(done == nil)
+        #expect(delta == .delta("你"))
+        #expect(done == .done)
+    }
+
+    @Test("SSE framing rejects an oversized line before a newline arrives")
+    func streamLineLimit() throws {
+        var decoder = SSELineDecoder(maximumLineBytes: 4)
+
+        for byte in Data("data".utf8) {
+            #expect(try decoder.append(byte) == nil)
+        }
+        #expect(throws: ProviderTranslationError.responseTooLarge) {
+            try decoder.append(UInt8(ascii: ":"))
+        }
+    }
+
+    @Test("Streaming output has a total UTF-8 size bound")
+    func streamOutputLimit() throws {
+        var accumulator = TranslationStreamAccumulator(maximumUTF8Bytes: 4)
+
+        #expect(try accumulator.append("ab") == "ab")
+        #expect(throws: ProviderTranslationError.responseTooLarge) {
+            try accumulator.append("你好")
+        }
     }
 }

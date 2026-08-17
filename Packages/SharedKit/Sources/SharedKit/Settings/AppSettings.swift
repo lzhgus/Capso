@@ -165,88 +165,113 @@ public enum TranslationProviderKind: String, CaseIterable, Sendable {
     case custom
 
     public var displayName: String {
-        switch self {
-        case .apple: return "Apple Translation"
-        case .openAICompatible: return "OpenAI"
-        case .deepSeek: return "DeepSeek"
-        case .openRouter: return "OpenRouter"
-        case .deepL: return "DeepL"
-        case .googleCloud: return "Google Cloud"
-        case .custom: return "Custom"
-        }
+        descriptor.displayName
     }
 
     public var defaultEndpoint: String {
-        switch self {
-        case .apple:
-            return ""
-        case .openAICompatible:
-            return "https://api.openai.com/v1/chat/completions"
-        case .deepSeek:
-            return "https://api.deepseek.com/chat/completions"
-        case .openRouter:
-            return "https://openrouter.ai/api/v1/chat/completions"
-        case .deepL:
-            return ""
-        case .googleCloud:
-            return "https://translation.googleapis.com/language/translate/v2"
-        case .custom:
-            return ""
-        }
+        descriptor.defaultEndpoint
     }
 
     public var defaultModel: String {
-        switch self {
-        case .apple, .deepL, .googleCloud:
-            return ""
-        case .openAICompatible:
-            return "gpt-4o-mini"
-        case .deepSeek:
-            return "deepseek-v4-flash"
-        case .openRouter:
-            return "openrouter/auto"
-        case .custom:
-            return ""
-        }
+        descriptor.defaultModel
     }
 
     public var requiresAPIKey: Bool {
-        self != .apple
+        descriptor.showsAPIKey
     }
 
     public var supportsModel: Bool {
-        switch self {
-        case .apple, .deepL, .googleCloud: return false
-        case .openAICompatible, .deepSeek, .openRouter, .custom: return true
-        }
+        descriptor.supportsModel
     }
 
     public var supportsEndpoint: Bool {
-        switch self {
-        case .apple: return false
-        case .openAICompatible, .deepSeek, .openRouter, .deepL, .googleCloud, .custom: return true
-        }
+        descriptor.supportsEndpoint
     }
 
     public var supportsStreaming: Bool {
-        switch self {
-        case .openAICompatible, .deepSeek, .openRouter, .custom: return true
-        case .apple, .deepL, .googleCloud: return false
-        }
+        descriptor.supportsStreaming
     }
 
     public var connectionSummary: String {
+        descriptor.connectionSummary
+    }
+
+    private var descriptor: TranslationProviderDescriptor {
         switch self {
         case .apple:
-            return "On-device · High-fidelity when available"
-        case .deepL, .googleCloud:
-            return "Cloud API · Complete response"
+            return TranslationProviderDescriptor(
+                displayName: "Apple Translation",
+                connectionSummary: "On-device · High-fidelity when available"
+            )
+        case .openAICompatible:
+            return TranslationProviderDescriptor(
+                displayName: "OpenAI",
+                defaultEndpoint: "https://api.openai.com/v1/chat/completions",
+                defaultModel: "gpt-4o-mini",
+                showsAPIKey: true,
+                supportsModel: true,
+                supportsEndpoint: true,
+                supportsStreaming: true,
+                connectionSummary: "Cloud API · Streaming"
+            )
+        case .deepSeek:
+            return TranslationProviderDescriptor(
+                displayName: "DeepSeek",
+                defaultEndpoint: "https://api.deepseek.com/chat/completions",
+                defaultModel: "deepseek-v4-flash",
+                showsAPIKey: true,
+                supportsModel: true,
+                supportsEndpoint: true,
+                supportsStreaming: true,
+                connectionSummary: "Cloud API · Streaming"
+            )
+        case .openRouter:
+            return TranslationProviderDescriptor(
+                displayName: "OpenRouter",
+                defaultEndpoint: "https://openrouter.ai/api/v1/chat/completions",
+                defaultModel: "openrouter/auto",
+                showsAPIKey: true,
+                supportsModel: true,
+                supportsEndpoint: true,
+                supportsStreaming: true,
+                connectionSummary: "Cloud API · Streaming"
+            )
+        case .deepL:
+            return TranslationProviderDescriptor(
+                displayName: "DeepL",
+                showsAPIKey: true,
+                supportsEndpoint: true,
+                connectionSummary: "Cloud API · Complete response"
+            )
+        case .googleCloud:
+            return TranslationProviderDescriptor(
+                displayName: "Google Cloud",
+                defaultEndpoint: "https://translation.googleapis.com/language/translate/v2",
+                showsAPIKey: true,
+                supportsEndpoint: true,
+                connectionSummary: "Cloud API · Complete response"
+            )
         case .custom:
-            return "Configured endpoint · Streaming"
-        case .openAICompatible, .deepSeek, .openRouter:
-            return "Cloud API · Streaming"
+            return TranslationProviderDescriptor(
+                displayName: "Custom",
+                showsAPIKey: true,
+                supportsModel: true,
+                supportsEndpoint: true,
+                connectionSummary: "Configured endpoint · Complete response"
+            )
         }
     }
+}
+
+private struct TranslationProviderDescriptor {
+    let displayName: String
+    var defaultEndpoint = ""
+    var defaultModel = ""
+    var showsAPIKey = false
+    var supportsModel = false
+    var supportsEndpoint = false
+    var supportsStreaming = false
+    let connectionSummary: String
 }
 
 public enum ExportQuality: String, CaseIterable, Sendable {

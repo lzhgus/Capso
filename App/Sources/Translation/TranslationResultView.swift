@@ -77,7 +77,7 @@ struct TranslationResultView: View {
         case .done(let regions):
             doneSections(region: regions.first)
         case .streaming(let region):
-            doneSections(region: region)
+            streamingSection(region: region)
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 10) {
@@ -153,6 +153,29 @@ struct TranslationResultView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func streamingSection(region: TranslatedRegion) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionLabel("TRANSLATION")
+            Text(region.translation)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineSpacing(3)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini)
+                Text("Translating…")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
     }
 
@@ -436,50 +459,23 @@ struct TranslationResultView: View {
             boundingBox: firstMeaningfulRegion?.boundingBox ?? .zero,
             confidence: 1.0
         )
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(joinedOriginal)
-        let localDetectedSource = recognizer.dominantLanguage?.rawValue ?? "und"
-
         do {
-            let response: ProviderTranslationResult
-            if provider.supportsStreaming {
-                var accumulated = ""
-                let clock = ContinuousClock()
-                var lastPublishedAt: ContinuousClock.Instant?
-                for try await delta in ProviderTranslationService.translateStreaming(
-                    text: joinedOriginal,
-                    target: target,
-                    provider: provider,
-                    config: providerConfig
-                ) {
-                    try Task.checkCancellation()
-                    accumulated += delta
-                    let now = clock.now
-                    let shouldPublish = lastPublishedAt.map {
-                        $0.duration(to: now) >= .milliseconds(33)
-                    } ?? true
-                    if shouldPublish {
-                        phase = .streaming(TranslatedRegion(
-                            original: merged,
-                            translation: accumulated,
-                            detectedSource: Locale.Language(identifier: localDetectedSource)
-                        ))
-                        lastPublishedAt = now
-                    }
-                }
-                response = ProviderTranslationResult(
-                    text: accumulated.trimmingCharacters(in: .whitespacesAndNewlines),
-                    detectedSource: localDetectedSource
-                )
-            } else {
-                response = try await ProviderTranslationService.translate(
-                    text: joinedOriginal,
-                    target: target,
-                    provider: provider,
-                    config: providerConfig
-                )
+            var response: ProviderTranslationResult?
+            for try await update in ProviderTranslationService.translationUpdates(
+                text: joinedOriginal,
+                target: target,
+                provider: provider,
+                config: providerConfig
+            ) {
+                try Task.checkCancellation()
+                response = update
+                phase = .streaming(TranslatedRegion(
+                    original: merged,
+                    translation: update.text,
+                    detectedSource: Locale.Language(identifier: update.detectedSource ?? "und")
+                ))
             }
-            guard !response.text.isEmpty else {
+            guard let response, !response.text.isEmpty else {
                 phase = .failed("Translation returned no results. Try changing the target language.")
                 return
             }
@@ -493,7 +489,7 @@ struct TranslationResultView: View {
             let result = TranslatedRegion(
                 original: merged,
                 translation: response.text,
-                detectedSource: Locale.Language(identifier: response.detectedSource ?? localDetectedSource)
+                detectedSource: Locale.Language(identifier: response.detectedSource ?? "und")
             )
             phase = .done([result])
         } catch {
@@ -514,7 +510,9 @@ struct TranslationResultView: View {
     }
 
     private var sourceText: String {
-        TranslationTextLayout.compose(regions)
+        TranslationTextLayout.compose(regions.map {
+            TranslationTextLine(text: $0.text, frame: $0.boundingBox)
+        })
     }
 
     private var firstMeaningfulRegion: TextRegion? {

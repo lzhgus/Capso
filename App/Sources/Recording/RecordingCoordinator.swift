@@ -161,8 +161,8 @@ final class RecordingCoordinator {
                 self?.selectedTarget = nil
             }
             overlay.onSpaceToggle = onSpaceToggle
-            overlay.onRecordingModeRequested = { [weak self] mode in
-                self?.handleRecordingModeRequest(mode)
+            overlay.onShortcutAction = { [weak self] action in
+                self?.handleRecordingModeRequest(RecordingSelectionMode(action: action))
             }
             overlay.activate(mode: mode)
             overlayWindows.append(overlay)
@@ -225,10 +225,7 @@ final class RecordingCoordinator {
     }
 
     private func selectFullScreenForRecording() {
-        let mouseLocation = NSEvent.mouseLocation
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
-                ?? NSScreen.main
-                ?? NSScreen.screens.first else {
+        guard let screen = screenUnderPointer else {
             return
         }
 
@@ -242,9 +239,7 @@ final class RecordingCoordinator {
     }
 
     private func showSelectionModeWindow(selectedMode: RecordingSelectionMode) {
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
-                ?? NSScreen.main
-                ?? NSScreen.screens.first else {
+        guard let screen = screenUnderPointer else {
             return
         }
 
@@ -262,6 +257,13 @@ final class RecordingCoordinator {
         )
         window.show()
         selectionModeWindow = window
+    }
+
+    private var screenUnderPointer: NSScreen? {
+        let location = NSEvent.mouseLocation
+        return NSScreen.screens.first(where: { $0.frame.contains(location) })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
     }
 
     private func handleAreaSelected(

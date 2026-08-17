@@ -7,23 +7,13 @@ enum RecordingSelectionMode: CaseIterable, Equatable {
     case fullScreen
     case lastArea
 
-    init?(keyCode: UInt16) {
-        switch keyCode {
-        case 0: self = .area
-        case 13: self = .window
-        case 3: self = .fullScreen
-        case 15: self = .lastArea
-        default: return nil
+    init(action: CaptureOverlayShortcutAction) {
+        switch action {
+        case .selectArea: self = .area
+        case .selectWindow: self = .window
+        case .selectFullScreen: self = .fullScreen
+        case .reuseLastArea: self = .lastArea
         }
-    }
-
-    init?(event: NSEvent) {
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard !event.isARepeat,
-              modifiers.intersection([.command, .option, .control]).isEmpty else {
-            return nil
-        }
-        self.init(keyCode: event.keyCode)
     }
 
     var title: LocalizedStringKey {
@@ -116,7 +106,8 @@ final class RecordingSelectionModeWindow: NSPanel {
             onCancel()
             return
         }
-        if let mode = RecordingSelectionMode(event: event) {
+        if let action = CaptureOverlayShortcutAction(event: event) {
+            let mode = RecordingSelectionMode(action: action)
             guard mode != .lastArea || canUseLastArea else {
                 NSSound.beep()
                 return

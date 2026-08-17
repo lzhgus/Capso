@@ -1,5 +1,4 @@
 import CoreGraphics
-import OCRKit
 import Testing
 @testable import TranslationKit
 
@@ -48,10 +47,43 @@ struct TranslationTextLayoutTests {
         #expect(TranslationTextLayout.compose(regions) == "Left column\n\nRight column")
     }
 
+    @Test("Multi-line columns read top-to-bottom instead of interleaving by row")
+    func ordersMultiLineColumns() {
+        let regions = [
+            region("Left one", x: 10, y: 10, width: 100),
+            region("Right one", x: 360, y: 10, width: 110),
+            region("Left two", x: 10, y: 34, width: 100),
+            region("Right two", x: 360, y: 34, width: 110),
+        ]
+
+        #expect(TranslationTextLayout.compose(regions) == "Left one Left two\n\nRight one Right two")
+    }
+
+    @Test("Indented code keeps indentation and explicit lines")
+    func preservesCodeIndentation() {
+        let regions = [
+            region("func run() {", x: 10, y: 10, width: 100),
+            region("    continuation()", x: 30, y: 34, width: 140),
+            region("}", x: 10, y: 58, width: 10),
+        ]
+
+        #expect(TranslationTextLayout.compose(regions) == "func run() {\n    continuation()\n}")
+    }
+
+    @Test("Chinese numbered lists keep item boundaries")
+    func preservesChineseNumberedLists() {
+        let regions = [
+            region("1、第一项", x: 10, y: 10, width: 80),
+            region("2、第二项", x: 10, y: 34, width: 80),
+        ]
+
+        #expect(TranslationTextLayout.compose(regions) == "1、第一项\n2、第二项")
+    }
+
     @Test("Text without OCR geometry keeps explicit line breaks")
     func preservesTextOnlyInput() {
         let regions = [
-            TextRegion(text: "First line\n\nSecond line", boundingBox: .zero, confidence: 1),
+            TranslationTextLine(text: "First line\n\nSecond line", frame: .zero),
         ]
 
         #expect(TranslationTextLayout.compose(regions) == "First line\n\nSecond line")
@@ -63,11 +95,10 @@ struct TranslationTextLayoutTests {
         y: CGFloat,
         width: CGFloat,
         height: CGFloat = 20
-    ) -> TextRegion {
-        TextRegion(
+    ) -> TranslationTextLine {
+        TranslationTextLine(
             text: text,
-            boundingBox: CGRect(x: x, y: y, width: width, height: height),
-            confidence: 1
+            frame: CGRect(x: x, y: y, width: width, height: height)
         )
     }
 }

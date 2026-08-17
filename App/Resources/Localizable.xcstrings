@@ -5180,6 +5180,13 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已配置端点 · 流式返回" } }
       }
     },
+    "Configured endpoint · Complete response" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定済みエンドポイント・一括応答" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설정된 엔드포인트 · 전체 응답" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已配置端点 · 完整返回" } }
+      }
+    },
     "Window" : {
       "localizations" : {
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "ウィンドウ" } },

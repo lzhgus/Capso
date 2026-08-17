@@ -543,7 +543,7 @@ struct AppSettingsTests {
         #expect(TranslationProviderKind.openAICompatible.supportsStreaming)
         #expect(TranslationProviderKind.deepSeek.supportsStreaming)
         #expect(TranslationProviderKind.openRouter.supportsStreaming)
-        #expect(TranslationProviderKind.custom.supportsStreaming)
+        #expect(!TranslationProviderKind.custom.supportsStreaming)
         #expect(!TranslationProviderKind.apple.supportsStreaming)
         #expect(!TranslationProviderKind.deepL.supportsStreaming)
         #expect(!TranslationProviderKind.googleCloud.supportsStreaming)

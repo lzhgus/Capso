@@ -6,11 +6,11 @@ import SharedKit
 @MainActor
 final class RecordingSelectionModeTests: XCTestCase {
     func testLetterShortcutsMapToEveryRecordingSelectionMode() {
-        XCTAssertEqual(RecordingSelectionMode(keyCode: 0), .area)
-        XCTAssertEqual(RecordingSelectionMode(keyCode: 13), .window)
-        XCTAssertEqual(RecordingSelectionMode(keyCode: 3), .fullScreen)
-        XCTAssertEqual(RecordingSelectionMode(keyCode: 15), .lastArea)
-        XCTAssertNil(RecordingSelectionMode(keyCode: 12))
+        XCTAssertEqual(CaptureOverlayShortcutAction(keyCode: 0), .selectArea)
+        XCTAssertEqual(CaptureOverlayShortcutAction(keyCode: 13), .selectWindow)
+        XCTAssertEqual(CaptureOverlayShortcutAction(keyCode: 3), .selectFullScreen)
+        XCTAssertEqual(CaptureOverlayShortcutAction(keyCode: 15), .reuseLastArea)
+        XCTAssertNil(CaptureOverlayShortcutAction(keyCode: 12))
     }
 
     func testOverlayRoutesARecordingModeShortcutExactlyOnce() throws {
@@ -25,8 +25,8 @@ final class RecordingSelectionModeTests: XCTestCase {
             presetsDisabled: true,
             allowsMultiWindowSelection: false
         )
-        var requestedModes: [RecordingSelectionMode] = []
-        window.onRecordingModeRequested = { requestedModes.append($0) }
+        var requestedActions: [CaptureOverlayShortcutAction] = []
+        window.onShortcutAction = { requestedActions.append($0) }
 
         let event = try XCTUnwrap(NSEvent.keyEvent(
             with: .keyDown,
@@ -42,7 +42,7 @@ final class RecordingSelectionModeTests: XCTestCase {
         ))
 
         XCTAssertNil(window.handleLocalKeyEvent(event))
-        XCTAssertEqual(requestedModes, [.window])
+        XCTAssertEqual(requestedActions, [.selectWindow])
     }
 
     func testOverlayLeavesModifiedLetterShortcutsUntouched() throws {
@@ -57,8 +57,8 @@ final class RecordingSelectionModeTests: XCTestCase {
             presetsDisabled: true,
             allowsMultiWindowSelection: false
         )
-        var requestedModes: [RecordingSelectionMode] = []
-        window.onRecordingModeRequested = { requestedModes.append($0) }
+        var requestedActions: [CaptureOverlayShortcutAction] = []
+        window.onShortcutAction = { requestedActions.append($0) }
         let event = try XCTUnwrap(NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -73,6 +73,96 @@ final class RecordingSelectionModeTests: XCTestCase {
         ))
 
         XCTAssertTrue(window.handleLocalKeyEvent(event) === event)
-        XCTAssertTrue(requestedModes.isEmpty)
+        XCTAssertTrue(requestedActions.isEmpty)
+    }
+
+    func testSelectedAreaIsRememberedWhenAutomaticReuseIsOff() throws {
+        let suiteName = "RecordingSelectionModeTests.\(UUID().uuidString)"
+        defer {
+            closeRecordingSelectionWindows()
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        settings.rememberLastRecordingArea = false
+        let screen = try XCTUnwrap(NSScreen.main)
+        let rect = CGRect(x: 80, y: 90, width: 640, height: 360)
+        let coordinator = RecordingCoordinator(settings: settings)
+
+        coordinator.startRecordingFlow(withSelectedArea: rect, screen: screen)
+
+        XCTAssertEqual(
+            settings.lastRecordingArea,
+            .area(rect: rect, screenID: screen.displayID)
+        )
+    }
+
+    func testLastAreaShortcutWorksWithoutAutomaticReuse() async throws {
+        let suiteName = "RecordingSelectionModeTests.\(UUID().uuidString)"
+        defer {
+            closeRecordingSelectionWindows()
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        let screen = try XCTUnwrap(NSScreen.main)
+        settings.rememberLastRecordingArea = false
+        settings.lastRecordingArea = .area(
+            rect: CGRect(x: 100, y: 120, width: 640, height: 360),
+            screenID: screen.displayID
+        )
+        let coordinator = RecordingCoordinator(settings: settings)
+
+        coordinator.startRecordingFlow()
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertFalse(NSApp.windows.contains { $0 is RecordingToolbarWindow && $0.isVisible })
+        let modeWindow = try XCTUnwrap(
+            NSApp.windows.first { $0 is RecordingSelectionModeWindow && $0.isVisible }
+                as? RecordingSelectionModeWindow
+        )
+        modeWindow.keyDown(with: try makeKeyEvent("r", keyCode: 15, windowNumber: modeWindow.windowNumber))
+
+        XCTAssertTrue(NSApp.windows.contains { $0 is RecordingToolbarWindow && $0.isVisible })
+    }
+
+    func testFullScreenShortcutShowsRecordingToolbar() async throws {
+        let suiteName = "RecordingSelectionModeTests.\(UUID().uuidString)"
+        defer {
+            closeRecordingSelectionWindows()
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        let coordinator = RecordingCoordinator(settings: settings)
+
+        coordinator.startRecordingFlow()
+        try await Task.sleep(for: .milliseconds(250))
+        let modeWindow = try XCTUnwrap(
+            NSApp.windows.first { $0 is RecordingSelectionModeWindow && $0.isVisible }
+                as? RecordingSelectionModeWindow
+        )
+        modeWindow.keyDown(with: try makeKeyEvent("f", keyCode: 3, windowNumber: modeWindow.windowNumber))
+
+        XCTAssertTrue(NSApp.windows.contains { $0 is RecordingToolbarWindow && $0.isVisible })
+    }
+
+    private func makeKeyEvent(_ characters: String, keyCode: UInt16, windowNumber: Int) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: windowNumber,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: keyCode
+        ))
+    }
+
+    private func closeRecordingSelectionWindows() {
+        for window in NSApp.windows where window is CaptureOverlayWindow
+            || window is RecordingSelectionModeWindow
+            || window is RecordingToolbarWindow {
+            window.close()
+        }
     }
 }

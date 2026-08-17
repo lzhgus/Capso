@@ -11,6 +11,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "TranslationKit", dependencies: ["SharedKit", "OCRKit"]),
-        .testTarget(name: "TranslationKitTests", dependencies: ["TranslationKit", "OCRKit"]),
+        .testTarget(name: "TranslationKitTests", dependencies: ["TranslationKit"]),
     ]
 )
