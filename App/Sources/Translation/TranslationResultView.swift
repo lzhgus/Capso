@@ -24,88 +24,6 @@ struct TranslationResultView: View {
         case failed(String)
     }
 
-    private enum TextBlock {
-        case paragraph(String)
-        case bulletList([String])
-        case numberedList([NumberedItem])
-    }
-
-    private struct NumberedItem {
-        let number: Int
-        let text: String
-    }
-
-    private static func parseBlocks(_ text: String) -> [TextBlock] {
-        let rawLines = text.components(separatedBy: CharacterSet.newlines)
-        let lines = rawLines.map { $0.trimmingCharacters(in: .whitespaces) }
-
-        var blocks: [TextBlock] = []
-        var pendingBullets: [String] = []
-        var pendingNumbers: [NumberedItem] = []
-        var pendingParagraphLines: [String] = []
-
-        func flushBullets() {
-            if !pendingBullets.isEmpty {
-                blocks.append(.bulletList(pendingBullets))
-                pendingBullets = []
-            }
-        }
-        func flushNumbers() {
-            if !pendingNumbers.isEmpty {
-                blocks.append(.numberedList(pendingNumbers))
-                pendingNumbers = []
-            }
-        }
-        func flushParagraph() {
-            if !pendingParagraphLines.isEmpty {
-                let joined = pendingParagraphLines.joined(separator: " ")
-                if !joined.trimmingCharacters(in: .whitespaces).isEmpty {
-                    blocks.append(.paragraph(joined))
-                }
-                pendingParagraphLines = []
-            }
-        }
-        func flushAll() {
-            flushBullets()
-            flushNumbers()
-            flushParagraph()
-        }
-
-        let bulletPattern = try! NSRegularExpression(pattern: "^[•\\-\\*]\\s*", options: [])
-        let numberPattern = try! NSRegularExpression(pattern: "^(\\d+)[\\.、]\\s*", options: [])
-
-        for line in lines {
-            if line.isEmpty {
-                flushAll()
-                continue
-            }
-            let range = NSRange(line.startIndex..., in: line)
-            if let m = bulletPattern.firstMatch(in: line, options: [], range: range) {
-                flushNumbers()
-                flushParagraph()
-                let rest = (line as NSString).substring(from: m.range.upperBound)
-                pendingBullets.append(rest)
-                continue
-            }
-            if let m = numberPattern.firstMatch(in: line, options: [], range: range) {
-                flushBullets()
-                flushParagraph()
-                let numberRange = m.range(at: 1)
-                let numberText = (line as NSString).substring(with: numberRange)
-                let number = Int(numberText) ?? (pendingNumbers.count + 1)
-                let rest = (line as NSString).substring(from: m.range.upperBound)
-                pendingNumbers.append(NumberedItem(number: number, text: rest))
-                continue
-            }
-            // Plain line → accumulate into paragraph (wrapping soft-wraps into one paragraph)
-            flushBullets()
-            flushNumbers()
-            pendingParagraphLines.append(line)
-        }
-        flushAll()
-        return blocks
-    }
-
     @State private var phase: Phase = .loading
     @State private var runConfig: TranslationSession.Configuration?
     @State private var originalExpanded: Bool = false
@@ -125,7 +43,7 @@ struct TranslationResultView: View {
 
             footer(copiedMessage: shouldShowCopied ? "Copied" : nil)
         }
-        .frame(width: 360, height: 480)
+        .frame(width: 420, height: 520)
         .background(hiddenEscape)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -240,7 +158,7 @@ struct TranslationResultView: View {
         bodyColor: BC,
         markerColor: MC
     ) -> some View {
-        let blocks = Self.parseBlocks(text)
+        let blocks = TranslationTextBlockParser.parse(text)
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block {
@@ -403,7 +321,7 @@ struct TranslationResultView: View {
     // MARK: - Logic
 
     private func buildConfig() {
-        let combined = regions.map(\.text).joined(separator: "\n")
+        let combined = sourceText
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(combined)
         let detected = recognizer.dominantLanguage?.rawValue
@@ -443,15 +361,11 @@ struct TranslationResultView: View {
     }
 
     private func runTranslation(using session: TranslationSession) async {
-        let meaningful = regions.filter {
-            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-        guard !meaningful.isEmpty else {
+        let joinedOriginal = sourceText
+        guard !joinedOriginal.isEmpty else {
             phase = .failed("No text to translate")
             return
         }
-
-        let joinedOriginal = meaningful.map(\.text).joined(separator: "\n")
 
         nonisolated(unsafe) let s = session
         do {
@@ -478,7 +392,7 @@ struct TranslationResultView: View {
 
             let merged = TextRegion(
                 text: joinedOriginal,
-                boundingBox: meaningful.first?.boundingBox ?? .zero,
+                boundingBox: firstMeaningfulRegion?.boundingBox ?? .zero,
                 confidence: 1.0
             )
             let result = TranslatedRegion(
@@ -493,15 +407,11 @@ struct TranslationResultView: View {
     }
 
     private func runProviderTranslation() async {
-        let meaningful = regions.filter {
-            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-        guard !meaningful.isEmpty else {
+        let joinedOriginal = sourceText
+        guard !joinedOriginal.isEmpty else {
             phase = .failed("No text to translate")
             return
         }
-
-        let joinedOriginal = meaningful.map(\.text).joined(separator: "\n")
         do {
             let response = try await ProviderTranslationService.translate(
                 text: joinedOriginal,
@@ -522,7 +432,7 @@ struct TranslationResultView: View {
 
             let merged = TextRegion(
                 text: joinedOriginal,
-                boundingBox: meaningful.first?.boundingBox ?? .zero,
+                boundingBox: firstMeaningfulRegion?.boundingBox ?? .zero,
                 confidence: 1.0
             )
             let result = TranslatedRegion(
@@ -539,6 +449,16 @@ struct TranslationResultView: View {
     private func copyCurrent() {
         guard case .done(let regions) = phase, let region = regions.first else { return }
         copyText(region.translation)
+    }
+
+    private var sourceText: String {
+        TranslationTextLayout.compose(regions)
+    }
+
+    private var firstMeaningfulRegion: TextRegion? {
+        regions.first {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     private func copyText(_ text: String) {

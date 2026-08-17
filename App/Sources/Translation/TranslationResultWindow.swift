@@ -38,10 +38,10 @@ final class TranslationResultWindow: NSPanel {
         self.providerConfig = providerConfig
         self.settings = settings
 
-        // Fixed window size matching the SwiftUI view's `.frame(width: 360, height: 480)`.
+        // Fixed window size matching the SwiftUI view's `.frame(width: 420, height: 520)`.
         // No auto-resize — internal ScrollView handles overflow.
         let frame = Self.positionedFrame(
-            size: NSSize(width: 360, height: 480),
+            size: NSSize(width: 420, height: 520),
             anchor: anchor,
             anchorScreen: anchorScreen,
             position: settings.translationCardPosition
