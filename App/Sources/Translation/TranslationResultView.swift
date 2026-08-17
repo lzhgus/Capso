@@ -370,18 +370,20 @@ struct TranslationResultView: View {
 
         let sourceLanguage = detected.map { Locale.Language(identifier: $0) }
         let targetLanguage = Locale.Language(identifier: target)
+#if compiler(>=6.2)
         if #available(macOS 26.4, *) {
             runConfig = TranslationSession.Configuration(
                 source: sourceLanguage,
                 target: targetLanguage,
                 preferredStrategy: .highFidelity
             )
-        } else {
-            runConfig = TranslationSession.Configuration(
-                source: sourceLanguage,
-                target: targetLanguage
-            )
+            return
         }
+#endif
+        runConfig = TranslationSession.Configuration(
+            source: sourceLanguage,
+            target: targetLanguage
+        )
     }
 
     private func startTranslation() {
