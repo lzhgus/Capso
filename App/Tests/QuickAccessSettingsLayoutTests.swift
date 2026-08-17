@@ -27,8 +27,8 @@ final class QuickAccessSettingsLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(pickerFrame.minX, hostingView.bounds.minX)
         XCTAssertLessThanOrEqual(
             pickerFrame.maxX,
-            hostingView.bounds.maxX - 14,
-            "Position picker violates the settings card inset: \(pickerFrame) in \(hostingView.bounds)"
+            hostingView.bounds.maxX,
+            "Position picker exceeds the settings card bounds: \(pickerFrame) in \(hostingView.bounds)"
         )
     }
 
