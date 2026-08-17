@@ -61,16 +61,18 @@ struct TextAndTranslationSettingsView: View {
                         }
                         .frame(width: 180)
                     }
-                    SettingRow(label: "Provider", sublabel: "Engine used for screenshot and selected text translation", showDivider: true) {
+                    SettingRow(
+                        label: "Provider",
+                        sublabel: LocalizedStringKey(viewModel.translationProvider.connectionSummary),
+                        showDivider: true
+                    ) {
                         Picker("", selection: $viewModel.translationProvider) {
                             ForEach(TranslationProviderKind.allCases, id: \.rawValue) { provider in
                                 Text(provider.displayName).tag(provider)
                             }
                         }
                         .frame(width: 180)
-                        .onChange(of: viewModel.translationProvider) { _, provider in
-                            viewModel.translationProviderEndpoint = provider.defaultEndpoint
-                            viewModel.translationProviderModel = provider.defaultModel
+                        .onChange(of: viewModel.translationProvider) { _, _ in
                             loadProviderAPIKey()
                         }
                     }

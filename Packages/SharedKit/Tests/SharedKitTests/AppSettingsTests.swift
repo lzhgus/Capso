@@ -525,14 +525,28 @@ struct AppSettingsTests {
         #expect(settings.translationProvider == .apple)
     }
 
-    @Test("Translation provider choices exclude DeepSeek")
-    func translationProviderChoicesExcludeDeepSeek() {
+    @Test("Translation provider choices include official services and compatible presets")
+    func translationProviderChoices() {
         #expect(TranslationProviderKind.allCases.map(\.rawValue) == [
             "apple",
             "openAICompatible",
+            "deepSeek",
+            "openRouter",
             "deepL",
+            "googleCloud",
             "custom",
         ])
+    }
+
+    @Test("Only chat-completion providers advertise streaming")
+    func translationProviderStreamingCapabilities() {
+        #expect(TranslationProviderKind.openAICompatible.supportsStreaming)
+        #expect(TranslationProviderKind.deepSeek.supportsStreaming)
+        #expect(TranslationProviderKind.openRouter.supportsStreaming)
+        #expect(TranslationProviderKind.custom.supportsStreaming)
+        #expect(!TranslationProviderKind.apple.supportsStreaming)
+        #expect(!TranslationProviderKind.deepL.supportsStreaming)
+        #expect(!TranslationProviderKind.googleCloud.supportsStreaming)
     }
 
     @Test("Translation provider settings persist across instances")
@@ -550,6 +564,25 @@ struct AppSettingsTests {
         #expect(second.translationProvider == .openAICompatible)
         #expect(second.translationProviderModel == "gpt-4o-mini")
         #expect(second.translationProviderEndpoint == "https://example.com/chat/completions")
+    }
+
+    @Test("Each translation provider keeps its own endpoint and model")
+    func translationProviderSettingsAreScoped() {
+        let suite = "test.translationProvider.scoped"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AppSettings(defaults: defaults)
+
+        settings.translationProvider = .openAICompatible
+        settings.translationProviderModel = "openai-model"
+        settings.translationProviderEndpoint = "https://openai.example/v1/chat/completions"
+        settings.translationProvider = .deepSeek
+        settings.translationProviderModel = "deepseek-model"
+        settings.translationProviderEndpoint = "https://deepseek.example/chat/completions"
+        settings.translationProvider = .openAICompatible
+
+        #expect(settings.translationProviderModel == "openai-model")
+        #expect(settings.translationProviderEndpoint == "https://openai.example/v1/chat/completions")
     }
 
     @Test("File formats map common extensions")

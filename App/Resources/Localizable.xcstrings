@@ -5131,6 +5131,55 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "宽度比例" } }
       }
     },
+    "Full Screen" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "フルスクリーン" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "전체 화면" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全屏" } }
+      }
+    },
+    "Last Area" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "前回の範囲" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "마지막 영역" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次区域" } }
+      }
+    },
+    "Record an area once to enable Last Area" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "範囲を一度録画すると「前回の範囲」を使用できます" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "영역을 한 번 녹화하면 마지막 영역을 사용할 수 있습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "先录制一次区域即可使用“上次区域”" } }
+      }
+    },
+    "On-device · High-fidelity when available" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "オンデバイス・利用可能な場合は高精度" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "온디바이스 · 사용 가능 시 고품질" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设备端 · 可用时使用高保真" } }
+      }
+    },
+    "Cloud API · Complete response" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド API・一括応答" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 API · 전체 응답" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端 API · 完整返回" } }
+      }
+    },
+    "Cloud API · Streaming" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "クラウド API・ストリーミング" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "클라우드 API · 스트리밍" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "云端 API · 流式返回" } }
+      }
+    },
+    "Configured endpoint · Streaming" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "設定済みエンドポイント・ストリーミング" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설정된 엔드포인트 · 스트리밍" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已配置端点 · 流式返回" } }
+      }
+    },
     "Window" : {
       "localizations" : {
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "ウィンドウ" } },

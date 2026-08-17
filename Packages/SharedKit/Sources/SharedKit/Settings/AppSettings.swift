@@ -158,14 +158,20 @@ public enum TranslationAutoDismiss: String, CaseIterable, Sendable {
 public enum TranslationProviderKind: String, CaseIterable, Sendable {
     case apple
     case openAICompatible
+    case deepSeek
+    case openRouter
     case deepL
+    case googleCloud
     case custom
 
     public var displayName: String {
         switch self {
         case .apple: return "Apple Translation"
         case .openAICompatible: return "OpenAI"
+        case .deepSeek: return "DeepSeek"
+        case .openRouter: return "OpenRouter"
         case .deepL: return "DeepL"
+        case .googleCloud: return "Google Cloud"
         case .custom: return "Custom"
         }
     }
@@ -176,8 +182,14 @@ public enum TranslationProviderKind: String, CaseIterable, Sendable {
             return ""
         case .openAICompatible:
             return "https://api.openai.com/v1/chat/completions"
+        case .deepSeek:
+            return "https://api.deepseek.com/chat/completions"
+        case .openRouter:
+            return "https://openrouter.ai/api/v1/chat/completions"
         case .deepL:
             return ""
+        case .googleCloud:
+            return "https://translation.googleapis.com/language/translate/v2"
         case .custom:
             return ""
         }
@@ -185,10 +197,14 @@ public enum TranslationProviderKind: String, CaseIterable, Sendable {
 
     public var defaultModel: String {
         switch self {
-        case .apple, .deepL:
+        case .apple, .deepL, .googleCloud:
             return ""
         case .openAICompatible:
             return "gpt-4o-mini"
+        case .deepSeek:
+            return "deepseek-v4-flash"
+        case .openRouter:
+            return "openrouter/auto"
         case .custom:
             return ""
         }
@@ -200,15 +216,35 @@ public enum TranslationProviderKind: String, CaseIterable, Sendable {
 
     public var supportsModel: Bool {
         switch self {
-        case .apple, .deepL: return false
-        case .openAICompatible, .custom: return true
+        case .apple, .deepL, .googleCloud: return false
+        case .openAICompatible, .deepSeek, .openRouter, .custom: return true
         }
     }
 
     public var supportsEndpoint: Bool {
         switch self {
         case .apple: return false
-        case .openAICompatible, .deepL, .custom: return true
+        case .openAICompatible, .deepSeek, .openRouter, .deepL, .googleCloud, .custom: return true
+        }
+    }
+
+    public var supportsStreaming: Bool {
+        switch self {
+        case .openAICompatible, .deepSeek, .openRouter, .custom: return true
+        case .apple, .deepL, .googleCloud: return false
+        }
+    }
+
+    public var connectionSummary: String {
+        switch self {
+        case .apple:
+            return "On-device · High-fidelity when available"
+        case .deepL, .googleCloud:
+            return "Cloud API · Complete response"
+        case .custom:
+            return "Configured endpoint · Streaming"
+        case .openAICompatible, .deepSeek, .openRouter:
+            return "Cloud API · Streaming"
         }
     }
 }
@@ -924,17 +960,51 @@ public final class AppSettings: @unchecked Sendable {
                   let provider = TranslationProviderKind(rawValue: raw) else { return .apple }
             return provider
         }
-        set { defaults.set(newValue.rawValue, forKey: "translationProvider") }
+        set {
+            migrateLegacyTranslationProviderSettingsIfNeeded()
+            defaults.set(newValue.rawValue, forKey: "translationProvider")
+        }
     }
 
     public var translationProviderModel: String {
-        get { defaults.string(forKey: "translationProviderModel") ?? translationProvider.defaultModel }
-        set { defaults.set(newValue, forKey: "translationProviderModel") }
+        get {
+            migrateLegacyTranslationProviderSettingsIfNeeded()
+            return defaults.string(forKey: translationProviderSettingKey("model"))
+                ?? translationProvider.defaultModel
+        }
+        set {
+            migrateLegacyTranslationProviderSettingsIfNeeded()
+            defaults.set(newValue, forKey: translationProviderSettingKey("model"))
+        }
     }
 
     public var translationProviderEndpoint: String {
-        get { defaults.string(forKey: "translationProviderEndpoint") ?? translationProvider.defaultEndpoint }
-        set { defaults.set(newValue, forKey: "translationProviderEndpoint") }
+        get {
+            migrateLegacyTranslationProviderSettingsIfNeeded()
+            return defaults.string(forKey: translationProviderSettingKey("endpoint"))
+                ?? translationProvider.defaultEndpoint
+        }
+        set {
+            migrateLegacyTranslationProviderSettingsIfNeeded()
+            defaults.set(newValue, forKey: translationProviderSettingKey("endpoint"))
+        }
+    }
+
+    private func translationProviderSettingKey(_ field: String) -> String {
+        "translationProvider.\(translationProvider.rawValue).\(field)"
+    }
+
+    private func migrateLegacyTranslationProviderSettingsIfNeeded() {
+        let migrationKey = "translationProviderSettingsMigrated"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        if let model = defaults.string(forKey: "translationProviderModel") {
+            defaults.set(model, forKey: translationProviderSettingKey("model"))
+        }
+        if let endpoint = defaults.string(forKey: "translationProviderEndpoint") {
+            defaults.set(endpoint, forKey: translationProviderSettingKey("endpoint"))
+        }
+        defaults.set(true, forKey: migrationKey)
     }
 
     public var translationAutoCopy: Bool {
