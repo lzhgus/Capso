@@ -18,6 +18,7 @@ final class TranslationResultWindow: NSPanel {
     private var globalClickMonitor: Any?
     private var isPinned = false
     private var translationCompleted = false
+    private var lastProgrammaticFrame: NSRect?
 
     var onClose: (() -> Void)?
     var onPinChanged: ((Bool) -> Void)?
@@ -110,6 +111,24 @@ final class TranslationResultWindow: NSPanel {
         return min(520, max(240, estimatedHeight))
     }
 
+    static func frameAfterResize(
+        currentFrame: NSRect,
+        lastProgrammaticFrame: NSRect?,
+        preferredFrame: NSRect
+    ) -> NSRect {
+        guard let lastProgrammaticFrame,
+              abs(currentFrame.minX - lastProgrammaticFrame.minX) > 0.5
+                || abs(currentFrame.minY - lastProgrammaticFrame.minY) > 0.5 else {
+            return preferredFrame
+        }
+        return NSRect(
+            x: currentFrame.minX,
+            y: currentFrame.maxY - preferredFrame.height,
+            width: preferredFrame.width,
+            height: preferredFrame.height
+        )
+    }
+
     func translationDidComplete() {
         guard !translationCompleted else { return }
         translationCompleted = true
@@ -156,13 +175,21 @@ final class TranslationResultWindow: NSPanel {
     }
 
     private func resize(height: CGFloat) {
-        let frame = Self.positionedFrame(
+        let preferredFrame = Self.positionedFrame(
             size: NSSize(width: Self.cardWidth, height: height),
             anchor: anchor,
             anchorScreen: anchorScreen,
             position: settings.translationCardPosition
         )
-        setFrame(frame, display: true)
+        let resizedFrame = Self.frameAfterResize(
+            currentFrame: frame,
+            lastProgrammaticFrame: lastProgrammaticFrame,
+            preferredFrame: preferredFrame
+        )
+        let targetScreen = anchorScreen ?? screen ?? NSScreen.main ?? NSScreen.screens.first!
+        let constrainedFrame = constrainFrameRect(resizedFrame, to: targetScreen)
+        setFrame(constrainedFrame, display: true)
+        lastProgrammaticFrame = constrainedFrame
     }
 
     private func installClickOutsideMonitors() {

@@ -132,6 +132,17 @@ final class RecordingSelectionModeTests: XCTestCase {
         XCTAssertEqual(requestedModes, [.window, .window])
     }
 
+    func testWindowEnumerationFailurePreservesTheActiveOverlayMode() {
+        XCTAssertEqual(
+            RecordingCoordinator.windowEnumerationFallbackMode(activeMode: .area),
+            .area
+        )
+        XCTAssertEqual(
+            RecordingCoordinator.windowEnumerationFallbackMode(activeMode: .window),
+            .window
+        )
+    }
+
     func testSelectedAreaIsRememberedWhenAutomaticReuseIsOff() throws {
         let suiteName = "RecordingSelectionModeTests.\(UUID().uuidString)"
         defer {

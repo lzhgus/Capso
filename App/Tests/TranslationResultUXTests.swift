@@ -84,6 +84,36 @@ final class TranslationResultUXTests: XCTestCase {
         XCTAssertFalse(generation.isCurrent(second))
     }
 
+    func testResultResizePreservesDraggedCardTopEdge() {
+        let lastProgrammaticFrame = NSRect(x: 100, y: 100, width: 420, height: 160)
+        let draggedFrame = NSRect(x: 300, y: 400, width: 420, height: 160)
+        let preferredFrame = NSRect(x: 120, y: 80, width: 420, height: 360)
+
+        let resized = TranslationResultWindow.frameAfterResize(
+            currentFrame: draggedFrame,
+            lastProgrammaticFrame: lastProgrammaticFrame,
+            preferredFrame: preferredFrame
+        )
+
+        XCTAssertEqual(resized.minX, draggedFrame.minX)
+        XCTAssertEqual(resized.maxY, draggedFrame.maxY)
+        XCTAssertEqual(resized.size, preferredFrame.size)
+    }
+
+    func testResultResizeUsesPreferredFrameWhenCardWasNotDragged() {
+        let currentFrame = NSRect(x: 100, y: 100, width: 420, height: 160)
+        let preferredFrame = NSRect(x: 120, y: 80, width: 420, height: 360)
+
+        XCTAssertEqual(
+            TranslationResultWindow.frameAfterResize(
+                currentFrame: currentFrame,
+                lastProgrammaticFrame: currentFrame,
+                preferredFrame: preferredFrame
+            ),
+            preferredFrame
+        )
+    }
+
     private func makeWindow(autoDismissDelay: TimeInterval) -> TranslationResultWindow {
         let suiteName = "TranslationResultUXTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
