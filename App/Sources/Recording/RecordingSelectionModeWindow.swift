@@ -17,6 +17,15 @@ enum RecordingSelectionMode: CaseIterable, Equatable {
         }
     }
 
+    init?(event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard !event.isARepeat,
+              modifiers.intersection([.command, .option, .control]).isEmpty else {
+            return nil
+        }
+        self.init(keyCode: event.keyCode)
+    }
+
     var title: LocalizedStringKey {
         switch self {
         case .area: "Area"
@@ -107,7 +116,7 @@ final class RecordingSelectionModeWindow: NSPanel {
             onCancel()
             return
         }
-        if let mode = RecordingSelectionMode(keyCode: event.keyCode) {
+        if let mode = RecordingSelectionMode(event: event) {
             guard mode != .lastArea || canUseLastArea else {
                 NSSound.beep()
                 return

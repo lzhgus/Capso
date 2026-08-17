@@ -170,7 +170,7 @@ final class CaptureOverlayWindow: NSPanel {
         case 49:
             overlayView.requestSpaceToggle()
         default:
-            if let mode = RecordingSelectionMode(keyCode: event.keyCode) {
+            if let mode = RecordingSelectionMode(event: event) {
                 onRecordingModeRequested?(mode)
             }
         }
@@ -195,7 +195,7 @@ final class CaptureOverlayWindow: NSPanel {
             overlayView.requestSpaceToggle()
             return nil
         default:
-            guard let mode = RecordingSelectionMode(keyCode: event.keyCode),
+            guard let mode = RecordingSelectionMode(event: event),
                   onRecordingModeRequested != nil else {
                 return event
             }
