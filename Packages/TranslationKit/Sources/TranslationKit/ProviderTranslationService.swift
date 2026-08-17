@@ -117,7 +117,27 @@ struct TranslationStreamAccumulator {
     }
 }
 
+struct ProviderResponseDataAccumulator {
+    let maximumBytes: Int
+    private(set) var data: Data
+
+    init(maximumBytes: Int) {
+        self.maximumBytes = maximumBytes
+        data = Data()
+        data.reserveCapacity(min(maximumBytes, 64 * 1024))
+    }
+
+    mutating func append(_ byte: UInt8) throws {
+        guard data.count < maximumBytes else {
+            throw ProviderTranslationError.responseTooLarge
+        }
+        data.append(byte)
+    }
+}
+
 public enum ProviderTranslationService {
+    private static let maximumResponseBytes = 4 * 1024 * 1024
+
     public static func translationUpdates(
         text: String,
         target: String,
@@ -186,7 +206,7 @@ public enum ProviderTranslationService {
         config: TranslationProviderConfiguration
     ) async throws -> ProviderTranslationResult {
         let request = try makeRequest(text: text, target: target, provider: provider, config: config)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await loadBoundedResponse(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ProviderTranslationError.badResponse
         }
@@ -196,6 +216,26 @@ public enum ProviderTranslationService {
         }
 
         return try parseResponse(data, provider: provider)
+    }
+
+    private static func loadBoundedResponse(for request: URLRequest) async throws -> (Data, URLResponse) {
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.timeoutIntervalForRequest = 60
+        sessionConfiguration.timeoutIntervalForResource = 90
+        let session = URLSession(configuration: sessionConfiguration)
+        defer { session.invalidateAndCancel() }
+
+        let (bytes, response) = try await session.bytes(for: request)
+        if response.expectedContentLength > maximumResponseBytes {
+            throw ProviderTranslationError.responseTooLarge
+        }
+
+        var accumulator = ProviderResponseDataAccumulator(maximumBytes: maximumResponseBytes)
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            try accumulator.append(byte)
+        }
+        return (accumulator.data, response)
     }
 
     private static func translateStreaming(

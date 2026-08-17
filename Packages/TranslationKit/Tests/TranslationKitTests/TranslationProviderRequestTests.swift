@@ -233,4 +233,17 @@ struct TranslationProviderRequestTests {
             try accumulator.append("你好")
         }
     }
+
+    @Test("Complete provider responses have a total byte bound")
+    func completeResponseLimit() throws {
+        var accumulator = ProviderResponseDataAccumulator(maximumBytes: 4)
+
+        for byte in Data("data".utf8) {
+            try accumulator.append(byte)
+        }
+        #expect(accumulator.data == Data("data".utf8))
+        #expect(throws: ProviderTranslationError.responseTooLarge) {
+            try accumulator.append(UInt8(ascii: "!"))
+        }
+    }
 }

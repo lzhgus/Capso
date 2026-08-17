@@ -12,6 +12,24 @@ import TranslationKit
 
 private let logger = Logger(subsystem: "com.awesomemacapps.capso", category: "Translation")
 
+struct TranslationRequestGeneration {
+    private var current: UUID?
+
+    mutating func begin() -> UUID {
+        let requestID = UUID()
+        current = requestID
+        return requestID
+    }
+
+    func isCurrent(_ requestID: UUID) -> Bool {
+        current == requestID
+    }
+
+    mutating func invalidate() {
+        current = nil
+    }
+}
+
 @MainActor
 @Observable
 final class TranslationCoordinator {
@@ -21,6 +39,8 @@ final class TranslationCoordinator {
     private var typedInputWindow: TypedTranslationInputWindow?
     private var resultWindow: TranslationResultWindow?
     private var toastWindow: ToastWindow?
+    private var translationTask: Task<Void, Never>?
+    private var translationGeneration = TranslationRequestGeneration()
 
     init(settings: AppSettings) {
         self.settings = settings
@@ -69,10 +89,10 @@ final class TranslationCoordinator {
     func translate(image: CGImage, anchorScreen: NSScreen? = nil) {
         if !settings.translationOnboardingShown {
             showOnboarding { [weak self] in
-                self?.performTranslation(image: image, anchor: nil, anchorScreen: anchorScreen)
+                self?.startImageTranslation(image: image, anchor: nil, anchorScreen: anchorScreen)
             }
         } else {
-            performTranslation(image: image, anchor: nil, anchorScreen: anchorScreen)
+            startImageTranslation(image: image, anchor: nil, anchorScreen: anchorScreen)
         }
     }
 
@@ -98,7 +118,9 @@ final class TranslationCoordinator {
     }
 
     private func captureAndPerform(rect: CGRect, screen: NSScreen) {
-        Task {
+        let requestID = beginTranslationRequest()
+        translationTask = Task { [weak self] in
+            guard let self else { return }
             do {
                 let screenFrame = screen.frame
                 let screenRect = CGRect(
@@ -119,12 +141,17 @@ final class TranslationCoordinator {
                     width: rect.width,
                     height: rect.height
                 )
+                guard translationGeneration.isCurrent(requestID), !Task.isCancelled else { return }
                 performTranslation(
                     image: result.image,
                     anchor: screenAnchor,
-                    anchorScreen: screen
+                    anchorScreen: screen,
+                    requestID: requestID
                 )
             } catch {
+                guard translationGeneration.isCurrent(requestID), !Task.isCancelled else { return }
+                translationTask = nil
+                translationGeneration.invalidate()
                 showToast("Translation: \(error.localizedDescription)", icon: "xmark.circle.fill", iconColor: .systemRed, screen: screen)
             }
         }
@@ -132,21 +159,63 @@ final class TranslationCoordinator {
 
     // MARK: - Translation (OCR only; actual translation runs in the card)
 
-    private func performTranslation(image: CGImage, anchor: NSRect?, anchorScreen: NSScreen? = nil) {
-        Task {
+    private func startImageTranslation(image: CGImage, anchor: NSRect?, anchorScreen: NSScreen?) {
+        let requestID = beginTranslationRequest()
+        performTranslation(
+            image: image,
+            anchor: anchor,
+            anchorScreen: anchorScreen,
+            requestID: requestID
+        )
+    }
+
+    private func performTranslation(
+        image: CGImage,
+        anchor: NSRect?,
+        anchorScreen: NSScreen?,
+        requestID: UUID
+    ) {
+        guard translationGeneration.isCurrent(requestID) else { return }
+        let window = makeResultWindow(anchor: anchor, anchorScreen: anchorScreen)
+        window.showRecognizing()
+
+        translationTask = Task { [weak self, weak window] in
+            guard let self else { return }
             do {
                 let regions = try await TextRecognizer.recognize(image: image, detectURLs: false)
+                guard let window,
+                      translationGeneration.isCurrent(requestID),
+                      resultWindow === window else { return }
                 if regions.isEmpty {
-                    showToast("No text detected", icon: "info.circle.fill", iconColor: .systemYellow)
+                    closeResultWindow(window)
+                    showToast(
+                        "No text detected",
+                        icon: "info.circle.fill",
+                        iconColor: .systemYellow,
+                        screen: anchorScreen
+                    )
                     return
                 }
                 let target = settings.translationTargetLanguage
-                showLoadingResult(regions: regions, target: target, anchor: anchor, anchorScreen: anchorScreen)
+                showTranslation(
+                    in: window,
+                    regions: regions,
+                    target: target,
+                    anchor: anchor,
+                    anchorScreen: anchorScreen
+                )
+                translationTask = nil
             } catch {
+                guard let window,
+                      translationGeneration.isCurrent(requestID),
+                      resultWindow === window,
+                      !Task.isCancelled else { return }
+                closeResultWindow(window)
                 showToast(
                     "OCR failed: \(error.localizedDescription)",
                     icon: "xmark.circle.fill",
-                    iconColor: .systemRed
+                    iconColor: .systemRed,
+                    screen: anchorScreen
                 )
                 logger.error("OCR error: \(error.localizedDescription, privacy: .public)")
             }
@@ -154,30 +223,48 @@ final class TranslationCoordinator {
     }
 
     private func showLoadingResult(regions: [TextRegion], target: String, anchor: NSRect?, anchorScreen: NSScreen?) {
-        resultWindow?.close()
-        let window = TranslationResultWindow(
+        let window = makeResultWindow(anchor: anchor, anchorScreen: anchorScreen)
+        showTranslation(
+            in: window,
             regions: regions,
             target: target,
-            provider: settings.translationProvider,
-            providerConfig: providerConfig(),
+            anchor: anchor,
+            anchorScreen: anchorScreen
+        )
+    }
+
+    private func makeResultWindow(anchor: NSRect?, anchorScreen: NSScreen?) -> TranslationResultWindow {
+        resultWindow?.close()
+        let window = TranslationResultWindow(
             settings: settings,
             anchor: anchor,
             anchorScreen: anchorScreen
         )
-        window.onClose = { [weak self] in
-            self?.resultWindow?.close()
-            self?.resultWindow = nil
+        window.onClose = { [weak self, weak window] in
+            guard let self, let window, self.resultWindow === window else { return }
+            self.closeResultWindow(window)
         }
-        window.onPinChanged = { [weak self] isPinned in
-            guard let window = self?.resultWindow else { return }
+        window.onPinChanged = { [weak self, weak window] isPinned in
+            guard let self, let window, self.resultWindow === window else { return }
             // `.screenSaver` floats above everything — including other apps'
             // windows — making the translation card genuinely always-on-top
             // when pinned. Unpinning returns to regular floating level.
             window.setPinned(isPinned)
             window.level = isPinned ? .screenSaver : .floating
         }
-        window.onChangeLanguage = { [weak self] in
-            guard let self else { return }
+        resultWindow = window
+        return window
+    }
+
+    private func showTranslation(
+        in window: TranslationResultWindow,
+        regions: [TextRegion],
+        target: String,
+        anchor: NSRect?,
+        anchorScreen: NSScreen?
+    ) {
+        window.onChangeLanguage = { [weak self, weak window] in
+            guard let self, let window, self.resultWindow === window else { return }
             // Fall back includes all 20 macOS 15 target languages (adds th, vi
             // that the earlier list missed). Apple may add more in later
             // OS versions — `LanguageAvailability.supportedLanguages` gives
@@ -189,19 +276,23 @@ final class TranslationCoordinator {
                 "tr", "uk", "vi", "zh-Hans", "zh-Hant"
             ]
 
-            Task { @MainActor in
+            Task { @MainActor [weak self, weak window] in
+                guard let self, let window, self.resultWindow === window else { return }
                 let supportedCodes = await Self.loadSupportedLanguageCodes(fallback: fallbackCodes)
+                guard self.resultWindow === window else { return }
                 let popover = NSPopover()
                 let picker = TranslationLanguagePickerPopover(
                     current: target,
                     available: supportedCodes
-                ) { newCode in
+                ) { [weak self, weak window] newCode in
                     popover.performClose(nil)
+                    guard let self, let window, self.resultWindow === window else { return }
+                    _ = self.beginTranslationRequest()
                     self.showLoadingResult(regions: regions, target: newCode, anchor: anchor, anchorScreen: anchorScreen)
                 }
                 popover.contentViewController = NSHostingController(rootView: picker)
                 popover.behavior = .transient
-                if let contentView = self.resultWindow?.contentView {
+                if let contentView = window.contentView {
                     popover.show(
                         relativeTo: contentView.bounds,
                         of: contentView,
@@ -210,27 +301,46 @@ final class TranslationCoordinator {
                 }
             }
         }
-        resultWindow = window
-        window.show()
+        window.showTranslation(
+            regions: regions,
+            target: target,
+            provider: settings.translationProvider,
+            providerConfig: providerConfig()
+        )
+    }
+
+    private func closeResultWindow(_ window: TranslationResultWindow) {
+        guard resultWindow === window else { return }
+        translationTask?.cancel()
+        translationTask = nil
+        translationGeneration.invalidate()
+        window.close()
+        resultWindow = nil
     }
 
     private func beginSelectedTextFlow() {
-        Task {
+        let requestID = beginTranslationRequest()
+        translationTask = Task { [weak self] in
+            guard let self else { return }
             guard AXIsProcessTrusted() else {
                 let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
                 _ = AXIsProcessTrustedWithOptions(options)
                 NotificationCenter.default.post(name: .openPreferencesTab, object: PreferencesTab.permissions)
                 NSWorkspace.shared.open(PermissionKind.accessibility.settingsURL)
                 showToast("Allow Accessibility to translate selected text", icon: "lock.fill", iconColor: .systemYellow)
+                finishTranslationRequest(requestID)
                 return
             }
 
             guard let text = await SelectedTextReader.readSelectedText(),
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                guard translationGeneration.isCurrent(requestID), !Task.isCancelled else { return }
                 showToast("No selected text found", icon: "text.cursor", iconColor: .systemYellow)
+                finishTranslationRequest(requestID)
                 return
             }
 
+            guard translationGeneration.isCurrent(requestID), !Task.isCancelled else { return }
             let region = TextRegion(text: text, boundingBox: .zero, confidence: 1)
             let (anchor, screen) = Self.mouseAnchor()
             showLoadingResult(
@@ -239,6 +349,7 @@ final class TranslationCoordinator {
                 anchor: anchor,
                 anchorScreen: screen
             )
+            translationTask = nil
         }
     }
 
@@ -247,6 +358,7 @@ final class TranslationCoordinator {
             let region = try TypedTranslationInput(rawText: text).makeTextRegion()
             typedInputWindow?.close()
             typedInputWindow = nil
+            _ = beginTranslationRequest()
             showLoadingResult(
                 regions: [region],
                 target: settings.translationTargetLanguage,
@@ -264,6 +376,21 @@ final class TranslationCoordinator {
             endpoint: settings.translationProviderEndpoint,
             model: settings.translationProviderModel
         )
+    }
+
+    @discardableResult
+    private func beginTranslationRequest() -> UUID {
+        translationTask?.cancel()
+        translationTask = nil
+        resultWindow?.close()
+        resultWindow = nil
+        return translationGeneration.begin()
+    }
+
+    private func finishTranslationRequest(_ requestID: UUID) {
+        guard translationGeneration.isCurrent(requestID) else { return }
+        translationTask = nil
+        translationGeneration.invalidate()
     }
 
     private static func mouseAnchor() -> (NSRect, NSScreen?) {

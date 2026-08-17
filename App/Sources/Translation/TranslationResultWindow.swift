@@ -7,15 +7,17 @@ import TranslationKit
 
 @MainActor
 final class TranslationResultWindow: NSPanel {
+    private static let cardWidth: CGFloat = 420
+    private static let recognizingHeight: CGFloat = 160
+
     private let settings: AppSettings
-    private let regions: [TextRegion]
-    private let target: String
-    private let provider: TranslationProviderKind
-    private let providerConfig: TranslationProviderConfiguration
+    private let anchor: NSRect?
+    private let anchorScreen: NSScreen?
     private var dismissTimer: Timer?
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
     private var isPinned = false
+    private var translationCompleted = false
 
     var onClose: (() -> Void)?
     var onPinChanged: ((Bool) -> Void)?
@@ -24,24 +26,16 @@ final class TranslationResultWindow: NSPanel {
     override var canBecomeKey: Bool { true }
 
     init(
-        regions: [TextRegion],
-        target: String,
-        provider: TranslationProviderKind,
-        providerConfig: TranslationProviderConfiguration,
         settings: AppSettings,
         anchor: NSRect?,
         anchorScreen: NSScreen?
     ) {
-        self.regions = regions
-        self.target = target
-        self.provider = provider
-        self.providerConfig = providerConfig
         self.settings = settings
+        self.anchor = anchor
+        self.anchorScreen = anchorScreen
 
-        // Fixed window size matching the SwiftUI view's `.frame(width: 420, height: 520)`.
-        // No auto-resize — internal ScrollView handles overflow.
         let frame = Self.positionedFrame(
-            size: NSSize(width: 420, height: 520),
+            size: NSSize(width: Self.cardWidth, height: Self.recognizingHeight),
             anchor: anchor,
             anchorScreen: anchorScreen,
             position: settings.translationCardPosition
@@ -63,7 +57,29 @@ final class TranslationResultWindow: NSPanel {
         isReleasedWhenClosed = false
     }
 
-    func show() {
+    func showRecognizing() {
+        translationCompleted = false
+        disarmAutoDismiss()
+        resize(height: Self.recognizingHeight)
+        contentView = NSHostingView(rootView: TranslationRecognizingView(
+            onClose: { [weak self] in self?.onClose?() }
+        ))
+        makeKeyAndOrderFront(nil)
+    }
+
+    func showTranslation(
+        regions: [TextRegion],
+        target: String,
+        provider: TranslationProviderKind,
+        providerConfig: TranslationProviderConfiguration
+    ) {
+        translationCompleted = false
+        disarmAutoDismiss()
+        let sourceText = TranslationTextLayout.compose(regions.map {
+            TranslationTextLine(text: $0.text, frame: $0.boundingBox)
+        })
+        let height = Self.preferredHeight(for: sourceText)
+        resize(height: height)
         let view = TranslationResultView(
             regions: regions,
             target: target,
@@ -73,20 +89,45 @@ final class TranslationResultWindow: NSPanel {
             showOriginal: settings.translationShowOriginal,
             onClose:          { [weak self] in self?.onClose?() },
             onPinChanged:     { [weak self] isPinned in self?.onPinChanged?(isPinned) },
-            onChangeLanguage: { [weak self] in self?.onChangeLanguage?() }
+            onChangeLanguage: { [weak self] in self?.onChangeLanguage?() },
+            onTranslationCompleted: { [weak self] in self?.translationDidComplete() },
+            height: height
         )
         // Plain NSHostingView (no NSHostingController sizingOptions) — prevents
         // the window <=> SwiftUI layout feedback loop that was causing stack overflow.
         contentView = NSHostingView(rootView: view)
 
         makeKeyAndOrderFront(nil)
+    }
 
+    static func preferredHeight(for text: String) -> CGFloat {
+        let estimatedLineCount = text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .reduce(0) { count, line in
+                count + max(1, Int(ceil(Double(line.count) / 48)))
+            }
+        let estimatedHeight = 130 + CGFloat(estimatedLineCount) * 22
+        return min(520, max(240, estimatedHeight))
+    }
+
+    func translationDidComplete() {
+        guard !translationCompleted else { return }
+        translationCompleted = true
+        armAutoDismissIfNeeded()
+    }
+
+    private func armAutoDismissIfNeeded() {
+        guard translationCompleted, !isPinned else { return }
+        disarmAutoDismiss()
         if settings.translationAutoDismiss == .afterDelay {
             dismissTimer = Timer.scheduledTimer(
                 withTimeInterval: settings.translationAutoDismissDelay,
                 repeats: false
             ) { [weak self] _ in
-                Task { @MainActor in self?.onClose?() }
+                Task { @MainActor in
+                    guard let self, self.translationCompleted, !self.isPinned else { return }
+                    self.onClose?()
+                }
             }
         }
         if settings.translationAutoDismiss == .clickOutside {
@@ -96,13 +137,32 @@ final class TranslationResultWindow: NSPanel {
 
     func setPinned(_ pinned: Bool) {
         isPinned = pinned
+        if pinned {
+            disarmAutoDismiss()
+        } else {
+            armAutoDismissIfNeeded()
+        }
     }
 
     override func close() {
+        disarmAutoDismiss()
+        super.close()
+    }
+
+    private func disarmAutoDismiss() {
         dismissTimer?.invalidate()
         dismissTimer = nil
         removeClickOutsideMonitors()
-        super.close()
+    }
+
+    private func resize(height: CGFloat) {
+        let frame = Self.positionedFrame(
+            size: NSSize(width: Self.cardWidth, height: height),
+            anchor: anchor,
+            anchorScreen: anchorScreen,
+            position: settings.translationCardPosition
+        )
+        setFrame(frame, display: true)
     }
 
     private func installClickOutsideMonitors() {
@@ -168,5 +228,43 @@ final class TranslationResultWindow: NSPanel {
             }
             return centered()
         }
+    }
+}
+
+private struct TranslationRecognizingView: View {
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Button(action: onClose) {
+                    Circle()
+                        .fill(Color.red.opacity(0.9))
+                        .frame(width: 11, height: 11)
+                        .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+                .help("Close")
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            HStack(spacing: 12) {
+                ProgressView().controlSize(.small)
+                Text("Recognizing text…")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.bottom, 24)
+        }
+        .frame(width: 420, height: 160)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
     }
 }

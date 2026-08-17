@@ -49,6 +49,7 @@ final class RecordingSelectionModeWindow: NSPanel {
     private let onSelect: (RecordingSelectionMode) -> Void
     private let onCancel: () -> Void
     private let canUseLastArea: Bool
+    private var selectedMode: RecordingSelectionMode
 
     init(
         screen: NSScreen,
@@ -60,6 +61,7 @@ final class RecordingSelectionModeWindow: NSPanel {
         self.onSelect = onSelect
         self.onCancel = onCancel
         self.canUseLastArea = canUseLastArea
+        self.selectedMode = selectedMode
 
         let size = NSSize(width: 520, height: 68)
         let visible = screen.visibleFrame
@@ -88,7 +90,7 @@ final class RecordingSelectionModeWindow: NSPanel {
         contentView = NSHostingView(rootView: RecordingSelectionModeRail(
             selectedMode: selectedMode,
             canUseLastArea: canUseLastArea,
-            onSelect: onSelect
+            onSelect: { [weak self] mode in self?.selectMode(mode) }
         ))
     }
 
@@ -101,9 +103,18 @@ final class RecordingSelectionModeWindow: NSPanel {
         makeFirstResponder(contentView)
     }
 
+    func setSelectedMode(_ mode: RecordingSelectionMode) {
+        selectedMode = mode
+        updateContent()
+    }
+
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 {
             onCancel()
+            return
+        }
+        if event.keyCode == 49 {
+            selectMode(selectedMode == .window ? .area : .window)
             return
         }
         if let action = CaptureOverlayShortcutAction(event: event) {
@@ -112,10 +123,25 @@ final class RecordingSelectionModeWindow: NSPanel {
                 NSSound.beep()
                 return
             }
-            onSelect(mode)
+            selectMode(mode)
             return
         }
         super.keyDown(with: event)
+    }
+
+    private func selectMode(_ mode: RecordingSelectionMode) {
+        selectedMode = mode
+        updateContent()
+        onSelect(mode)
+    }
+
+    private func updateContent() {
+        contentView = NSHostingView(rootView: RecordingSelectionModeRail(
+            selectedMode: selectedMode,
+            canUseLastArea: canUseLastArea,
+            onSelect: { [weak self] mode in self?.selectMode(mode) }
+        ))
+        makeFirstResponder(contentView)
     }
 }
 

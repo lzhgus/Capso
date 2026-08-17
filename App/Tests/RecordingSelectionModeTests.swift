@@ -76,6 +76,62 @@ final class RecordingSelectionModeTests: XCTestCase {
         XCTAssertTrue(requestedActions.isEmpty)
     }
 
+    func testSpaceTogglesAreaModeToWindowInFocusedHUD() throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        var requestedModes: [RecordingSelectionMode] = []
+        let window = RecordingSelectionModeWindow(
+            screen: screen,
+            selectedMode: .area,
+            canUseLastArea: false,
+            onSelect: { requestedModes.append($0) },
+            onCancel: {}
+        )
+        defer { window.close() }
+
+        window.keyDown(with: try makeKeyEvent(" ", keyCode: 49, windowNumber: window.windowNumber))
+
+        XCTAssertEqual(requestedModes, [.window])
+    }
+
+    func testRepeatedSpaceCancelsPendingWindowModeRequest() throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        var requestedModes: [RecordingSelectionMode] = []
+        let window = RecordingSelectionModeWindow(
+            screen: screen,
+            selectedMode: .area,
+            canUseLastArea: false,
+            onSelect: { requestedModes.append($0) },
+            onCancel: {}
+        )
+        defer { window.close() }
+        let event = try makeKeyEvent(" ", keyCode: 49, windowNumber: window.windowNumber)
+
+        window.keyDown(with: event)
+        window.keyDown(with: event)
+
+        XCTAssertEqual(requestedModes, [.window, .area])
+    }
+
+    func testHUDCanRestoreAreaAfterWindowEnumerationFailure() throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        var requestedModes: [RecordingSelectionMode] = []
+        let window = RecordingSelectionModeWindow(
+            screen: screen,
+            selectedMode: .area,
+            canUseLastArea: false,
+            onSelect: { requestedModes.append($0) },
+            onCancel: {}
+        )
+        defer { window.close() }
+        let event = try makeKeyEvent(" ", keyCode: 49, windowNumber: window.windowNumber)
+
+        window.keyDown(with: event)
+        window.setSelectedMode(.area)
+        window.keyDown(with: event)
+
+        XCTAssertEqual(requestedModes, [.window, .window])
+    }
+
     func testSelectedAreaIsRememberedWhenAutomaticReuseIsOff() throws {
         let suiteName = "RecordingSelectionModeTests.\(UUID().uuidString)"
         defer {

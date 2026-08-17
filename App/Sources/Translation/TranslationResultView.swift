@@ -17,6 +17,8 @@ struct TranslationResultView: View {
     let onClose: () -> Void
     let onPinChanged: (Bool) -> Void
     let onChangeLanguage: () -> Void
+    let onTranslationCompleted: () -> Void
+    let height: CGFloat
 
     enum Phase {
         case loading
@@ -31,6 +33,7 @@ struct TranslationResultView: View {
     @State private var isPinned: Bool = false
     @State private var manualCopyShown: Bool = false
     @State private var providerTask: Task<Void, Never>?
+    @State private var completionReported: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -45,7 +48,7 @@ struct TranslationResultView: View {
 
             footer(copiedMessage: shouldShowCopied ? "Copied" : nil)
         }
-        .frame(width: 420, height: 520)
+        .frame(width: 420, height: height)
         .background(hiddenEscape)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -79,7 +82,7 @@ struct TranslationResultView: View {
         case .streaming(let region):
             streamingSection(region: region)
         case .failed(let message):
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
@@ -88,9 +91,17 @@ struct TranslationResultView: View {
                         .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 20)
+
+                HStack(spacing: 8) {
+                    Button("Retry", action: retryTranslation)
+                        .buttonStyle(.borderedProminent)
+                    Button("Open Settings", action: openTranslationSettings)
+                        .buttonStyle(.bordered)
+                }
+                .controlSize(.small)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 20)
         }
     }
 
@@ -387,7 +398,7 @@ struct TranslationResultView: View {
     }
 
     private func startTranslation() {
-        originalExpanded = showOriginal
+        originalExpanded = false
         guard provider == .apple else {
             runConfig = nil
             providerTask?.cancel()
@@ -397,11 +408,49 @@ struct TranslationResultView: View {
         buildConfig()
     }
 
+    private func retryTranslation() {
+        providerTask?.cancel()
+        manualCopyShown = false
+        completionReported = false
+        phase = .loading
+
+        if provider == .apple {
+            runConfig = nil
+            Task { @MainActor in
+                await Task.yield()
+                buildConfig()
+            }
+        } else {
+            providerTask = Task { await runProviderTranslation() }
+        }
+    }
+
+    private func openTranslationSettings() {
+        NotificationCenter.default.post(name: .openPreferencesTab, object: PreferencesTab.ocr)
+    }
+
+    private func finishTranslation(with result: TranslatedRegion) {
+        phase = .done([result])
+        guard !completionReported else { return }
+        completionReported = true
+        onTranslationCompleted()
+    }
+
     /// Normalizes codes for comparison (e.g. NLLanguageRecognizer returns
     /// "zh-Hans" / "zh-Hant"; our target stores the same form). Makes matching
     /// robust to minor casing/encoding differences.
     private static func normalizedCode(_ code: String) -> String {
         code.lowercased()
+    }
+
+    static func visibleFailureMessage(for error: Error) -> String? {
+        if error is CancellationError {
+            return nil
+        }
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return nil
+        }
+        return error.localizedDescription
     }
 
     private func runTranslation(using session: TranslationSession) async {
@@ -444,9 +493,11 @@ struct TranslationResultView: View {
                 translation: response.targetText,
                 detectedSource: Locale.Language(identifier: detectedSource.isEmpty ? "en" : detectedSource)
             )
-            phase = .done([result])
+            finishTranslation(with: result)
         } catch {
-            phase = .failed(error.localizedDescription)
+            if let message = Self.visibleFailureMessage(for: error) {
+                phase = .failed(message)
+            }
         }
     }
 
@@ -493,9 +544,11 @@ struct TranslationResultView: View {
                 translation: response.text,
                 detectedSource: Locale.Language(identifier: response.detectedSource ?? "und")
             )
-            phase = .done([result])
+            finishTranslation(with: result)
         } catch {
-            phase = .failed(error.localizedDescription)
+            if let message = Self.visibleFailureMessage(for: error) {
+                phase = .failed(message)
+            }
         }
     }
 

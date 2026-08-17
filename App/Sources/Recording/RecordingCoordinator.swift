@@ -118,10 +118,15 @@ final class RecordingCoordinator {
             do {
                 let windows = try await ContentEnumerator.windows()
                     .filter { !overlayIDs.contains($0.id) }
-                guard !Task.isCancelled, !windows.isEmpty else { return }
+                guard !Task.isCancelled else { return }
+                guard !windows.isEmpty else {
+                    selectionModeWindow?.setSelectedMode(.area)
+                    return
+                }
                 showWindowSelectionOverlay(windows: windows)
             } catch {
                 guard !Task.isCancelled else { return }
+                selectionModeWindow?.setSelectedMode(.area)
                 print("Window enumeration failed: \(error)")
             }
         }
