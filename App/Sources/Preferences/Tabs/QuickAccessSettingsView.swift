@@ -12,15 +12,25 @@ struct QuickAccessSettingsView: View {
 
             SettingGroup(title: "Position") {
                 SettingCard {
-                    SettingRow(label: "Preview Position", sublabel: "Where the floating preview appears") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Preview Position")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.primary)
+                            Text("Where the floating preview appears")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.tertiary)
+                        }
                         Picker("", selection: $viewModel.quickAccessPosition) {
                             Text("↙ Bottom Left").tag(QuickAccessPosition.bottomLeft)
                             Text("◎ Center").tag(QuickAccessPosition.centerScreen)
                             Text("↘ Bottom Right").tag(QuickAccessPosition.bottomRight)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 300)
+                        .frame(maxWidth: .infinity)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                 }
             }
 
