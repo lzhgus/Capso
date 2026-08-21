@@ -342,6 +342,8 @@ public enum ClipboardPinContentReader {
             return nil
         }
 
+        context.translateBy(x: 0, y: height)
+        context.scaleBy(x: 1, y: -1)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
         defer { NSGraphicsContext.restoreGraphicsState() }
@@ -420,6 +422,8 @@ public enum ClipboardPinContentReader {
         context.setFillColor(srgb.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: 1, y: -1)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
         defer { NSGraphicsContext.restoreGraphicsState() }

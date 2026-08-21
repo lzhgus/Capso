@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import Vision
 @testable import SharedKit
 
 @Suite("ClipboardPinContentReader")
@@ -45,6 +46,22 @@ struct ClipboardPinContentReaderTests {
         #expect(image.colorSpace?.name == CGColorSpace.sRGB)
         #expect(image.bitsPerComponent == 8)
         #expect(try rgbaPixel(in: image, x: 10, y: 10) == [0, 255, 128, 255])
+    }
+
+    @Test("renders color card labels upright")
+    @MainActor
+    func rendersColorLabelsUpright() throws {
+        let pasteboard = makePasteboard()
+        pasteboard.setString("#00FF80", forType: .string)
+
+        let result = ClipboardPinContentReader.render(from: pasteboard)
+
+        guard case let .image(image) = result else {
+            Issue.record("Expected a color card, got \(result)")
+            return
+        }
+        let recognized = try recognizedText(in: image)
+        #expect(recognized.contains("00FF80"))
     }
 
     @Test("renders integer RGB clipboard colors as color cards")
@@ -277,6 +294,31 @@ struct ClipboardPinContentReaderTests {
         #expect(image.height >= 100)
         #expect(image.colorSpace?.name == CGColorSpace.sRGB)
         #expect(image.bitsPerComponent == 8)
+    }
+
+    @Test("renders clipboard text upright")
+    @MainActor
+    func rendersTextUpright() throws {
+        let pasteboard = makePasteboard()
+        pasteboard.setString("CAPSO UPRIGHT 123", forType: .string)
+
+        let result = ClipboardPinContentReader.render(from: pasteboard)
+
+        guard case let .image(image) = result else {
+            Issue.record("Expected rendered clipboard text, got \(result)")
+            return
+        }
+        let recognized = try recognizedText(in: image)
+        #expect(recognized.contains("CAPSO UPRIGHT 123"))
+    }
+
+    private func recognizedText(in image: CGImage) throws -> String {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        try VNImageRequestHandler(cgImage: image).perform([request])
+        return (request.results ?? [])
+            .compactMap { $0.topCandidates(1).first?.string.uppercased() }
+            .joined(separator: " ")
     }
 
     private func makePasteboard() -> NSPasteboard {
