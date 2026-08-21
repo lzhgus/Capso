@@ -8,6 +8,7 @@ final class PinnedScreenshotWindow: NSPanel {
     private let image: CGImage
     private let onCopy: () -> Void
     private let onSave: () -> Void
+    let activatesAppWhenShown: Bool
     var onDidClose: (UUID) -> Void
     private var screenshotView: PinnedScreenshotContentView!
 
@@ -26,6 +27,7 @@ final class PinnedScreenshotWindow: NSPanel {
     init(
         image: CGImage,
         anchorRect: CGRect?,
+        activatesApp: Bool = true,
         onCopy: @escaping () -> Void,
         onSave: @escaping () -> Void,
         onDidClose: @escaping (UUID) -> Void
@@ -33,6 +35,7 @@ final class PinnedScreenshotWindow: NSPanel {
         self.image = image
         self.onCopy = onCopy
         self.onSave = onSave
+        activatesAppWhenShown = activatesApp
         self.onDidClose = onDidClose
 
         let imageWidth = CGFloat(image.width)
@@ -52,7 +55,7 @@ final class PinnedScreenshotWindow: NSPanel {
 
         super.init(
             contentRect: NSRect(x: x, y: y, width: width, height: height),
-            styleMask: [.borderless],
+            styleMask: activatesApp ? [.borderless] : [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -79,8 +82,12 @@ final class PinnedScreenshotWindow: NSPanel {
     }
 
     func show() {
-        makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if activatesAppWhenShown {
+            makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            orderFrontRegardless()
+        }
     }
 
     override func cancelOperation(_ sender: Any?) {

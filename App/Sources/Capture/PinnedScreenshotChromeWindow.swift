@@ -8,12 +8,12 @@ final class PinnedScreenshotChromeWindow: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    init(frame: CGRect) {
+    init(frame: CGRect, activatesApp: Bool = true) {
         chromeView = PinnedScreenshotChromeView(frame: NSRect(origin: .zero, size: frame.size))
 
         super.init(
             contentRect: frame,
-            styleMask: [.borderless],
+            styleMask: activatesApp ? [.borderless] : [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )

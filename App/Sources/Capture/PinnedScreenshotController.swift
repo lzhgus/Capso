@@ -9,6 +9,7 @@ final class PinnedScreenshotController {
     private let onCopy: () -> Void
     private let onSave: () -> Void
     private let onDidClose: (UUID) -> Void
+    private let activatesApp: Bool
 
     private let contentWindow: PinnedScreenshotWindow
     private let chromeWindow: PinnedScreenshotChromeWindow
@@ -20,6 +21,7 @@ final class PinnedScreenshotController {
     init(
         image: CGImage,
         anchorRect: CGRect?,
+        activatesApp: Bool = true,
         onCopy: @escaping () -> Void,
         onSave: @escaping () -> Void,
         onDidClose: @escaping (UUID) -> Void
@@ -28,15 +30,20 @@ final class PinnedScreenshotController {
         self.onCopy = onCopy
         self.onSave = onSave
         self.onDidClose = onDidClose
+        self.activatesApp = activatesApp
 
         contentWindow = PinnedScreenshotWindow(
             image: image,
             anchorRect: anchorRect,
+            activatesApp: activatesApp,
             onCopy: onCopy,
             onSave: onSave,
             onDidClose: { _ in }
         )
-        chromeWindow = PinnedScreenshotChromeWindow(frame: contentWindow.frame)
+        chromeWindow = PinnedScreenshotChromeWindow(
+            frame: contentWindow.frame,
+            activatesApp: activatesApp
+        )
 
         contentWindow.onDidClose = { [weak self] _ in
             self?.closeAll(fromContentWindow: true)
@@ -58,7 +65,11 @@ final class PinnedScreenshotController {
     func show() {
         contentWindow.show()
         contentWindow.addChildWindow(chromeWindow, ordered: .above)
-        chromeWindow.orderFront(nil)
+        if activatesApp {
+            chromeWindow.orderFront(nil)
+        } else {
+            chromeWindow.orderFrontRegardless()
+        }
     }
 
     func updateZoomHUD(scalePercent: Int) {

@@ -173,6 +173,37 @@ final class CaptureCoordinator {
         startAreaCapture()
     }
 
+    func pinFromClipboard(pasteboard: NSPasteboard = .general) {
+        let screen = NSScreen.screens.first {
+            NSMouseInRect(NSEvent.mouseLocation, $0.frame, false)
+        } ?? NSScreen.main
+
+        switch ClipboardPinContentReader.render(
+            from: pasteboard,
+            visibleFrame: screen?.visibleFrame
+        ) {
+        case let .image(image):
+            pinRenderedImage(
+                image,
+                anchor: screen?.frame,
+                sourceAppName: String(localized: "Clipboard"),
+                activatesApp: false
+            )
+        case .tooLarge:
+            showToast(
+                String(localized: "Clipboard content is too large to pin"),
+                icon: "exclamationmark.triangle",
+                iconColor: .systemYellow
+            )
+        case .unsupported:
+            showToast(
+                String(localized: "No supported content found on clipboard"),
+                icon: "doc.on.clipboard",
+                iconColor: .systemYellow
+            )
+        }
+    }
+
     func editClipboardImage() {
         guard let image = ClipboardImageReader.image() else {
             showToast(
@@ -1887,11 +1918,13 @@ final class CaptureCoordinator {
         anchor: CGRect?,
         sourceAppName: String? = nil,
         sourceWindowTitle: String? = nil,
-        date: Date = Date()
+        date: Date = Date(),
+        activatesApp: Bool = true
     ) {
         let controller = PinnedScreenshotController(
             image: image,
             anchorRect: anchor,
+            activatesApp: activatesApp,
             onCopy: { [weak self] in
                 self?.copyRenderedScreenshotToClipboard(image)
             },

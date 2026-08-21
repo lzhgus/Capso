@@ -89,6 +89,11 @@ final class MenuBarController: NSObject {
         captureWindow.setShortcut(for: .captureWindow)
         menu.addItem(captureWindow)
 
+        let pinFromClipboard = menuItem(String(localized: "Pin from Clipboard"), action: #selector(pinFromClipboard))
+        pinFromClipboard.setShortcut(for: .pinFromClipboard)
+        pinFromClipboard.toolTip = String(localized: "Float copied images, text, colors, or files above other windows")
+        menu.addItem(pinFromClipboard)
+
         let editClipboardImage = menuItem(String(localized: "Edit Clipboard Image"), action: #selector(editClipboardImage))
         editClipboardImage.setShortcut(for: .editClipboardImage)
         editClipboardImage.toolTip = String(localized: "Open the image currently copied to the clipboard in Annotate")
@@ -250,6 +255,10 @@ final class MenuBarController: NSObject {
         captureCoordinator.captureWindow()
     }
 
+    @objc private func pinFromClipboard() {
+        captureCoordinator.pinFromClipboard()
+    }
+
     @objc private func editClipboardImage() {
         captureCoordinator.editClipboardImage()
     }
@@ -315,6 +324,7 @@ extension MenuBarController: NSMenuDelegate {
             case #selector(captureArea): item.setShortcut(for: .captureArea)
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)
             case #selector(captureWindow): item.setShortcut(for: .captureWindow)
+            case #selector(pinFromClipboard): item.setShortcut(for: .pinFromClipboard)
             case #selector(editClipboardImage): item.setShortcut(for: .editClipboardImage)
             case #selector(captureText): item.setShortcut(for: .captureText)
             case #selector(captureAndTranslate): item.setShortcut(for: .captureAndTranslate)
