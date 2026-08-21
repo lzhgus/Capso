@@ -193,9 +193,14 @@ public enum ClipboardPinContentReader {
             return .image(image)
         }
 
-        if let attributed = attributedText(from: pasteboard),
-           let image = renderCard(attributed, visibleFrame: visibleFrame) {
-            return .image(image)
+        if let attributed = attributedText(from: pasteboard) {
+            let content = attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !content.isEmpty {
+                guard attributed.length <= maxTextLength else { return .tooLarge }
+                if let image = renderCard(attributed, visibleFrame: visibleFrame) {
+                    return .image(image)
+                }
+            }
         }
 
         switch readImage(from: pasteboard) {
@@ -204,9 +209,11 @@ public enum ClipboardPinContentReader {
         case .unsupported: break
         }
 
-        if let text = htmlText(from: pasteboard),
-           let image = renderCard(plainAttributedString(text), visibleFrame: visibleFrame) {
-            return .image(image)
+        if let text = htmlText(from: pasteboard) {
+            guard text.utf16.count <= maxTextLength else { return .tooLarge }
+            if let image = renderCard(plainAttributedString(text), visibleFrame: visibleFrame) {
+                return .image(image)
+            }
         }
 
         guard let text = pasteboard.string(forType: .string)?
@@ -327,7 +334,8 @@ public enum ClipboardPinContentReader {
             with: NSSize(width: maxContentWidth, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading]
         )
-        let width = max(320, ceil(measured.width + padding.left + padding.right))
+        let maxWidth = ceil(maxContentWidth + padding.left + padding.right)
+        let width = min(maxWidth, max(320, ceil(measured.width + padding.left + padding.right)))
         let height = min(8_000, max(120, ceil(measured.height + padding.top + padding.bottom)))
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(

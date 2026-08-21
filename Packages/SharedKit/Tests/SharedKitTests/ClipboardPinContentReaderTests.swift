@@ -159,6 +159,32 @@ struct ClipboardPinContentReaderTests {
         #expect(parsed.string == "RTFD content")
     }
 
+    @Test("ignores empty rich text when the clipboard also contains an image")
+    @MainActor
+    func emptyRichTextFallsBackToImage() throws {
+        let source = try makeImage(width: 11, height: 7)
+        let pngData = try #require(ImageUtilities.pngData(from: source))
+        let blank = NSAttributedString(string: " \n ")
+        let rtfData = try blank.data(
+            from: NSRange(location: 0, length: blank.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
+        let item = NSPasteboardItem()
+        item.setData(rtfData, forType: .rtf)
+        item.setData(pngData, forType: .png)
+        let pasteboard = makePasteboard()
+        pasteboard.writeObjects([item])
+
+        let result = ClipboardPinContentReader.render(from: pasteboard)
+
+        guard case let .image(image) = result else {
+            Issue.record("Expected the clipboard image, got \(result)")
+            return
+        }
+        #expect(image.width == 11)
+        #expect(image.height == 7)
+    }
+
     @Test("converts HTML locally without retaining remote resources or scripts")
     @MainActor
     func convertsHTMLSafely() throws {
@@ -271,6 +297,45 @@ struct ClipboardPinContentReaderTests {
 
         guard case .tooLarge = result else {
             Issue.record("Expected oversized clipboard content, got \(result)")
+            return
+        }
+    }
+
+    @Test("rejects rich text that expands beyond the text limit")
+    @MainActor
+    func rejectsExpandedRichText() throws {
+        let source = NSAttributedString(string: String(repeating: "A", count: 100_001))
+        let data = try source.data(
+            from: NSRange(location: 0, length: source.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
+        let item = NSPasteboardItem()
+        item.setData(data, forType: .rtf)
+        item.setString("short fallback", forType: .string)
+        let pasteboard = makePasteboard()
+        pasteboard.writeObjects([item])
+
+        let result = ClipboardPinContentReader.render(from: pasteboard)
+
+        guard case .tooLarge = result else {
+            Issue.record("Expected expanded rich text to be rejected, got \(result)")
+            return
+        }
+    }
+
+    @Test("rejects HTML that expands beyond the text limit")
+    @MainActor
+    func rejectsExpandedHTML() {
+        let item = NSPasteboardItem()
+        item.setString("<p>\(String(repeating: "A", count: 100_001))</p>", forType: .html)
+        item.setString("short fallback", forType: .string)
+        let pasteboard = makePasteboard()
+        pasteboard.writeObjects([item])
+
+        let result = ClipboardPinContentReader.render(from: pasteboard)
+
+        guard case .tooLarge = result else {
+            Issue.record("Expected expanded HTML to be rejected, got \(result)")
             return
         }
     }
