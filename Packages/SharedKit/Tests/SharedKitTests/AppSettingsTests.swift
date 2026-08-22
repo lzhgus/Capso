@@ -4,6 +4,19 @@ import Testing
 
 @Suite("AppSettings")
 struct AppSettingsTests {
+    @Test("Recording auto-copy defaults off and persists")
+    func recordingAutoCopyPersists() {
+        let suite = "test.recordingAutoCopy"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        #expect(!first.recordingAutoCopy)
+
+        first.recordingAutoCopy = true
+        #expect(AppSettings(defaults: defaults).recordingAutoCopy)
+    }
+
     @Test("Default export location is Desktop")
     func defaultExportLocation() {
         let settings = AppSettings()

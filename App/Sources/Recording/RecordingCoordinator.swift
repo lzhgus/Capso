@@ -64,6 +64,13 @@ final class RecordingCoordinator {
     private var escEventTap: CFMachPort?
     private var escEventTapRunLoopSource: CFRunLoopSource?
     private var automaticUploadSourceTasks: [URL: Task<URL?, Never>] = [:]
+    private struct AutomaticClipboardCopyResult {
+        let copied: Bool
+        let fileURL: URL?
+    }
+
+    private var automaticClipboardCopyTasks: [URL: Task<AutomaticClipboardCopyResult, Never>] = [:]
+    private var automaticClipboardCopyState: [URL: RecordingClipboardState] = [:]
 
     // Selection state
     private var selectedRect: CGRect = .zero
@@ -686,6 +693,7 @@ final class RecordingCoordinator {
                 let format = result.format as RecordingKit.RecordingFormat
                 let entryID = UUID()
                 saveRecordingToHistory(url: tempURL, format: format, entryID: entryID)
+                startAutomaticClipboardCopyIfNeeded(url: tempURL, format: format)
                 startAutomaticUploadIfNeeded(url: tempURL, format: format, entryID: entryID)
 
                 if settings.openEditorAfterRecording {
@@ -704,7 +712,7 @@ final class RecordingCoordinator {
                     let size = VideoThumbnail.formattedFileSize(VideoThumbnail.fileSize(at: tempURL))
                     let duration = VideoThumbnail.formattedDuration(result.duration)
                     showRecordingPreview(thumbnail: nsThumb, duration: duration, fileSize: size,
-                                        tempURL: tempURL, format: result.format as RecordingKit.RecordingFormat)
+                                        tempURL: tempURL, format: format)
                 }
             } catch {
                 print("Failed to stop/save recording: \(error)")
@@ -788,6 +796,10 @@ final class RecordingCoordinator {
         )
 
         do {
+            if deleteSourceOnSuccess,
+               let copyTask = automaticClipboardCopyTasks[tempURL] {
+                _ = await copyTask.value
+            }
             let result = try await VideoExporter.export(source: tempURL, options: options, progress: progress)
             if deleteSourceOnSuccess {
                 if let sourceTask = automaticUploadSourceTasks[tempURL] {
@@ -817,12 +829,19 @@ final class RecordingCoordinator {
         alert.runModal()
     }
 
-    private func showRecordingCopyFailureAlert(format: RecordingKit.RecordingFormat) {
+    private func showRecordingCopyFailureAlert(
+        format: RecordingKit.RecordingFormat,
+        previewAvailable: Bool
+    ) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Couldn't copy recording")
         let kind = format == .gif ? String(localized: "GIF") : String(localized: "video")
-        alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. The recording is still available in the preview — close this dialog and try Copy again, or use Save.")
+        if previewAvailable {
+            alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. The recording is still available in the preview — close this dialog and try Copy again, or use Save.")
+        } else {
+            alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. Try Copy from History, or export it again from the editor.")
+        }
         alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()
     }
@@ -884,22 +903,21 @@ final class RecordingCoordinator {
             window?.cancelAutoDismissForSave()
 
             Task { @MainActor in
-                let clipboardURL = await self.exportRecordingToClipboard(tempURL, format: format) { progress in
-                    Task { @MainActor in
-                        state.saveProgress = progress
-                    }
+                let copied = await self.copyRecordingToClipboard(
+                    tempURL,
+                    format: format
+                ) { progress in
+                    Task { @MainActor in state.saveProgress = progress }
                 }
 
-                if let clipboardURL {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.writeObjects([clipboardURL as NSURL])
+                if copied {
                     self.recordingPreviewWindow?.close()
                     self.recordingPreviewWindow = nil
                 } else {
                     state.isSaving = false
                     state.saveProgress = 0
                     state.progressLabel = String(localized: "Saving…")
-                    self.showRecordingCopyFailureAlert(format: format)
+                    self.showRecordingCopyFailureAlert(format: format, previewAvailable: true)
                 }
             }
         }
@@ -949,9 +967,39 @@ final class RecordingCoordinator {
         recordingPreviewWindow = window
     }
 
+    private func startAutomaticClipboardCopyIfNeeded(
+        url: URL,
+        format: RecordingKit.RecordingFormat
+    ) {
+        guard settings.recordingAutoCopy else { return }
+
+        let copyTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return AutomaticClipboardCopyResult(copied: false, fileURL: nil) }
+            let copied = await copyRecordingToClipboard(
+                url,
+                format: format,
+                deleteSourceOnSuccess: false
+            )
+            return AutomaticClipboardCopyResult(copied: copied, fileURL: automaticClipboardCopyState[url]?.copiedFileURL)
+        }
+        automaticClipboardCopyTasks[url] = copyTask
+
+        Task { [weak self] in
+            let result = await copyTask.value
+            guard let self else { return }
+            if !result.copied {
+                showRecordingCopyFailureAlert(
+                    format: format,
+                    previewAvailable: self.recordingPreviewWindow != nil
+                )
+            }
+        }
+    }
+
     private func exportRecordingToClipboard(
         _ tempURL: URL,
         format: RecordingKit.RecordingFormat,
+        deleteSourceOnSuccess: Bool = true,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async -> URL? {
         let fileFormat: FileFormat = format == .gif ? .gif : .mp4
@@ -960,12 +1008,75 @@ final class RecordingCoordinator {
         let destinationURL = clipboardDir
             .appendingPathComponent("capso_clipboard_\(UUID().uuidString).\(FileNaming.fileExtension(for: fileFormat))")
 
-        return await exportRecording(
+        let exportedURL = await exportRecording(
             tempURL,
             format: format,
             destinationOverride: destinationURL,
+            deleteSourceOnSuccess: deleteSourceOnSuccess,
             progress: progress
         )
+        if exportedURL == nil {
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+        return exportedURL
+    }
+
+    private func copyRecordingToClipboard(
+        _ tempURL: URL,
+        format: RecordingKit.RecordingFormat,
+        deleteSourceOnSuccess: Bool = true,
+        progress: (@Sendable (Double) -> Void)? = nil
+    ) async -> Bool {
+        if deleteSourceOnSuccess {
+            if let copyTask = automaticClipboardCopyTasks[tempURL] {
+                let result = await copyTask.value
+                if result.copied, let copiedFileURL = result.fileURL {
+                    automaticClipboardCopyState[tempURL] = RecordingClipboardState(copiedFileURL: copiedFileURL)
+                    let restored = RecordingClipboard.copy(
+                        fileURL: copiedFileURL,
+                        cleaningDirectory: copiedFileURL.deletingLastPathComponent()
+                    )
+                    if restored {
+                        await waitForUploadStagingThenDeleteSource(tempURL)
+                        return true
+                    }
+                }
+            } else if let copiedFileURL = automaticClipboardCopyState[tempURL]?.copiedFileURL {
+                let restored = RecordingClipboard.copy(
+                    fileURL: copiedFileURL,
+                    cleaningDirectory: copiedFileURL.deletingLastPathComponent()
+                )
+                if restored {
+                    await waitForUploadStagingThenDeleteSource(tempURL)
+                    return true
+                }
+            }
+        }
+
+        guard let clipboardURL = await exportRecordingToClipboard(
+            tempURL,
+            format: format,
+            deleteSourceOnSuccess: deleteSourceOnSuccess,
+            progress: progress
+        ) else {
+            return false
+        }
+
+        let copied = RecordingClipboard.copy(
+            fileURL: clipboardURL,
+            cleaningDirectory: clipboardURL.deletingLastPathComponent()
+        )
+        if copied {
+            automaticClipboardCopyState[tempURL] = RecordingClipboardState(copiedFileURL: clipboardURL)
+        }
+        return copied
+    }
+
+    private func waitForUploadStagingThenDeleteSource(_ tempURL: URL) async {
+        if let sourceTask = automaticUploadSourceTasks[tempURL] {
+            _ = await sourceTask.value
+        }
+        try? FileManager.default.removeItem(at: tempURL)
     }
 
     // MARK: - UI Helpers
@@ -1258,6 +1369,7 @@ final class RecordingCoordinator {
 
         Task { [weak self] in
             defer { self?.automaticUploadSourceTasks[url] = nil }
+            guard let self else { return }
             guard let stagedURL = await sourceTask.value else {
                 CaptureCoordinator.postNotification(
                     title: String(localized: "Cloud share failed"),
@@ -1268,11 +1380,16 @@ final class RecordingCoordinator {
             defer { try? FileManager.default.removeItem(at: stagedURL) }
 
             do {
-                _ = try await historyCoordinator.uploadRecording(
+                let cloudURL = try await historyCoordinator.uploadRecording(
                     url: stagedURL,
                     mode: mode,
                     entryID: entryID
                 )
+                if let copyTask = automaticClipboardCopyTasks[url] {
+                    _ = await copyTask.value
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(cloudURL.absoluteString, forType: .string)
+                }
                 CaptureCoordinator.postNotification(
                     title: String(localized: "Cloud share ready"),
                     body: String(localized: "Link copied to clipboard.")

@@ -2282,7 +2282,6 @@
       }
     },
     "Copy to Clipboard" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5405,6 +5404,13 @@
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出す前に編集・トリミング・エフェクトを追加" } },
         "ko" : { "stringUnit" : { "state" : "translated", "value" : "내보내기 전에 편집, 자르기 및 효과 추가" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出前编辑、裁剪并添加特效" } }
+      }
+    },
+    "Copy the finished recording as an MP4 or GIF file" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "完成した録画を MP4 または GIF ファイルとしてコピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "완료된 녹화를 MP4 또는 GIF 파일로 복사" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将完成的录屏以 MP4 或 GIF 文件复制" } }
       }
     },
     "Show Menu Bar Icon" : {

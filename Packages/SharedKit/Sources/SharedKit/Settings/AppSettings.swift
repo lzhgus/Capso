@@ -619,6 +619,14 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "openEditorAfterRecording") }
     }
 
+    /// When `true`, the finished recording is exported to the selected MP4/GIF
+    /// format and placed on the pasteboard as a file URL.
+    /// Default is `false` so existing recording workflows remain unchanged.
+    public var recordingAutoCopy: Bool {
+        get { defaults.object(forKey: "recordingAutoCopy") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "recordingAutoCopy") }
+    }
+
     // MARK: Camera
     public var cameraShape: CameraShape {
         get {

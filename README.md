@@ -78,6 +78,7 @@ Capso exists to give back to the macOS community and to show what a modern, modu
 - **Camera presentation mode** — click PiP to expand fullscreen, click again to restore
 - **System audio + microphone** capture
 - **Recording controls** — pause, stop, restart, delete, timer
+- **Automatic clipboard copy** — optionally export the finished recording as an MP4 or GIF file ready to paste
 - **Countdown overlay** — 3-2-1 before recording starts
 - **Export quality presets** — Maximum, Social, Web
 - **Recording editor** — trim, zoom suggestions, cursor smoothing, background styling, and MP4/GIF export in one flow
