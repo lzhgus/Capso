@@ -96,6 +96,15 @@ final class RecordingCoordinator {
         }
     }
 
+    /// Start a full-screen recording flow for the display under the pointer.
+    /// The recording toolbar still appears before capture begins so the user
+    /// can confirm camera, microphone, system audio, format, and countdown.
+    func startFullScreenRecordingFlow() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.selectFullScreenForRecording()
+        }
+    }
+
     func startRecordingFlow(withSelectedArea rect: CGRect, screen: NSScreen) {
         dismissOverlay()
         dismissToolbarUI()

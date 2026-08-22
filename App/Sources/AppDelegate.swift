@@ -146,6 +146,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .recordScreen) { [weak self] in
             self?.recordingCoordinator?.startRecordingFlow()
         }
+        KeyboardShortcuts.onKeyDown(for: .recordFullscreen) { [weak self] in
+            self?.recordingCoordinator?.startFullScreenRecordingFlow()
+        }
         KeyboardShortcuts.onKeyDown(for: .captureScrolling) { [weak self] in
             self?.captureCoordinator?.captureScrolling()
         }

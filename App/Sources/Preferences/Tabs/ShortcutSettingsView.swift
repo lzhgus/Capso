@@ -10,7 +10,10 @@ extension KeyboardShortcuts.Name {
     static let captureFullscreen = Self("captureFullscreen", default: .init(.two, modifiers: [.option, .shift]))
     static let captureWindow = Self("captureWindow", default: .init(.three, modifiers: [.option, .shift]))
     static let captureText = Self("captureText", default: .init(.four, modifiers: [.option, .shift]))
+    /// Keep the existing storage key so current users retain their recording shortcut.
     static let recordScreen = Self("recordScreen", default: .init(.five, modifiers: [.option, .shift]))
+    /// Opt-in to avoid adding another default global shortcut.
+    static let recordFullscreen = Self("recordFullscreen")
     static let captureScrolling = Self("captureScrolling", default: .init(.six, modifiers: [.option, .shift]))
     static let captureAreaToClipboard = Self("captureAreaToClipboard", default: .init(.seven, modifiers: [.option, .shift]))
     static let captureAreaAndShare = Self("captureAreaAndShare", default: .init(.zero, modifiers: [.option, .shift]))
@@ -105,7 +108,8 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Translate Selected Text", name: .translateSelectedText, showDivider: true)
                     shortcutRow("Translate Typed Text", name: .translateTypedText, showDivider: true)
                     shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
-                    shortcutRow("Start / Stop Recording", name: .recordScreen, showDivider: true)
+                    shortcutRow("Record Area", name: .recordScreen, showDivider: true)
+                    shortcutRow("Record Full Screen", name: .recordFullscreen, showDivider: true)
                     shortcutRow("Screenshot History", name: .screenshotHistory, showDivider: true)
                 }
             }

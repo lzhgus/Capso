@@ -210,6 +210,23 @@ final class RecordingSelectionModeTests: XCTestCase {
         XCTAssertTrue(NSApp.windows.contains { $0 is RecordingToolbarWindow && $0.isVisible })
     }
 
+    func testDirectFullScreenRecordingSkipsSelectionAndShowsToolbar() async throws {
+        let suiteName = "RecordingSelectionModeTests.\(UUID().uuidString)"
+        defer {
+            closeRecordingSelectionWindows()
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        }
+        let settings = AppSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
+        let coordinator = RecordingCoordinator(settings: settings)
+
+        coordinator.startFullScreenRecordingFlow()
+        try await Task.sleep(for: .milliseconds(250))
+
+        XCTAssertFalse(NSApp.windows.contains { $0 is RecordingSelectionModeWindow && $0.isVisible })
+        XCTAssertFalse(NSApp.windows.contains { $0 is CaptureOverlayWindow && $0.isVisible })
+        XCTAssertTrue(NSApp.windows.contains { $0 is RecordingToolbarWindow && $0.isVisible })
+    }
+
     private func makeKeyEvent(_ characters: String, keyCode: UInt16, windowNumber: Int) throws -> NSEvent {
         try XCTUnwrap(NSEvent.keyEvent(
             with: .keyDown,

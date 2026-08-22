@@ -130,9 +130,13 @@ final class MenuBarController: NSObject {
 
         menu.addItem(.separator())
 
-        let recordScreen = menuItem(String(localized: "Record Screen"), action: #selector(recordScreen))
-        recordScreen.setShortcut(for: .recordScreen)
-        menu.addItem(recordScreen)
+        let recordArea = menuItem(String(localized: "Record Area"), action: #selector(recordArea))
+        recordArea.setShortcut(for: .recordScreen)
+        menu.addItem(recordArea)
+
+        let recordFullscreen = menuItem(String(localized: "Record Full Screen"), action: #selector(recordFullscreen))
+        recordFullscreen.setShortcut(for: .recordFullscreen)
+        menu.addItem(recordFullscreen)
 
         menu.addItem(cameraPiPMenuItem())
 
@@ -291,8 +295,12 @@ final class MenuBarController: NSObject {
         captureCoordinator.captureAreaWithSelfTimer()
     }
 
-    @objc private func recordScreen() {
+    @objc private func recordArea() {
         recordingCoordinator.startRecordingFlow()
+    }
+
+    @objc private func recordFullscreen() {
+        recordingCoordinator.startFullScreenRecordingFlow()
     }
 
     @objc private func openHistory() {
@@ -330,7 +338,8 @@ extension MenuBarController: NSMenuDelegate {
             case #selector(captureAndTranslate): item.setShortcut(for: .captureAndTranslate)
             case #selector(translateSelectedText): item.setShortcut(for: .translateSelectedText)
             case #selector(translateTypedText): item.setShortcut(for: .translateTypedText)
-            case #selector(recordScreen): item.setShortcut(for: .recordScreen)
+            case #selector(recordArea): item.setShortcut(for: .recordScreen)
+            case #selector(recordFullscreen): item.setShortcut(for: .recordFullscreen)
             case #selector(captureScrolling): item.setShortcut(for: .captureScrolling)
             case #selector(captureSelfTimer):
                 item.setShortcut(for: .selfTimerCapture)
