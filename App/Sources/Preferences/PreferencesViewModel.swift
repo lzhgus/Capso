@@ -430,6 +430,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var recordingAutoCopy: Bool {
+        get {
+            access(keyPath: \.recordingAutoCopy)
+            return settings.recordingAutoCopy
+        }
+        set {
+            withMutation(keyPath: \.recordingAutoCopy) {
+                settings.recordingAutoCopy = newValue
+            }
+        }
+    }
     var dimScreenWhileRecording: Bool {
         get {
             access(keyPath: \.dimScreenWhileRecording)

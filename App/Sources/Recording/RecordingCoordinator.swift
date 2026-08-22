@@ -64,6 +64,7 @@ final class RecordingCoordinator {
     private var escEventTap: CFMachPort?
     private var escEventTapRunLoopSource: CFRunLoopSource?
     private var automaticUploadSourceTasks: [URL: Task<URL?, Never>] = [:]
+    private var automaticClipboardCopyTasks: [URL: Task<Bool, Never>] = [:]
 
     // Selection state
     private var selectedRect: CGRect = .zero
@@ -687,6 +688,7 @@ final class RecordingCoordinator {
                 let entryID = UUID()
                 saveRecordingToHistory(url: tempURL, format: format, entryID: entryID)
                 startAutomaticUploadIfNeeded(url: tempURL, format: format, entryID: entryID)
+                startAutomaticClipboardCopyIfNeeded(url: tempURL, format: format)
 
                 if settings.openEditorAfterRecording {
                     // Open the full recording editor (trim, zoom, export)
@@ -704,7 +706,7 @@ final class RecordingCoordinator {
                     let size = VideoThumbnail.formattedFileSize(VideoThumbnail.fileSize(at: tempURL))
                     let duration = VideoThumbnail.formattedDuration(result.duration)
                     showRecordingPreview(thumbnail: nsThumb, duration: duration, fileSize: size,
-                                        tempURL: tempURL, format: result.format as RecordingKit.RecordingFormat)
+                                        tempURL: tempURL, format: format)
                 }
             } catch {
                 print("Failed to stop/save recording: \(error)")
@@ -788,6 +790,10 @@ final class RecordingCoordinator {
         )
 
         do {
+            if deleteSourceOnSuccess,
+               let copyTask = automaticClipboardCopyTasks[tempURL] {
+                _ = await copyTask.value
+            }
             let result = try await VideoExporter.export(source: tempURL, options: options, progress: progress)
             if deleteSourceOnSuccess {
                 if let sourceTask = automaticUploadSourceTasks[tempURL] {
@@ -884,15 +890,14 @@ final class RecordingCoordinator {
             window?.cancelAutoDismissForSave()
 
             Task { @MainActor in
-                let clipboardURL = await self.exportRecordingToClipboard(tempURL, format: format) { progress in
-                    Task { @MainActor in
-                        state.saveProgress = progress
-                    }
+                let copied = await self.copyRecordingToClipboard(
+                    tempURL,
+                    format: format
+                ) { progress in
+                    Task { @MainActor in state.saveProgress = progress }
                 }
 
-                if let clipboardURL {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.writeObjects([clipboardURL as NSURL])
+                if copied {
                     self.recordingPreviewWindow?.close()
                     self.recordingPreviewWindow = nil
                 } else {
@@ -949,9 +954,36 @@ final class RecordingCoordinator {
         recordingPreviewWindow = window
     }
 
+    private func startAutomaticClipboardCopyIfNeeded(
+        url: URL,
+        format: RecordingKit.RecordingFormat
+    ) {
+        guard settings.recordingAutoCopy else { return }
+
+        let copyTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return false }
+            return await copyRecordingToClipboard(
+                url,
+                format: format,
+                deleteSourceOnSuccess: false
+            )
+        }
+        automaticClipboardCopyTasks[url] = copyTask
+
+        Task { [weak self] in
+            let copied = await copyTask.value
+            guard let self else { return }
+            automaticClipboardCopyTasks[url] = nil
+            if !copied {
+                showRecordingCopyFailureAlert(format: format)
+            }
+        }
+    }
+
     private func exportRecordingToClipboard(
         _ tempURL: URL,
         format: RecordingKit.RecordingFormat,
+        deleteSourceOnSuccess: Bool = true,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async -> URL? {
         let fileFormat: FileFormat = format == .gif ? .gif : .mp4
@@ -960,11 +992,47 @@ final class RecordingCoordinator {
         let destinationURL = clipboardDir
             .appendingPathComponent("capso_clipboard_\(UUID().uuidString).\(FileNaming.fileExtension(for: fileFormat))")
 
-        return await exportRecording(
+        let exportedURL = await exportRecording(
             tempURL,
             format: format,
             destinationOverride: destinationURL,
+            deleteSourceOnSuccess: deleteSourceOnSuccess,
             progress: progress
+        )
+        if exportedURL == nil {
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+        return exportedURL
+    }
+
+    private func copyRecordingToClipboard(
+        _ tempURL: URL,
+        format: RecordingKit.RecordingFormat,
+        deleteSourceOnSuccess: Bool = true,
+        progress: (@Sendable (Double) -> Void)? = nil
+    ) async -> Bool {
+        if deleteSourceOnSuccess,
+           let copyTask = automaticClipboardCopyTasks[tempURL],
+           await copyTask.value {
+            if let sourceTask = automaticUploadSourceTasks[tempURL] {
+                _ = await sourceTask.value
+            }
+            try? FileManager.default.removeItem(at: tempURL)
+            return true
+        }
+
+        guard let clipboardURL = await exportRecordingToClipboard(
+            tempURL,
+            format: format,
+            deleteSourceOnSuccess: deleteSourceOnSuccess,
+            progress: progress
+        ) else {
+            return false
+        }
+
+        return RecordingClipboard.copy(
+            fileURL: clipboardURL,
+            cleaningDirectory: clipboardURL.deletingLastPathComponent()
         )
     }
 

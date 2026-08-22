@@ -55,6 +55,15 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(
+                        label: "Copy to Clipboard",
+                        sublabel: "Copy the finished recording as an MP4 or GIF file",
+                        showDivider: true
+                    ) {
+                        Toggle("", isOn: $viewModel.recordingAutoCopy)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                     // TODO: Re-enable the row below once its behavior is
                     // implemented. It is stored in AppSettings but never
                     // consumed by RecordingCoordinator:
