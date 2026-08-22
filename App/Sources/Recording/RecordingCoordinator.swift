@@ -64,7 +64,13 @@ final class RecordingCoordinator {
     private var escEventTap: CFMachPort?
     private var escEventTapRunLoopSource: CFRunLoopSource?
     private var automaticUploadSourceTasks: [URL: Task<URL?, Never>] = [:]
-    private var automaticClipboardCopyTasks: [URL: Task<Bool, Never>] = [:]
+    private struct AutomaticClipboardCopyResult {
+        let copied: Bool
+        let fileURL: URL?
+    }
+
+    private var automaticClipboardCopyTasks: [URL: Task<AutomaticClipboardCopyResult, Never>] = [:]
+    private var automaticClipboardCopyState: [URL: RecordingClipboardState] = [:]
 
     // Selection state
     private var selectedRect: CGRect = .zero
@@ -687,8 +693,8 @@ final class RecordingCoordinator {
                 let format = result.format as RecordingKit.RecordingFormat
                 let entryID = UUID()
                 saveRecordingToHistory(url: tempURL, format: format, entryID: entryID)
-                startAutomaticUploadIfNeeded(url: tempURL, format: format, entryID: entryID)
                 startAutomaticClipboardCopyIfNeeded(url: tempURL, format: format)
+                startAutomaticUploadIfNeeded(url: tempURL, format: format, entryID: entryID)
 
                 if settings.openEditorAfterRecording {
                     // Open the full recording editor (trim, zoom, export)
@@ -823,12 +829,19 @@ final class RecordingCoordinator {
         alert.runModal()
     }
 
-    private func showRecordingCopyFailureAlert(format: RecordingKit.RecordingFormat) {
+    private func showRecordingCopyFailureAlert(
+        format: RecordingKit.RecordingFormat,
+        previewAvailable: Bool
+    ) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Couldn't copy recording")
         let kind = format == .gif ? String(localized: "GIF") : String(localized: "video")
-        alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. The recording is still available in the preview — close this dialog and try Copy again, or use Save.")
+        if previewAvailable {
+            alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. The recording is still available in the preview — close this dialog and try Copy again, or use Save.")
+        } else {
+            alert.informativeText = String(localized: "Copying the \(kind) to the clipboard failed. Try Copy from History, or export it again from the editor.")
+        }
         alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()
     }
@@ -904,7 +917,7 @@ final class RecordingCoordinator {
                     state.isSaving = false
                     state.saveProgress = 0
                     state.progressLabel = String(localized: "Saving…")
-                    self.showRecordingCopyFailureAlert(format: format)
+                    self.showRecordingCopyFailureAlert(format: format, previewAvailable: true)
                 }
             }
         }
@@ -961,21 +974,24 @@ final class RecordingCoordinator {
         guard settings.recordingAutoCopy else { return }
 
         let copyTask = Task(priority: .utility) { [weak self] in
-            guard let self else { return false }
-            return await copyRecordingToClipboard(
+            guard let self else { return AutomaticClipboardCopyResult(copied: false, fileURL: nil) }
+            let copied = await copyRecordingToClipboard(
                 url,
                 format: format,
                 deleteSourceOnSuccess: false
             )
+            return AutomaticClipboardCopyResult(copied: copied, fileURL: automaticClipboardCopyState[url]?.copiedFileURL)
         }
         automaticClipboardCopyTasks[url] = copyTask
 
         Task { [weak self] in
-            let copied = await copyTask.value
+            let result = await copyTask.value
             guard let self else { return }
-            automaticClipboardCopyTasks[url] = nil
-            if !copied {
-                showRecordingCopyFailureAlert(format: format)
+            if !result.copied {
+                showRecordingCopyFailureAlert(
+                    format: format,
+                    previewAvailable: self.recordingPreviewWindow != nil
+                )
             }
         }
     }
@@ -1011,14 +1027,30 @@ final class RecordingCoordinator {
         deleteSourceOnSuccess: Bool = true,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async -> Bool {
-        if deleteSourceOnSuccess,
-           let copyTask = automaticClipboardCopyTasks[tempURL],
-           await copyTask.value {
-            if let sourceTask = automaticUploadSourceTasks[tempURL] {
-                _ = await sourceTask.value
+        if deleteSourceOnSuccess {
+            if let copyTask = automaticClipboardCopyTasks[tempURL] {
+                let result = await copyTask.value
+                if result.copied, let copiedFileURL = result.fileURL {
+                    automaticClipboardCopyState[tempURL] = RecordingClipboardState(copiedFileURL: copiedFileURL)
+                    let restored = RecordingClipboard.copy(
+                        fileURL: copiedFileURL,
+                        cleaningDirectory: copiedFileURL.deletingLastPathComponent()
+                    )
+                    if restored {
+                        await waitForUploadStagingThenDeleteSource(tempURL)
+                        return true
+                    }
+                }
+            } else if let copiedFileURL = automaticClipboardCopyState[tempURL]?.copiedFileURL {
+                let restored = RecordingClipboard.copy(
+                    fileURL: copiedFileURL,
+                    cleaningDirectory: copiedFileURL.deletingLastPathComponent()
+                )
+                if restored {
+                    await waitForUploadStagingThenDeleteSource(tempURL)
+                    return true
+                }
             }
-            try? FileManager.default.removeItem(at: tempURL)
-            return true
         }
 
         guard let clipboardURL = await exportRecordingToClipboard(
@@ -1030,10 +1062,21 @@ final class RecordingCoordinator {
             return false
         }
 
-        return RecordingClipboard.copy(
+        let copied = RecordingClipboard.copy(
             fileURL: clipboardURL,
             cleaningDirectory: clipboardURL.deletingLastPathComponent()
         )
+        if copied {
+            automaticClipboardCopyState[tempURL] = RecordingClipboardState(copiedFileURL: clipboardURL)
+        }
+        return copied
+    }
+
+    private func waitForUploadStagingThenDeleteSource(_ tempURL: URL) async {
+        if let sourceTask = automaticUploadSourceTasks[tempURL] {
+            _ = await sourceTask.value
+        }
+        try? FileManager.default.removeItem(at: tempURL)
     }
 
     // MARK: - UI Helpers
@@ -1326,6 +1369,7 @@ final class RecordingCoordinator {
 
         Task { [weak self] in
             defer { self?.automaticUploadSourceTasks[url] = nil }
+            guard let self else { return }
             guard let stagedURL = await sourceTask.value else {
                 CaptureCoordinator.postNotification(
                     title: String(localized: "Cloud share failed"),
@@ -1336,11 +1380,16 @@ final class RecordingCoordinator {
             defer { try? FileManager.default.removeItem(at: stagedURL) }
 
             do {
-                _ = try await historyCoordinator.uploadRecording(
+                let cloudURL = try await historyCoordinator.uploadRecording(
                     url: stagedURL,
                     mode: mode,
                     entryID: entryID
                 )
+                if let copyTask = automaticClipboardCopyTasks[url] {
+                    _ = await copyTask.value
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(cloudURL.absoluteString, forType: .string)
+                }
                 CaptureCoordinator.postNotification(
                     title: String(localized: "Cloud share ready"),
                     body: String(localized: "Link copied to clipboard.")

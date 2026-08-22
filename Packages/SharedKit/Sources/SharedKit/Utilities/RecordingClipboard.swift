@@ -8,15 +8,25 @@ public enum RecordingClipboard {
         fileURL: URL,
         cleaningDirectory directory: URL? = nil,
         fileManager: FileManager = .default,
-        pasteboard: NSPasteboard = .general
+        pasteboard: NSPasteboard = .general,
+        write: ((NSPasteboard, URL) -> Bool)? = nil
     ) -> Bool {
         guard fileURL.isFileURL,
               fileManager.isReadableFile(atPath: fileURL.path) else {
             return false
         }
 
-        pasteboard.clearContents()
-        guard pasteboard.writeObjects([fileURL as NSURL]) else { return false }
+        let wrote: Bool
+        if let write {
+            wrote = write(pasteboard, fileURL)
+        } else {
+            pasteboard.clearContents()
+            wrote = pasteboard.writeObjects([fileURL as NSURL])
+        }
+        guard wrote else {
+            try? fileManager.removeItem(at: fileURL)
+            return false
+        }
 
         if let directory,
            let files = try? fileManager.contentsOfDirectory(

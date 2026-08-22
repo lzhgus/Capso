@@ -55,11 +55,46 @@ struct RecordingClipboardTests {
         #expect(!FileManager.default.fileExists(atPath: staleURL.path))
     }
 
+    @Test("does not leave a completed export after a failed pasteboard write")
+    func removesCompletedExportWhenPasteboardWriteFails() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RecordingClipboardTests.failedWrite.\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let fileURL = directory.appendingPathComponent("completed.mp4")
+        try Data([0x00]).write(to: fileURL)
+
+        #expect(!RecordingClipboard.copy(
+            fileURL: fileURL,
+            cleaningDirectory: directory,
+            pasteboard: makePasteboard(),
+            write: { pasteboard, _ in
+                pasteboard.setString("keep me", forType: .string)
+                return false
+            }
+        ))
+        #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
     private func makePasteboard() -> NSPasteboard {
         let pasteboard = NSPasteboard(
             name: NSPasteboard.Name("RecordingClipboardTests.\(UUID().uuidString)")
         )
         pasteboard.clearContents()
         return pasteboard
+    }
+}
+
+@Suite("RecordingClipboardState")
+struct RecordingClipboardStateTests {
+    @Test("reuses a finished automatic copy")
+    func reusesFinishedAutomaticCopy() {
+        var state = RecordingClipboardState()
+        #expect(!state.canReuseAutomaticCopy)
+
+        state.markCopied(URL(fileURLWithPath: "/tmp/capso_clipboard.mp4"))
+        #expect(state.canReuseAutomaticCopy)
+        #expect(state.copiedFileURL?.lastPathComponent == "capso_clipboard.mp4")
     }
 }
