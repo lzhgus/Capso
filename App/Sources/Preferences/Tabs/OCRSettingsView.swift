@@ -2,34 +2,15 @@
 import SwiftUI
 import Vision
 import SharedKit
+import TranslationKit
 
 struct TextAndTranslationSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
     @State private var supportedLanguages: [(code: String, name: String)] = []
+    @State private var translationLanguages: [(code: String, name: String)] = LanguagePreference.sortedLanguages()
     @State private var providerAPIKey: String = ""
     @State private var providerStatusMessage: String?
     @State private var isTestingProvider = false
-
-    private let translationLanguages: [(code: String, name: String)] = [
-        ("en",      "English"),
-        ("zh-Hans", "简体中文"),
-        ("zh-Hant", "繁體中文"),
-        ("ja",      "日本語"),
-        ("ko",      "한국어"),
-        ("fr",      "Français"),
-        ("de",      "Deutsch"),
-        ("es",      "Español"),
-        ("it",      "Italiano"),
-        ("pt-BR",   "Português (Brasil)"),
-        ("ru",      "Русский"),
-        ("ar",      "العربية"),
-        ("hi",      "हिन्दी"),
-        ("nl",      "Nederlands"),
-        ("pl",      "Polski"),
-        ("tr",      "Türkçe"),
-        ("uk",      "Українська"),
-        ("id",      "Bahasa Indonesia"),
-    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -167,6 +148,10 @@ struct TextAndTranslationSettingsView: View {
             //     }
             // }
         }
+        .task {
+            let codes = await LanguagePreference.loadSupportedLanguageCodes()
+            translationLanguages = LanguagePreference.sortedLanguages(from: codes)
+        }
         .onAppear {
             loadProviderAPIKey()
             // loadSupportedLanguages()
@@ -219,6 +204,4 @@ struct TextAndTranslationSettingsView: View {
             return (code: code, name: name)
         }
     }
-
-
 }

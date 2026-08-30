@@ -51,4 +51,31 @@ struct LanguagePreferenceTests {
         #expect(LanguagePreference.isSupported("pt-BR"))
         #expect(!LanguagePreference.isSupported("pt"))
     }
+
+    @Test("fallbackLanguageCodes contains standard set of 20 macOS 15 languages")
+    func fallbackLanguageCodes() {
+        #expect(LanguagePreference.fallbackLanguageCodes.count == 20)
+        #expect(LanguagePreference.fallbackLanguageCodes.contains("en"))
+        #expect(LanguagePreference.fallbackLanguageCodes.contains("zh-Hans"))
+        #expect(LanguagePreference.fallbackLanguageCodes.contains("zh-Hant"))
+        #expect(LanguagePreference.fallbackLanguageCodes.contains("pt-BR"))
+        #expect(LanguagePreference.fallbackLanguageCodes.contains("th"))
+        #expect(LanguagePreference.fallbackLanguageCodes.contains("vi"))
+    }
+
+    @Test("sortedLanguages returns items sorted by localized name")
+    func sortedLanguages() {
+        let locale = Locale(identifier: "en_US")
+        let languages = LanguagePreference.sortedLanguages(from: ["zh-Hans", "ar", "en"], in: locale)
+        #expect(languages.count == 3)
+        let codes = languages.map { $0.code }
+        #expect(codes == ["ar", "zh-Hans", "en"])
+    }
+
+    @Test("loadSupportedLanguageCodes returns non-empty list")
+    func loadSupportedLanguageCodes() async {
+        let codes = await LanguagePreference.loadSupportedLanguageCodes()
+        #expect(!codes.isEmpty)
+        #expect(codes.contains("en"))
+    }
 }

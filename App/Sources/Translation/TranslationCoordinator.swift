@@ -265,20 +265,9 @@ final class TranslationCoordinator {
     ) {
         window.onChangeLanguage = { [weak self, weak window] in
             guard let self, let window, self.resultWindow === window else { return }
-            // Fall back includes all 20 macOS 15 target languages (adds th, vi
-            // that the earlier list missed). Apple may add more in later
-            // OS versions — `LanguageAvailability.supportedLanguages` gives
-            // the authoritative runtime list.
-            let fallbackCodes = [
-                "ar", "de", "en", "es", "fr",
-                "hi", "id", "it", "ja", "ko",
-                "nl", "pl", "pt-BR", "ru", "th",
-                "tr", "uk", "vi", "zh-Hans", "zh-Hant"
-            ]
-
             Task { @MainActor [weak self, weak window] in
                 guard let self, let window, self.resultWindow === window else { return }
-                let supportedCodes = await Self.loadSupportedLanguageCodes(fallback: fallbackCodes)
+                let supportedCodes = await LanguagePreference.loadSupportedLanguageCodes()
                 guard self.resultWindow === window else { return }
                 let popover = NSPopover()
                 let picker = TranslationLanguagePickerPopover(
@@ -406,33 +395,8 @@ final class TranslationCoordinator {
     /// `supportedLanguages` returns regional variants (e.g. en-US, en-GB, zh-Hans-CN,
     /// zh-Hant-TW). We deduplicate to unique canonical codes: language-only for most
     /// languages, language-script for Chinese (which has two distinct scripts).
-    static func loadSupportedLanguageCodes(fallback: [String]) async -> [String] {
-        // Create LanguageAvailability off the main actor to satisfy Swift 6
-        // Sendable checking (LanguageAvailability is non-Sendable).
-        let langs: [Locale.Language] = await Task.detached {
-            let availability = LanguageAvailability()
-            return await availability.supportedLanguages
-        }.value
-        if langs.isEmpty { return fallback }
-
-        var seen = Set<String>()
-        var result: [String] = []
-        for lang in langs {
-            guard let langCode = lang.languageCode?.identifier else { continue }
-            let canonical: String
-            if langCode == "zh", let script = lang.script?.identifier {
-                // Distinguish Simplified (Hans) from Traditional (Hant).
-                canonical = "\(langCode)-\(script)"
-            } else if langCode == "pt", let region = lang.region?.identifier, region == "BR" {
-                // Keep pt-BR distinct from pt-PT.
-                canonical = "pt-BR"
-            } else {
-                canonical = langCode
-            }
-            guard !canonical.isEmpty, seen.insert(canonical).inserted else { continue }
-            result.append(canonical)
-        }
-        return result.isEmpty ? fallback : result
+    static func loadSupportedLanguageCodes(fallback: [String] = LanguagePreference.fallbackLanguageCodes) async -> [String] {
+        await LanguagePreference.loadSupportedLanguageCodes(fallback: fallback)
     }
 
     // MARK: - Onboarding

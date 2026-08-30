@@ -1,5 +1,6 @@
 // App/Sources/Translation/TranslationLanguagePickerPopover.swift
 import SwiftUI
+import TranslationKit
 
 struct TranslationLanguagePickerPopover: View {
     let current: String
@@ -80,9 +81,6 @@ struct TranslationLanguagePickerPopover: View {
     }
 
     private var sortedLanguages: [(String, String)] {
-        let locale = Locale.current
-        return available
-            .map { code in (code, locale.localizedString(forIdentifier: code) ?? code) }
-            .sorted { a, b in a.1.localizedCaseInsensitiveCompare(b.1) == .orderedAscending }
+        LanguagePreference.sortedLanguages(from: available).map { ($0.code, $0.name) }
     }
 }
