@@ -109,8 +109,14 @@ final class PinnedScreenshotWindow: NSPanel {
     }
 
     override func close() {
+        let closeCallback = onDidClose
+        onDidClose = { _ in }
+        onFrameChanged = nil
+        onScaleChanged = nil
+        contentView = nil
+        screenshotView = nil
         super.close()
-        onDidClose(windowID)
+        closeCallback(windowID)
     }
 
     private func makeContextMenu() -> NSMenu {

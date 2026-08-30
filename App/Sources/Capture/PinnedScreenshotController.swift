@@ -84,7 +84,10 @@ final class PinnedScreenshotController {
         guard !isClosing else { return }
         isClosing = true
 
+        chromeWindow.chromeView.closeButton.target = nil
+        chromeWindow.chromeView.lockButton.target = nil
         contentWindow.removeChildWindow(chromeWindow)
+        chromeWindow.contentView = nil
         chromeWindow.close()
 
         if !fromContentWindow {
