@@ -5,6 +5,23 @@ public enum AutomationURLAction: Equatable, Sendable {
     case captureFullscreen
     case captureWindow
     case captureAllInOne
+    case captureScrolling
+    case captureSelfTimer
+    case captureLastArea
+    case captureAreaToClipboard
+    case captureAreaAndShare
+    case captureAreaAndAnnotate
+    case pinFromClipboard
+    case editClipboardImage
+    case openImageFile
+    case captureOCR
+    case captureAndTranslate
+    case translateSelectedText
+    case translateTypedText
+    case recordArea
+    case recordFullscreen
+    case openHistory
+    case openPreferences
 
     public init?(url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -23,6 +40,23 @@ public enum AutomationURLAction: Equatable, Sendable {
         case "/fullscreen": self = .captureFullscreen
         case "/window": self = .captureWindow
         case "/all-in-one": self = .captureAllInOne
+        case "/scrolling": self = .captureScrolling
+        case "/self-timer": self = .captureSelfTimer
+        case "/last-area": self = .captureLastArea
+        case "/clipboard", "/area-to-clipboard": self = .captureAreaToClipboard
+        case "/share", "/area-and-share": self = .captureAreaAndShare
+        case "/annotate", "/area-and-annotate": self = .captureAreaAndAnnotate
+        case "/pin", "/pin-from-clipboard": self = .pinFromClipboard
+        case "/edit-clipboard", "/edit-clipboard-image": self = .editClipboardImage
+        case "/open-image", "/open-image-file": self = .openImageFile
+        case "/ocr", "/text", "/capture-text": self = .captureOCR
+        case "/translate", "/capture-and-translate": self = .captureAndTranslate
+        case "/translate-selection", "/translate-selected-text": self = .translateSelectedText
+        case "/translate-text", "/translate-typed-text": self = .translateTypedText
+        case "/record", "/record-area", "/record-screen": self = .recordArea
+        case "/record-fullscreen", "/record-full-screen": self = .recordFullscreen
+        case "/history", "/screenshot-history": self = .openHistory
+        case "/preferences", "/settings": self = .openPreferences
         default: return nil
         }
     }

@@ -250,6 +250,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             captureCoordinator.captureWindow()
         case .captureAllInOne:
             captureCoordinator.captureAllInOne()
+        case .captureScrolling:
+            captureCoordinator.captureScrolling()
+        case .captureSelfTimer:
+            captureCoordinator.captureAreaWithSelfTimer()
+        case .captureLastArea:
+            captureCoordinator.replayLastCapture()
+        case .captureAreaToClipboard:
+            captureCoordinator.captureAreaToClipboard()
+        case .captureAreaAndShare:
+            captureCoordinator.captureAreaAndShare()
+        case .captureAreaAndAnnotate:
+            captureCoordinator.captureAreaAndAnnotate()
+        case .pinFromClipboard:
+            captureCoordinator.pinFromClipboard()
+        case .editClipboardImage:
+            captureCoordinator.editClipboardImage()
+        case .openImageFile:
+            captureCoordinator.openImageFilesWithPanel()
+        case .captureOCR:
+            ocrCoordinator?.startInstantOCR()
+        case .captureAndTranslate:
+            translationCoordinator?.startCaptureAndTranslate()
+        case .translateSelectedText:
+            translationCoordinator?.translateSelectedText()
+        case .translateTypedText:
+            translationCoordinator?.translateTypedText()
+        case .recordArea:
+            recordingCoordinator?.startRecordingFlow()
+        case .recordFullscreen:
+            recordingCoordinator?.startFullScreenRecordingFlow()
+        case .openHistory:
+            historyCoordinator?.showWindow()
+        case .openPreferences:
+            showPreferences()
         }
         logAutomationURL("Performed action \(String(describing: action))")
     }

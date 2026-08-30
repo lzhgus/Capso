@@ -9,6 +9,7 @@ struct GeneralSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
     let updateManager: UpdateManager?
     @State private var showHideMenuBarConfirmation = false
+    @State private var showingAutomationURLs = false
 
     private var menuBarToggleBinding: Binding<Bool> {
         Binding(
@@ -53,16 +54,15 @@ struct GeneralSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
-                    SettingRow(label: "Supported URLs", showDivider: true) {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(verbatim: "capso://grab/area")
-                            Text(verbatim: "capso://grab/fullscreen")
-                            Text(verbatim: "capso://grab/window")
-                            Text(verbatim: "capso://grab/all-in-one")
+                    SettingRow(
+                        label: "Supported URLs",
+                        sublabel: "View all commands for Raycast, Alfred, and Shortcuts",
+                        showDivider: true
+                    ) {
+                        Button("View Commands…") {
+                            showingAutomationURLs = true
                         }
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                        .controlSize(.small)
                     }
                 }
             }
@@ -150,6 +150,9 @@ struct GeneralSettingsView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingAutomationURLs) {
+            AutomationURLsSheetView(isPresented: $showingAutomationURLs)
         }
         .alert("Hide menu bar icon?", isPresented: $showHideMenuBarConfirmation) {
             Button("Cancel", role: .cancel) {}
