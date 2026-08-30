@@ -29,6 +29,11 @@ final class HistoryCoordinator {
     private var historyWindow: HistoryWindow?
     private var annotationWindow: AnnotationEditorWindow?
     private var pinnedControllers: [PinnedScreenshotController] = []
+    private let thumbnailCache: NSCache<NSURL, NSImage> = {
+        let cache = NSCache<NSURL, NSImage>()
+        cache.countLimit = 150
+        return cache
+    }()
     private let dragFileStore = QuickAccessDragFileStore()
     private var dragFileURLs: [UUID: URL] = [:]
     private var dragPreparationTasks: [UUID: Task<Void, Never>] = [:]
@@ -358,6 +363,7 @@ final class HistoryCoordinator {
             try store.delete(id: entry.id)
             let entryDir = store.entriesDirectory.appendingPathComponent(entry.id.uuidString, isDirectory: true)
             try? FileManager.default.removeItem(at: entryDir)
+            clearThumbnailCache(for: entry)
             clearDragFileCache(for: entry)
             loadEntries()
         } catch {
@@ -369,6 +375,7 @@ final class HistoryCoordinator {
         guard let store else { return }
         do {
             try HistoryCleanup.clearAll(store: store)
+            clearThumbnailCaches()
             clearDragFileCaches()
             loadEntries()
         } catch {
@@ -390,6 +397,43 @@ final class HistoryCoordinator {
             .appendingPathComponent(entry.id.uuidString, isDirectory: true)
             .appendingPathComponent(entry.thumbnailFileName)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    func loadThumbnailImage(for entry: HistoryEntry, maxPixelSize: Int = 480) async -> NSImage? {
+        guard let url = thumbnailURL(for: entry) else { return nil }
+        let nsURL = url as NSURL
+        if let cached = thumbnailCache.object(forKey: nsURL) {
+            return cached
+        }
+
+        let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+            ]
+            guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                return nil
+            }
+            return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        }.value
+
+        if let image {
+            thumbnailCache.setObject(image, forKey: nsURL)
+        }
+        return image
+    }
+
+    func clearThumbnailCache(for entry: HistoryEntry) {
+        if let url = thumbnailURL(for: entry) {
+            thumbnailCache.removeObject(forKey: url as NSURL)
+        }
+    }
+
+    func clearThumbnailCaches() {
+        thumbnailCache.removeAllObjects()
     }
 
     func loadFullImage(for entry: HistoryEntry) -> CGImage? {
@@ -539,6 +583,9 @@ final class HistoryCoordinator {
                 try pngData.write(to: fullURL, options: [.atomic])
                 if let thumbnailData = ThumbnailGenerator.generateThumbnail(from: image) {
                     try thumbnailData.write(to: thumbnailURL, options: [.atomic])
+                }
+                await MainActor.run { [weak self] in
+                    self?.clearThumbnailCache(for: entry)
                 }
 
                 let updated = HistoryEntry(

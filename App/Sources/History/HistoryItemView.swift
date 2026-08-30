@@ -8,6 +8,7 @@ struct HistoryItemView: View {
     let coordinator: HistoryCoordinator
     @State private var isHovered = false
     @State private var thumbnailImage: NSImage?
+    @State private var thumbnailLoadTask: Task<Void, Never>?
 
     // Cloud upload state for this item
     @State private var isUploading = false
@@ -144,6 +145,10 @@ struct HistoryItemView: View {
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
         .onAppear { loadThumbnail() }
+        .onDisappear {
+            thumbnailLoadTask?.cancel()
+            thumbnailLoadTask = nil
+        }
         .onChange(of: entry.fileSize) { _, _ in loadThumbnail() }
         .onChange(of: entry.imageWidth) { _, _ in loadThumbnail() }
         .onChange(of: entry.imageHeight) { _, _ in loadThumbnail() }
@@ -361,8 +366,18 @@ struct HistoryItemView: View {
     }
 
     private func loadThumbnail() {
-        guard let url = coordinator.thumbnailURL(for: entry) else { return }
-        thumbnailImage = NSImage(contentsOf: url)
+        thumbnailLoadTask?.cancel()
+        guard coordinator.thumbnailURL(for: entry) != nil else {
+            thumbnailImage = nil
+            return
+        }
+
+        let targetEntryID = entry.id
+        thumbnailLoadTask = Task {
+            let image = await coordinator.loadThumbnailImage(for: entry)
+            guard !Task.isCancelled, entry.id == targetEntryID else { return }
+            thumbnailImage = image
+        }
     }
 }
 
