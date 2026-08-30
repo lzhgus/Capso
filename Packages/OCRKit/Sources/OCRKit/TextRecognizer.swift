@@ -89,11 +89,13 @@ public enum TextRecognizer {
             request.automaticallyDetectsLanguage = languages == nil
             request.usesLanguageCorrection = true
 
-            let handler = VNImageRequestHandler(cgImage: image, options: [:])
-            do {
-                try handler.perform([request])
-            } catch {
-                oneShot.resume(throwing: error)
+            autoreleasepool {
+                let handler = VNImageRequestHandler(cgImage: image, options: [:])
+                do {
+                    try handler.perform([request])
+                } catch {
+                    oneShot.resume(throwing: error)
+                }
             }
         }
     }
