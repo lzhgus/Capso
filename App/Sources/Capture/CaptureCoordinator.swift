@@ -1186,9 +1186,10 @@ final class CaptureCoordinator {
                 window.animator().alphaValue = 0
             }
         }
-        // Clean up after animation
+        // Clean up after animation and release full-screen screenshot memory
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             for window in windows {
+                window.contentView = nil
                 window.orderOut(nil)
             }
         }
