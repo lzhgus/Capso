@@ -68,7 +68,10 @@ public enum CompositorExporter {
         )
         status?(ExportStatus(stage: .compositing, fractionCompleted: 0.08))
         let outSize = compositor.outputSize
-        let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+        let ciContext = CIContext(options: [
+            .useSoftwareRenderer: false,
+            .cacheIntermediates: false
+        ])
 
         // Build the video composition with per-frame CIFilter handler
         let videoComposition = AVMutableVideoComposition()

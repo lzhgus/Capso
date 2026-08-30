@@ -1158,7 +1158,7 @@ final class CaptureCoordinator {
             ci = out
         }
 
-        let ciCtx = CIContext(options: nil)
+        let ciCtx = CIContext(options: [.cacheIntermediates: false])
         return ciCtx.createCGImage(ci, from: CGRect(origin: .zero, size: targetSize))
     }
 

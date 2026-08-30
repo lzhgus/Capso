@@ -131,6 +131,7 @@ public final class CameraManager {
 
 private final class CameraFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     private let onFrame: (CGImage) -> Void
+    private let context = CIContext(options: [.cacheIntermediates: false, .priorityRequestLow: false])
 
     init(onFrame: @escaping (CGImage) -> Void) {
         self.onFrame = onFrame
@@ -139,7 +140,6 @@ private final class CameraFrameDelegate: NSObject, AVCaptureVideoDataOutputSampl
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let ciImage = CIImage(cvImageBuffer: imageBuffer)
-        let context = CIContext()
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
         onFrame(cgImage)
     }

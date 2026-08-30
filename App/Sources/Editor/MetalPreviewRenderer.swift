@@ -62,7 +62,10 @@ final class MetalPreviewRenderer: NSObject {
         // render directly into the drawable texture without any extra copy.
         self.ciContext = CIContext(
             mtlDevice: device,
-            options: [.workingColorSpace: CGColorSpaceCreateDeviceRGB()]
+            options: [
+                .workingColorSpace: CGColorSpaceCreateDeviceRGB(),
+                .cacheIntermediates: false
+            ]
         )
     }
 

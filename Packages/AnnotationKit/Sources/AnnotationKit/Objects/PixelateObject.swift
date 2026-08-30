@@ -156,13 +156,15 @@ public final class PixelateObject: AnnotationObject, @unchecked Sendable {
         return outputContext.makeImage()
     }
 
+    private static let blurContext = CIContext(options: [.cacheIntermediates: false])
+
     private static func makeBlurredImage(from image: CGImage, radius: CGFloat) -> CGImage? {
         let ciImage = CIImage(cgImage: image)
         let filter = CIFilter(name: "CIGaussianBlur")
         filter?.setValue(ciImage.clampedToExtent(), forKey: kCIInputImageKey)
         filter?.setValue(radius, forKey: kCIInputRadiusKey)
         guard let outputImage = filter?.outputImage?.cropped(to: ciImage.extent) else { return nil }
-        return CIContext().createCGImage(outputImage, from: ciImage.extent)
+        return blurContext.createCGImage(outputImage, from: ciImage.extent)
     }
 
     public func move(by delta: CGSize) {

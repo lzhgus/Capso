@@ -121,7 +121,7 @@ enum BeautifyRenderer {
             ci = out
         }
 
-        let context = CIContext(options: nil)
+        let context = CIContext(options: [.cacheIntermediates: false])
         let target = CGRect(origin: .zero, size: targetSize)
         return context.createCGImage(ci, from: target)
     }
