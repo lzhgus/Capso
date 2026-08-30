@@ -84,6 +84,22 @@ enum GIFExporter {
             throw ExportError.frameExtractionFailed
         }
 
+        // Memory-aware frame and resolution budgeting:
+        // CGImageDestination retains all standalone frame buffers in memory until finalization.
+        // We budget resolution dynamically if long recordings would exceed the safe ceiling (~350 MB).
+        let maxRetainedMemoryBytes: Double = 350 * 1024 * 1024
+        var effectiveMaxWidth = maxWidth
+        let naturalSize = (try? await videoTrack.load(.naturalSize)) ?? CGSize(width: 1920, height: 1080)
+        let aspectRatio = naturalSize.width > 0 && naturalSize.height > 0 ? naturalSize.height / naturalSize.width : (9.0 / 16.0)
+        let framePixelCount = effectiveMaxWidth * (effectiveMaxWidth * aspectRatio)
+        let frameByteCount = Double(framePixelCount * 4)
+        if Double(estimatedFrameCount) * frameByteCount > maxRetainedMemoryBytes {
+            let maxAllowedFrameBytes = maxRetainedMemoryBytes / Double(estimatedFrameCount)
+            let maxAllowedPixels = maxAllowedFrameBytes / 4.0
+            let budgetedWidth = sqrt(maxAllowedPixels / Double(aspectRatio))
+            effectiveMaxWidth = max(480, min(maxWidth, CGFloat(budgetedWidth)))
+        }
+
         // AVAssetReader for sequential decoding into BGRA pixel buffers.
         let reader: AVAssetReader
         do {
@@ -150,7 +166,7 @@ enum GIFExporter {
             guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { continue }
             guard let cgImage = makeStandaloneCGImage(
                 from: pixelBuffer,
-                maxWidth: maxWidth,
+                maxWidth: effectiveMaxWidth,
                 colorSpace: sRGB
             ) else { continue }
 
