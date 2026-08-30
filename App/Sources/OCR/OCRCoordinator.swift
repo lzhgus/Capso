@@ -34,6 +34,11 @@ final class OCRCoordinator {
     }
 
     private func beginInstantOCRFlow() {
+        // Prewarm Vision models concurrently while the user makes their marquee selection,
+        // avoiding both startup idle memory footprint and first-capture latency.
+        Task.detached(priority: .userInitiated) {
+            await TextRecognizer.prewarm()
+        }
         // Defer one run loop turn so the triggering event (menu click / global
         // hotkey) fully settles before the overlay becomes key — without the
         // previous fixed 150 ms wait on every invocation.

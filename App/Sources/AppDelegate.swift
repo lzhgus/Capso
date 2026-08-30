@@ -103,11 +103,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             await permissionManager.checkScreenRecordingPermission()
         }
-        // Load Vision's OCR models off the critical path so the first
-        // "Capture Text" of a session doesn't stall on one-time model setup.
-        Task.detached(priority: .utility) {
-            await TextRecognizer.prewarm()
-        }
     }
 
     /// One-time migration: clear stale KeyboardShortcuts UserDefaults so new defaults apply.
