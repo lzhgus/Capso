@@ -202,7 +202,11 @@ struct HistoryItemView: View {
             .accessibilityHidden(true)
         }
         .help(String(localized: "Drag Screenshot"))
-        .onAppear { coordinator.prepareDragFile(for: entry) }
+        .onHover { isHovering in
+            if isHovering {
+                coordinator.prepareDragFile(for: entry)
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Drag Screenshot"))
     }
