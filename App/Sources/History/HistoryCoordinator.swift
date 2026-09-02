@@ -406,7 +406,7 @@ final class HistoryCoordinator {
             return cached
         }
 
-        let image = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+        let cgImage = await Task.detached(priority: .userInitiated) { () -> CGImage? in
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
             let options: [CFString: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -414,15 +414,12 @@ final class HistoryCoordinator {
                 kCGImageSourceCreateThumbnailWithTransform: true,
                 kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
             ]
-            guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                return nil
-            }
-            return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
         }.value
 
-        if let image {
-            thumbnailCache.setObject(image, forKey: nsURL)
-        }
+        guard let cgImage else { return nil }
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        thumbnailCache.setObject(image, forKey: nsURL)
         return image
     }
 
