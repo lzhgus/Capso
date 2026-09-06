@@ -2524,6 +2524,50 @@
         }
       }
     },
+    "Discard" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "破棄"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버리기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃"
+          }
+        }
+      }
+    },
+    "Discard your edits?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集内容を破棄しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "편집 내용을 버리시겠습니까?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要放弃修改吗？"
+          }
+        }
+      }
+    },
     "Display thumbnail with quick actions" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5287,6 +5331,28 @@
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "昨日" } },
         "ko" : { "stringUnit" : { "state" : "translated", "value" : "어제" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "昨天" } }
+      }
+    },
+    "Your annotations haven't been saved and will be lost." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "注釈は保存されていないため、失われます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "주석이 저장되지 않아 모두 사라집니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的标注尚未保存，放弃后将会丢失。"
+          }
+        }
       }
     },
     "Your screenshots and recordings will appear here" : {

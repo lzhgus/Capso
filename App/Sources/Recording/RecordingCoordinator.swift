@@ -118,6 +118,7 @@ final class RecordingCoordinator {
         handleAreaSelected(rect: rect, screen: screen)
     }
 
+
     // MARK: - Step 1: Area Selection
 
     private func showAreaSelectionOverlay() {

@@ -83,10 +83,12 @@ final class OCRCoordinator {
                 )
 
 
-                let text = try await TextRecognizer.recognizeText(
+                let regions = try await OCRProcessFallback.recognize(
                     image: result.image,
-                    keepLineBreaks: settings.ocrKeepLineBreaks
+                    detectURLs: false
                 )
+                let separator = settings.ocrKeepLineBreaks ? "\n" : " "
+                let text = regions.map(\.text).joined(separator: separator)
 
 
                 if text.isEmpty {
@@ -123,7 +125,7 @@ final class OCRCoordinator {
     private func beginVisualOCR(image: CGImage, anchorScreen: NSScreen?) {
         Task {
             do {
-                let regions = try await TextRecognizer.recognize(
+                let regions = try await OCRProcessFallback.recognize(
                     image: image,
                     detectURLs: settings.ocrDetectLinks
                 )

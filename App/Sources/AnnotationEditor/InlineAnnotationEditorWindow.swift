@@ -363,7 +363,7 @@ private struct InlineAnnotationEditorView: View {
         lineWidth = savedWidth(for: currentTool)
         strokePattern = savedStrokePattern
         Task {
-            if let regions = try? await TextRecognizer.recognize(
+            if let regions = try? await OCRProcessFallback.recognize(
                 image: sourceImage,
                 level: .fast,
                 detectURLs: false

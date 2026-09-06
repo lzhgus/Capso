@@ -13,6 +13,9 @@ final class HistoryWindow {
 
     func show() {
         if let window {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -49,4 +52,23 @@ final class HistoryWindow {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    func toggle() {
+        guard let window else {
+            show()
+            return
+        }
+
+        if window.isVisible, !window.isMiniaturized {
+            window.orderOut(nil)
+        } else {
+            show()
+        }
+    }
+
+#if DEBUG
+    var isVisibleForTesting: Bool {
+        window?.isVisible == true && window?.isMiniaturized == false
+    }
+#endif
 }

@@ -29,6 +29,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let updateManager = UpdateManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A clean process is the workaround for a macOS 27 Vision regression.
+        // Handle the narrow helper invocation before any normal app startup.
+        if OCRProcessFallback.runHelperIfRequested() {
+            return
+        }
+
         // A hosted unit-test bundle only needs the AppKit run loop. Avoid
         // registering global shortcuts, touching real settings, or starting
         // coordinators in the separate test-host process.
@@ -105,8 +111,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Load Vision's OCR models off the critical path so the first
         // "Capture Text" of a session doesn't stall on one-time model setup.
-        Task.detached(priority: .utility) {
-            await TextRecognizer.prewarm()
+        if !OCRProcessFallback.shouldSkipPrewarm {
+            Task.detached(priority: .utility) {
+                await TextRecognizer.prewarm()
+            }
         }
     }
 
@@ -174,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.captureCoordinator?.replayLastCapture()
         }
         KeyboardShortcuts.onKeyDown(for: .screenshotHistory) { [weak self] in
-            self?.historyCoordinator?.showWindow()
+            self?.historyCoordinator?.toggleWindow()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAndTranslate) { [weak self] in
             guard let self else { return }

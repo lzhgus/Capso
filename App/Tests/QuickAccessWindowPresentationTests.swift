@@ -99,3 +99,28 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(interval))
     }
 }
+
+@MainActor
+final class HistoryWindowShortcutToggleTests: XCTestCase {
+    func testToggleShowsHidesAndShowsTheSameHistoryWindow() throws {
+        let suiteName = "HistoryWindowShortcutToggleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        let coordinator = HistoryCoordinator(settings: AppSettings(defaults: defaults))
+        defer {
+            if coordinator.isWindowVisibleForTesting {
+                coordinator.toggleWindow()
+            }
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        coordinator.toggleWindow()
+        XCTAssertTrue(coordinator.isWindowVisibleForTesting)
+
+        coordinator.toggleWindow()
+        XCTAssertFalse(coordinator.isWindowVisibleForTesting)
+
+        coordinator.toggleWindow()
+        XCTAssertTrue(coordinator.isWindowVisibleForTesting)
+    }
+}

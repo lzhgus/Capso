@@ -182,7 +182,7 @@ final class TranslationCoordinator {
         translationTask = Task { [weak self, weak window] in
             guard let self else { return }
             do {
-                let regions = try await TextRecognizer.recognize(image: image, detectURLs: false)
+                let regions = try await OCRProcessFallback.recognize(image: image, detectURLs: false)
                 guard let window,
                       translationGeneration.isCurrent(requestID),
                       resultWindow === window else { return }

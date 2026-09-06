@@ -360,7 +360,7 @@ final class AllInOneAnnotationSession: ObservableObject {
 
         Task { [weak self] in
             guard let self else { return }
-            if let regions = try? await TextRecognizer.recognize(
+            if let regions = try? await OCRProcessFallback.recognize(
                 image: sourceImage,
                 level: .fast,
                 detectURLs: false
