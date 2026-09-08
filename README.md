@@ -30,6 +30,22 @@ A native, feature-rich alternative to CleanShot X. Built with Swift 6.0 and Swif
 
 ---
 
+<p align="center">
+  <strong>Made possible by our amazing contributors</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/lzhgus/Capso/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=lzhgus/Capso" alt="Capso contributors">
+  </a>
+</p>
+
+<p align="center">
+  <sub><a href="./CONTRIBUTING.md">Join them</a> and help make Capso better.</sub>
+</p>
+
+---
+
 ## Download
 
 Grab the latest signed, notarized DMG from [**GitHub Releases →**](https://github.com/lzhgus/Capso/releases/latest)
