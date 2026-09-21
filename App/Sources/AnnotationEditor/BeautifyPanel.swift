@@ -47,6 +47,16 @@ struct BeautifyPanel: View {
                         }
                     }
 
+                    if settings.backgroundStyle == .gradient {
+                        settingRow("Gradient") {
+                            HStack(spacing: 4) {
+                                ForEach(BeautifyGradientPreset.allCases) { preset in
+                                    gradientSwatch(preset)
+                                }
+                            }
+                        }
+                    }
+
                     Divider()
                         .padding(.vertical, 1)
 
@@ -134,6 +144,32 @@ struct BeautifyPanel: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+
+    private func gradientSwatch(_ preset: BeautifyGradientPreset) -> some View {
+        let selected = settings.gradientPreset == preset
+        return Button {
+            settings.gradientPreset = preset
+        } label: {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(nsColor: preset.from), Color(nsColor: preset.to)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 18, height: 18)
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+                .padding(2)
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.accentColor, lineWidth: selected ? 1.5 : 0)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(preset.label)
+        .accessibilityLabel(Text(preset.label))
     }
 
     private func isColorMatch(_ a: Color, _ b: Color) -> Bool {
