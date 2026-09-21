@@ -101,13 +101,7 @@ struct CropEditorView: View {
                 onRotateCCW: rotateCCW,
                 onFlipH: flipHorizontal,
                 onCancel: onCancel,
-                onCommit: {
-                    onCommit(
-                        didTransformImage ? displayImage : nil,
-                        isIdentityCrop ? nil : cropRect,
-                        committedOutputSize
-                    )
-                }
+                onCommit: commit
             )
             Divider()
 
@@ -128,7 +122,9 @@ struct CropEditorView: View {
                             snapEnabled: snapEnabled,
                             onDragEnded: { oldRect in
                                 pushHistory(rect: oldRect, preset: preset)
-                            }
+                            },
+                            onCommit: commit,
+                            onCancel: onCancel
                         )
                         .frame(
                             width: imageSize.width * zoomScale,
@@ -181,6 +177,14 @@ struct CropEditorView: View {
             }
             undo(); return .handled
         }
+    }
+
+    private func commit() {
+        onCommit(
+            didTransformImage ? displayImage : nil,
+            isIdentityCrop ? nil : cropRect,
+            committedOutputSize
+        )
     }
 
     private func pushHistory(rect: CGRect, preset: CropPreset) {
