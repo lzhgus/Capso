@@ -61,6 +61,14 @@ public enum ContentEnumerator {
             .map { WindowInfo(from: $0) }
     }
 
+    /// System overlays that sit above app windows and steal hit testing.
+    /// `com.apple.dock` owns a transparent display-sized window at layer 20.
+    private static let excludedSystemOverlayBundleIDs: Set<String> = [
+        "com.apple.dock",
+        "com.apple.WindowManager",
+        "com.apple.wallpaper",
+    ]
+
     static func isCaptureCandidate(
         frame: CGRect,
         isOnScreen: Bool,
@@ -71,6 +79,11 @@ public enum ContentEnumerator {
         windowLayer: Int,
         isOwnAppWindow: Bool
     ) -> Bool {
+        if let bundleID = appBundleIdentifier,
+           excludedSystemOverlayBundleIDs.contains(bundleID) {
+            return false
+        }
+
         let hasUsableLabel = !title.isEmpty || !appName.isEmpty
         let hasIdentifiedOwningApplication = !appName.isEmpty
             || !(appBundleIdentifier?.isEmpty ?? true)
