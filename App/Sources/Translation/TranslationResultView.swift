@@ -381,7 +381,10 @@ struct TranslationResultView: View {
 
         let sourceLanguage = detected.map { Locale.Language(identifier: $0) }
         let targetLanguage = Locale.Language(identifier: target)
-#if compiler(>=6.2)
+// `preferredStrategy:` only exists in the macOS 26.4 SDK. Xcode 26.4 is the
+// first release that ships Swift 6.3; Xcode 26.0–26.3 ship Swift 6.2.x with
+// older SDKs, so gating on 6.2 broke the build there.
+#if compiler(>=6.3)
         if #available(macOS 26.4, *) {
             runConfig = TranslationSession.Configuration(
                 source: sourceLanguage,
