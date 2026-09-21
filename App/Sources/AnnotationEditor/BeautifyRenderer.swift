@@ -32,6 +32,23 @@ enum BeautifyRenderer {
             ctx.setFillColor(bgColor)
             ctx.fill(canvasRect)
 
+        case .gradient:
+            let preset = settings.gradientPreset
+            let colors = [preset.from.cgColor, preset.to.cgColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                // Top-leading → bottom-trailing in screen space. The bitmap
+                // context has a bottom-left origin, so the start is at maxY.
+                ctx.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: canvasRect.minX, y: canvasRect.maxY),
+                    end: CGPoint(x: canvasRect.maxX, y: canvasRect.minY),
+                    options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+                )
+            } else {
+                ctx.setFillColor(preset.from.cgColor)
+                ctx.fill(canvasRect)
+            }
+
         case .liquidGlass:
             // Fall back to a dark fill if CI fails for any reason.
             ctx.setFillColor(NSColor(calibratedWhite: 0.1, alpha: 1).cgColor)

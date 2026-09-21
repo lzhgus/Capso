@@ -201,7 +201,8 @@ struct AnnotationEditorView: View {
         }
     }
 
-    /// Live preview of the Beautify background. For solid, just a filled Rect.
+    /// Live preview of the Beautify background. For solid, just a filled Rect;
+    /// for gradient, a `LinearGradient` with the same corners as `BeautifyRenderer`.
     /// For liquid glass, a blurred & saturation-boosted copy of the screenshot
     /// scaled to fill the background area — mirrors what `BeautifyRenderer`
     /// produces on export. Blur radius is scaled by `zoomScale` so that the
@@ -213,6 +214,15 @@ struct AnnotationEditorView: View {
         case .solid:
             Rectangle()
                 .fill(beautifySettings.backgroundColor)
+        case .gradient:
+            LinearGradient(
+                colors: [
+                    Color(nsColor: beautifySettings.gradientPreset.from),
+                    Color(nsColor: beautifySettings.gradientPreset.to),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         case .liquidGlass:
             Image(decorative: sourceImage, scale: 1.0)
                 .resizable()
