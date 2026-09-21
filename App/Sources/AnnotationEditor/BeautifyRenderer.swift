@@ -33,19 +33,24 @@ enum BeautifyRenderer {
             ctx.fill(canvasRect)
 
         case .gradient:
-            let preset = settings.gradientPreset
-            let colors = [preset.from.cgColor, preset.to.cgColor] as CFArray
-            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
-                // Top-leading → bottom-trailing in screen space. The bitmap
-                // context has a bottom-left origin, so the start is at maxY.
+            let stops = settings.gradientStops
+            let colors = stops.map(\.cgColor) as CFArray
+            let locations = stops.indices.map { CGFloat($0) / CGFloat(max(1, stops.count - 1)) }
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locations) {
+                // Same unit geometry as the SwiftUI preview; the bitmap context
+                // has a bottom-left origin, so flip y.
+                let points = BeautifyGradientGeometry.unitPoints(angle: Double(settings.gradientAngle))
+                func canvasPoint(_ unit: UnitPoint) -> CGPoint {
+                    CGPoint(x: canvasRect.width * unit.x, y: canvasRect.height * (1 - unit.y))
+                }
                 ctx.drawLinearGradient(
                     gradient,
-                    start: CGPoint(x: canvasRect.minX, y: canvasRect.maxY),
-                    end: CGPoint(x: canvasRect.maxX, y: canvasRect.minY),
+                    start: canvasPoint(points.start),
+                    end: canvasPoint(points.end),
                     options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
                 )
-            } else {
-                ctx.setFillColor(preset.from.cgColor)
+            } else if let first = stops.first {
+                ctx.setFillColor(first.cgColor)
                 ctx.fill(canvasRect)
             }
 

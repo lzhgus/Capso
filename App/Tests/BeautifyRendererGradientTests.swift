@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import Capso
 
@@ -57,7 +58,7 @@ final class BeautifyRendererGradientTests: XCTestCase {
         var settings = BeautifySettings()
         settings.isEnabled = true
         settings.backgroundStyle = .gradient
-        settings.gradientPreset = .dusk
+        settings.selectGradientPreset(.dusk)
         settings.padding = 20
         settings.cornerRadius = 0
         settings.shadowEnabled = false
@@ -68,8 +69,9 @@ final class BeautifyRendererGradientTests: XCTestCase {
         XCTAssertEqual(output.height, 44)
 
         // Corners of the padding carry the preset's end colours.
-        try assertColor(try pixel(in: output, x: 0, y: 0), matches: BeautifyGradientPreset.dusk.from)
-        try assertColor(try pixel(in: output, x: 43, y: 43), matches: BeautifyGradientPreset.dusk.to)
+        XCTAssertEqual(settings.gradientAngle, 135)
+        try assertColor(try pixel(in: output, x: 0, y: 0), matches: BeautifyGradientPreset.dusk.stops[0])
+        try assertColor(try pixel(in: output, x: 43, y: 43), matches: BeautifyGradientPreset.dusk.stops[1])
 
         // The screenshot itself is drawn on top of the gradient. Loose bounds:
         // the renderer works in device RGB, so exact sRGB values shift a little.
@@ -79,9 +81,52 @@ final class BeautifyRendererGradientTests: XCTestCase {
         XCTAssertLessThan(center.b, 0.2)
     }
 
+    func testCustomGradientAtNinetyDegreesRunsLeftToRight() throws {
+        let source = try makeSolidImage(size: 4, red: 0, green: 0, blue: 1)
+        var settings = BeautifySettings()
+        settings.isEnabled = true
+        settings.backgroundStyle = .gradient
+        settings.gradientPreset = nil
+        settings.gradientCustomStart = Color(red: 1, green: 0, blue: 0)
+        settings.gradientCustomEnd = Color(red: 0, green: 1, blue: 0)
+        settings.gradientAngle = 90
+        settings.padding = 20
+        settings.cornerRadius = 0
+        settings.shadowEnabled = false
+
+        let output = try XCTUnwrap(BeautifyRenderer.render(image: source, settings: settings))
+
+        // Left edge is the start colour on every row, right edge the end colour.
+        let left = try pixel(in: output, x: 0, y: 40)
+        let right = try pixel(in: output, x: 43, y: 3)
+        XCTAssertGreaterThan(left.r, 0.9)
+        XCTAssertLessThan(left.g, 0.15)
+        XCTAssertLessThan(right.r, 0.15)
+        XCTAssertGreaterThan(right.g, 0.9)
+    }
+
     func testEveryPresetHasDistinctStops() {
         for preset in BeautifyGradientPreset.allCases {
-            XCTAssertNotEqual(preset.from, preset.to, "\(preset) should be a real gradient, not a solid")
+            XCTAssertGreaterThanOrEqual(preset.stops.count, 2, "\(preset)")
+            XCTAssertNotEqual(preset.stops.first, preset.stops.last, "\(preset) should be a real gradient, not a solid")
         }
+        XCTAssertEqual(
+            Set(BeautifyGradientPreset.vivid + BeautifyGradientPreset.muted),
+            Set(BeautifyGradientPreset.allCases),
+            "every preset must be in exactly one panel row"
+        )
+    }
+
+    func testGeometryReachesCornersOnDiagonalAndEdgesOnAxis() {
+        let diagonal = BeautifyGradientGeometry.unitPoints(angle: 135)
+        XCTAssertEqual(diagonal.start.x, 0, accuracy: 0.001)
+        XCTAssertEqual(diagonal.start.y, 0, accuracy: 0.001)
+        XCTAssertEqual(diagonal.end.x, 1, accuracy: 0.001)
+        XCTAssertEqual(diagonal.end.y, 1, accuracy: 0.001)
+
+        let vertical = BeautifyGradientGeometry.unitPoints(angle: 180)
+        XCTAssertEqual(vertical.start.y, 0, accuracy: 0.001)
+        XCTAssertEqual(vertical.end.y, 1, accuracy: 0.001)
+        XCTAssertEqual(vertical.start.x, 0.5, accuracy: 0.001)
     }
 }
