@@ -32,6 +32,28 @@ enum BeautifyRenderer {
             ctx.setFillColor(bgColor)
             ctx.fill(canvasRect)
 
+        case .gradient:
+            let stops = settings.gradientStops
+            let colors = stops.map(\.cgColor) as CFArray
+            let locations = stops.indices.map { CGFloat($0) / CGFloat(max(1, stops.count - 1)) }
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: locations) {
+                // Same unit geometry as the SwiftUI preview; the bitmap context
+                // has a bottom-left origin, so flip y.
+                let points = BeautifyGradientGeometry.unitPoints(angle: Double(settings.gradientAngle))
+                func canvasPoint(_ unit: UnitPoint) -> CGPoint {
+                    CGPoint(x: canvasRect.width * unit.x, y: canvasRect.height * (1 - unit.y))
+                }
+                ctx.drawLinearGradient(
+                    gradient,
+                    start: canvasPoint(points.start),
+                    end: canvasPoint(points.end),
+                    options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+                )
+            } else if let first = stops.first {
+                ctx.setFillColor(first.cgColor)
+                ctx.fill(canvasRect)
+            }
+
         case .liquidGlass:
             // Fall back to a dark fill if CI fails for any reason.
             ctx.setFillColor(NSColor(calibratedWhite: 0.1, alpha: 1).cgColor)
