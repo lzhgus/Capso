@@ -59,4 +59,39 @@ struct WindowCaptureCandidateTests {
             isOwnAppWindow: false
         ))
     }
+
+    @Test("Includes a normal application window")
+    func includesNormalApplicationWindow() {
+        #expect(ContentEnumerator.isCaptureCandidate(
+            frame: CGRect(x: 120, y: 80, width: 800, height: 600),
+            isOnScreen: true,
+            title: "Documents",
+            appName: "Finder",
+            appBundleIdentifier: "com.apple.finder",
+            hasOwningApplication: true,
+            windowLayer: 0,
+            isOwnAppWindow: false
+        ))
+    }
+
+    @Test(
+        "Excludes full-screen system overlay windows",
+        arguments: [
+            ("Dock", "com.apple.dock"),
+            ("Window Manager", "com.apple.WindowManager"),
+            ("Wallpaper", "com.apple.wallpaper"),
+        ]
+    )
+    func excludesFullScreenSystemOverlay(appName: String, bundleID: String) {
+        #expect(ContentEnumerator.isCaptureCandidate(
+            frame: CGRect(x: 0, y: 0, width: 1728, height: 1117),
+            isOnScreen: true,
+            title: appName,
+            appName: appName,
+            appBundleIdentifier: bundleID,
+            hasOwningApplication: true,
+            windowLayer: 20,
+            isOwnAppWindow: false
+        ) == false)
+    }
 }
