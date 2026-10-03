@@ -240,6 +240,22 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ---
 
+## Contributors
+
+Thanks to everyone who has contributed to Capso.
+
+<p align="center">
+  <a href="https://github.com/lzhgus/Capso/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=lzhgus/Capso" alt="Capso contributors">
+  </a>
+</p>
+
+<p align="center">
+  <sub><a href="./CONTRIBUTING.md">Join them</a> and help make Capso better.</sub>
+</p>
+
+---
+
 ## License
 
 Capso is licensed under the [Business Source License 1.1](LICENSE).
