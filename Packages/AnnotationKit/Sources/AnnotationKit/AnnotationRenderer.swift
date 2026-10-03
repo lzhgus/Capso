@@ -6,8 +6,8 @@ import CoreImage
 public enum AnnotationRenderer {
     /// Renders the source image with annotations drawn on top, optionally cropped.
     /// `cropRect` is in image coordinates with top-left origin (y grows down),
-    /// matching AnnotationObject.bounds. The renderer flips to bottom-left
-    /// internally before calling `CGImage.cropping(to:)`.
+    /// matching AnnotationObject.bounds. `CGImage.cropping(to:)` uses the same
+    /// top-left pixel space, so the rect is passed through unchanged.
     public static func render(
         sourceImage: CGImage,
         objects: [any AnnotationObject],
@@ -43,14 +43,8 @@ public enum AnnotationRenderer {
         guard var outputImage = ctx.makeImage() else { return nil }
 
         if let crop = cropRect {
-            let flipped = CGRect(
-                x: crop.minX,
-                y: CGFloat(height) - crop.maxY,
-                width: crop.width,
-                height: crop.height
-            ).intersection(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
-
-            if !flipped.isEmpty, let cropped = outputImage.cropping(to: flipped) {
+            let clipped = crop.intersection(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+            if !clipped.isEmpty, let cropped = outputImage.cropping(to: clipped) {
                 outputImage = cropped
             }
         }
