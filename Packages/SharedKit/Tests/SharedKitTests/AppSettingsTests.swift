@@ -812,6 +812,35 @@ struct AppSettingsTests {
         #expect(second.selfTimerPlayTickSound == false)
     }
 
+    @Test("Recording microphone choice defaults off")
+    func defaultRecordingMicSelection() {
+        let settings = makeSettings("test.recordingMic.default")
+        #expect(settings.recordingMicEnabled == false)
+        #expect(settings.recordingMicDeviceID == nil)
+    }
+
+    @Test("Recording microphone choice persists across instances")
+    func recordingMicSelectionPersists() {
+        let suite = "test.recordingMic.persists"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        first.recordingMicEnabled = true
+        first.recordingMicDeviceID = "BuiltInMicrophoneDevice"
+
+        let second = AppSettings(defaults: defaults)
+        #expect(second.recordingMicEnabled == true)
+        #expect(second.recordingMicDeviceID == "BuiltInMicrophoneDevice")
+
+        second.recordingMicEnabled = false
+        second.recordingMicDeviceID = nil
+
+        let third = AppSettings(defaults: defaults)
+        #expect(third.recordingMicEnabled == false)
+        #expect(third.recordingMicDeviceID == nil)
+    }
+
     @Test("Last recording area persists across instances")
     func lastRecordingAreaPersists() {
         let suite = "test.lastRecordingArea.persists"

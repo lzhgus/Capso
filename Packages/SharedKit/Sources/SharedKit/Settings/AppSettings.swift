@@ -611,6 +611,21 @@ public final class AppSettings: @unchecked Sendable {
         }
     }
 
+    /// Whether the microphone was enabled in the recording toolbar the last
+    /// time the user changed it. Restored the next time the toolbar opens so
+    /// long recordings don't silently start without audio. Default `false`.
+    public var recordingMicEnabled: Bool {
+        get { defaults.object(forKey: "recordingMicEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "recordingMicEnabled") }
+    }
+
+    /// `AVCaptureDevice.uniqueID` of the microphone last picked in the
+    /// recording toolbar, or `nil` when none was picked.
+    public var recordingMicDeviceID: String? {
+        get { defaults.string(forKey: "recordingMicDeviceID") }
+        set { defaults.set(newValue, forKey: "recordingMicDeviceID") }
+    }
+
     /// When `true`, the recording editor opens after every recording stops.
     /// When `false` (default), the quick-preview flow is used instead.
     /// Default is `false` to preserve existing behaviour for existing users.
