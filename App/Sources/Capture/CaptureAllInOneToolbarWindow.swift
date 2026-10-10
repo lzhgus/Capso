@@ -467,6 +467,7 @@ final class CaptureAllInOneToolbarWindow {
     private func installKeyboardMonitor() {
         globalEscMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return }
+            guard !event.isPostedByAnotherProcess else { return }
             Task { @MainActor in self?.onCancel?() }
         }
         localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
@@ -501,6 +502,13 @@ final class CaptureAllInOneToolbarWindow {
             return nil
         }
         guard event.type == .keyDown else { return event }
+        // Chords injected by other processes (e.g. a translation tool posting
+        // a synthetic ⌘C after every mouse-up) must never drive the copy /
+        // save / pin / cancel shortcuts — otherwise the capture tears itself
+        // down while the user is still working.
+        if event.isInjectedCommitOrDismissShortcut {
+            return nil
+        }
         if event.keyCode == 53 {
             onCancel?()
             return nil
@@ -599,6 +607,9 @@ private final class AllInOnePanel: NSPanel {
             super.keyDown(with: event)
             return
         }
+        // The window's local monitor already filters synthetic Esc; guard
+        // here too so an injected event can never dismiss the panel.
+        guard !event.isPostedByAnotherProcess else { return }
 
         onEscape?()
     }
@@ -1556,6 +1567,9 @@ final class AllInOneSelectionOverlayView: NSView {
             super.keyDown(with: event)
             return
         }
+        // The window's local monitor already filters synthetic Esc; guard
+        // here too so an injected event can never cancel the capture.
+        guard !event.isPostedByAnotherProcess else { return }
 
         onCancel?()
     }
