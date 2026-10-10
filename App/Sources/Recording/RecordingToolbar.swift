@@ -8,6 +8,34 @@ enum RecordingFormatChoice: String, CaseIterable {
     case gif
 }
 
+/// Microphone choice shown in the recording toolbar, restored from settings.
+struct RecordingMicSelection: Equatable {
+    var enabled: Bool
+    var deviceID: String?
+
+    /// Restores the last microphone choice against the devices available now.
+    /// - A remembered device that is still connected stays selected.
+    /// - If it's gone, the mic stays on and the system default is marked.
+    /// - With no microphones at all, the mic is turned off.
+    static func restored(
+        enabled: Bool,
+        storedDeviceID: String?,
+        availableDeviceIDs: [String],
+        defaultDeviceID: String?
+    ) -> RecordingMicSelection {
+        guard enabled, !availableDeviceIDs.isEmpty else {
+            return RecordingMicSelection(enabled: false, deviceID: nil)
+        }
+        if let storedDeviceID, availableDeviceIDs.contains(storedDeviceID) {
+            return RecordingMicSelection(enabled: true, deviceID: storedDeviceID)
+        }
+        if let defaultDeviceID, availableDeviceIDs.contains(defaultDeviceID) {
+            return RecordingMicSelection(enabled: true, deviceID: defaultDeviceID)
+        }
+        return RecordingMicSelection(enabled: true, deviceID: nil)
+    }
+}
+
 /// Recording toolbar with a two-section layout: controls row + action rows.
 struct RecordingToolbarView: View {
     let width: Int
@@ -23,7 +51,7 @@ struct RecordingToolbarView: View {
     let onCancel: () -> Void
     let onCameraSettingsChanged: () -> Void
 
-    @State private var selectedMicName: String = ""
+    @State private var selectedMicID: String?
     @State private var cameraMenuRevision = 0
 
     var body: some View {
@@ -168,6 +196,7 @@ struct RecordingToolbarView: View {
         // white — the toolbar has a dark background regardless of the
         // system color scheme.
         .environment(\.colorScheme, .dark)
+        .onAppear { restoreMicSelection() }
     }
 
     // MARK: - Mic Menu
@@ -176,7 +205,8 @@ struct RecordingToolbarView: View {
         Menu {
             Button {
                 micEnabled = false
-                selectedMicName = ""
+                selectedMicID = nil
+                persistMicSelection()
             } label: {
                 if !micEnabled {
                     Label("Do Not Record Microphone", systemImage: "checkmark")
@@ -190,9 +220,10 @@ struct RecordingToolbarView: View {
             ForEach(micDevices(), id: \.uniqueID) { device in
                 Button {
                     micEnabled = true
-                    selectedMicName = device.localizedName
+                    selectedMicID = device.uniqueID
+                    persistMicSelection()
                 } label: {
-                    if micEnabled && selectedMicName == device.localizedName {
+                    if micEnabled && selectedMicID == device.uniqueID {
                         Label(device.localizedName, systemImage: "checkmark")
                     } else {
                         Text(device.localizedName)
@@ -210,6 +241,22 @@ struct RecordingToolbarView: View {
         .background(micEnabled ? .white.opacity(0.15) : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .help("Microphone")
+    }
+
+    private func restoreMicSelection() {
+        let selection = RecordingMicSelection.restored(
+            enabled: settings.recordingMicEnabled,
+            storedDeviceID: settings.recordingMicDeviceID,
+            availableDeviceIDs: micDevices().map(\.uniqueID),
+            defaultDeviceID: AVCaptureDevice.default(for: .audio)?.uniqueID
+        )
+        micEnabled = selection.enabled
+        selectedMicID = selection.deviceID
+    }
+
+    private func persistMicSelection() {
+        settings.recordingMicEnabled = micEnabled
+        settings.recordingMicDeviceID = micEnabled ? selectedMicID : nil
     }
 
     // MARK: - Camera Menu
