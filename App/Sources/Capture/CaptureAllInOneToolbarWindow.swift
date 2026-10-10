@@ -306,7 +306,16 @@ final class CaptureAllInOneToolbarWindow {
             && CaptureChromeLayout.startsWithCompactSideRail
         if toolbarState.isCompact != shouldCompact {
             toolbarState.isCompact = shouldCompact
-            toolbarState.showsOverflow = false
+            // Start expanded so every action (modes, presets, utilities) is
+            // reachable without a first click; the chevron still collapses
+            // the rail on demand. On screens too short for the expanded
+            // rail the window clamp would clip its ends — including that
+            // chevron — so fall back to the collapsed rail there.
+            let margin: CGFloat = 12
+            toolbarState.showsOverflow = true
+            if toolbarState.preferredRailHeight > screen.visibleFrame.height - margin * 2 {
+                toolbarState.showsOverflow = false
+            }
         }
     }
 

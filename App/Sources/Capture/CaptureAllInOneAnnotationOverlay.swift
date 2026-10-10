@@ -65,7 +65,8 @@ final class CaptureAllInOneAnnotationOverlay {
         let wasCompact = session.usesCompactToolbar
         session.availableWidth = selectionRect.width
         if wasCompact != session.usesCompactToolbar {
-            session.showsOverflow = false
+            // Density changed — re-expand so the new layout starts fully open.
+            session.showsOverflow = true
         }
         session.onRequestToolbarLayout = { [weak self] in
             self?.repositionToolbar(selectionRect: selectionRect, avoidingFrame: avoidingFrame, animated: true)
@@ -333,7 +334,9 @@ final class AllInOneAnnotationSession: ObservableObject {
     @Published var commitEditingTrigger = 0
     @Published var textRegions: [CGRect] = []
     @Published var availableWidth: CGFloat = 0
-    @Published var showsOverflow = false
+    /// Expanded by default: every tool, color and style control is visible
+    /// right after the selection freezes; the chevron still collapses it.
+    @Published var showsOverflow = true
 
     let document: AnnotationDocument
     var onRequestCanvasFocus: (() -> Void)?
