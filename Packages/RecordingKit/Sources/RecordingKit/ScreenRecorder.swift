@@ -45,9 +45,13 @@ public final class ScreenRecorder {
     private static let excludedWindowLookupDelay: Duration = .milliseconds(30)
     private static let excludedWindowLookupAttempts = 8
 
-    public private(set) var state: RecordingState = .idle
+    public internal(set) var state: RecordingState = .idle
     public private(set) var elapsedTime: TimeInterval = 0
     public private(set) var error: Error?
+
+    /// Fires at most once per recording when ScreenCaptureKit stops the stream on its own.
+    @ObservationIgnored
+    public var onStreamInterrupted: (@MainActor (Error) -> Void)?
 
     private var stream: SCStream?
     private var streamOutput: StreamOutput?
@@ -58,6 +62,7 @@ public final class ScreenRecorder {
     private var outputFileURL: URL?
     private var recordingConfig: RecordingConfig?
     private var recordingSourceSize: CGSize?
+    private var streamInterrupted = false
 
     public init() {}
 
@@ -124,7 +129,13 @@ public final class ScreenRecorder {
         state = .stopping
         stopElapsedTimer()
         writer.deactivate()
-        if let s = stream { try await s.stopCapture() }
+        if let s = stream, !streamInterrupted {
+            do {
+                try await s.stopCapture()
+            } catch {
+                capsoLog("stopCapture failed (continuing to finalize): \(error)")
+            }
+        }
 
         guard writer.hasWrittenFrames else {
             capsoLog("No frames written"); cleanup(); state = .idle
@@ -191,6 +202,13 @@ public final class ScreenRecorder {
         output.onVideo = { buf in wr.appendVideo(buf) }
         output.onSystemAudio = { buf in wr.appendSystemAudio(buf) }
         output.onMicAudio = { buf in wr.appendMicAudio(buf) }
+        let outputID = ObjectIdentifier(output)
+        output.onStreamStopped = { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self, self.streamOutput.map(ObjectIdentifier.init) == outputID else { return }
+                self.handleStreamStopped(error: error)
+            }
+        }
 
         let queue = DispatchQueue(label: "com.capso.recording", qos: .userInteractive)
         self.recordingQueue = queue
@@ -285,6 +303,18 @@ public final class ScreenRecorder {
         return content
     }
 
+    func handleStreamStopped(error: Error) {
+        guard state.isActive, !streamInterrupted else {
+            capsoLog("Ignoring stream stop in state=\(state.rawValue)")
+            return
+        }
+        capsoLog("Stream stopped unexpectedly: \(error)")
+        streamInterrupted = true
+        writer.deactivate()
+        stopElapsedTimer()
+        onStreamInterrupted?(error)
+    }
+
     private func startElapsedTimer() {
         recordingStartTime = Date()
         let base = elapsedTime
@@ -302,6 +332,7 @@ public final class ScreenRecorder {
 
     private func cleanup() {
         stream = nil; streamOutput = nil; recordingConfig = nil; recordingQueue = nil; recordingSourceSize = nil
+        streamInterrupted = false
         writer.reset(); stopElapsedTimer()
     }
 }
@@ -575,11 +606,13 @@ private final class StreamOutput: NSObject, SCStreamOutput, SCStreamDelegate, @u
     var onVideo: ((CMSampleBuffer) -> Void)?
     var onSystemAudio: ((CMSampleBuffer) -> Void)?
     var onMicAudio: ((CMSampleBuffer) -> Void)?
+    var onStreamStopped: (@Sendable (Error) -> Void)?
     private var sysAudioCount = 0
     private var micAudioCount = 0
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         capsoLog("SCStream error: \(error)")
+        onStreamStopped?(error)
     }
 
     func stream(_ s: SCStream, didOutputSampleBuffer buf: CMSampleBuffer, of type: SCStreamOutputType) {
