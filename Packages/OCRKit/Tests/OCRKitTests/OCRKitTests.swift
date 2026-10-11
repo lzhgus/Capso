@@ -67,6 +67,39 @@ final class OCRKitTests: XCTestCase {
         XCTAssertEqual(regions.map(\.text), ["fast"])
     }
 
+    /// `.fast` can't read CJK, so falling back would hand the user garbage.
+    /// Without fallback support the original accurate error must surface.
+    func testNoFallbackWhenFastCannotReadUserLanguages() async throws {
+        let image = try blankImage()
+        let levels = Locked<[RecognitionLevel]>([])
+
+        do {
+            _ = try await TextRecognizer.recognize(
+                image: image,
+                languages: nil,
+                level: .accurate,
+                detectURLs: false,
+                allowsFastFallback: { false }
+            ) { _, _, level, _ in
+                levels.withLock { $0.append(level) }
+                throw Self.accurateEngineError
+            }
+            XCTFail("Expected the accurate failure to propagate")
+        } catch {
+            XCTAssertEqual((error as NSError).domain, "TextRecognition.CRImageReaderError")
+        }
+
+        XCTAssertEqual(levels.value, [.accurate])
+    }
+
+    func testFastSupportsOnlyLatinScriptLanguages() {
+        let fast = ["en-US", "fr-FR", "it-IT", "de-DE", "es-ES", "pt-BR"]
+        XCTAssertTrue(TextRecognizer.fastSupports(["en-GB", "de-CH"], fastLanguages: fast))
+        XCTAssertFalse(TextRecognizer.fastSupports(["zh-Hans-CN"], fastLanguages: fast))
+        XCTAssertFalse(TextRecognizer.fastSupports(["en-US", "ja-JP"], fastLanguages: fast))
+        XCTAssertFalse(TextRecognizer.fastSupports(["ko-KR"], fastLanguages: []))
+    }
+
     /// A successful `.accurate` request must not pay for a second pass.
     func testAccurateSuccessDoesNotFallBack() async throws {
         let image = try blankImage()

@@ -24,7 +24,8 @@ public enum TextRecognizer {
     /// that shows up as `E5RT … Code: 13` in the unified log — every accurate
     /// request fails with `TextRecognition.CRImageReaderError error 1`, while
     /// the `.fast` level (no neural network) keeps working. Rather than fail
-    /// the whole capture, fall back to `.fast` for that call.
+    /// the whole capture, fall back to `.fast` for that call — but only when
+    /// `.fast` supports the user's languages, since it turns CJK into garbage.
     public static func recognize(
         image: CGImage,
         languages: [String]? = nil,
@@ -36,6 +37,7 @@ public enum TextRecognizer {
             languages: languages,
             level: level,
             detectURLs: detectURLs,
+            allowsFastFallback: { fastSupports(Locale.preferredLanguages, fastLanguages: fastLanguages()) },
             run: recognizeWithVision
         )
     }
@@ -47,6 +49,7 @@ public enum TextRecognizer {
         languages: [String]?,
         level: RecognitionLevel,
         detectURLs: Bool,
+        allowsFastFallback: () -> Bool = { true },
         run: @Sendable (CGImage, [String]?, RecognitionLevel, Bool) async throws -> [TextRegion]
     ) async throws -> [TextRegion] {
         do {
@@ -54,7 +57,7 @@ public enum TextRecognizer {
         } catch let accurateError {
             // Only `.accurate` has a fallback; an explicit `.fast` failure is
             // the underlying error and must propagate unchanged.
-            guard level == .accurate else { throw accurateError }
+            guard level == .accurate, allowsFastFallback() else { throw accurateError }
 
             logger.warning("""
                 Accurate OCR failed, retrying with the fast level: \
@@ -66,6 +69,20 @@ public enum TextRecognizer {
                 throw accurateError
             }
         }
+    }
+
+    /// True when every preferred language is one the `.fast` level can read.
+    static func fastSupports(_ preferredLanguages: [String], fastLanguages: [String]) -> Bool {
+        let supported = Set(fastLanguages.compactMap { Locale.Language(identifier: $0).languageCode })
+        return preferredLanguages.allSatisfy { identifier in
+            Locale.Language(identifier: identifier).languageCode.map(supported.contains) ?? false
+        }
+    }
+
+    private static func fastLanguages() -> [String] {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .fast
+        return (try? request.supportedRecognitionLanguages()) ?? []
     }
 
     private static func recognizeWithVision(
