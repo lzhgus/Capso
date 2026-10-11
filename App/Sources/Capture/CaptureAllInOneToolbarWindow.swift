@@ -501,7 +501,6 @@ final class CaptureAllInOneToolbarWindow {
             return nil
         }
         guard event.type == .keyDown else { return event }
-
         if event.keyCode == 53 {
             onCancel?()
             return nil
