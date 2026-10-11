@@ -98,7 +98,7 @@ final class OCRCoordinator {
                     showToast("Copied \(text.count) characters", screen: screen)
                 }
             } catch {
-
+                logger.error("Instant OCR failed: \(error.localizedDescription, privacy: .public)")
                 showToast("OCR: \(error.localizedDescription)", icon: "xmark.circle.fill", iconColor: .systemRed, screen: screen)
             }
         }

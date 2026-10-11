@@ -1,7 +1,10 @@
 // Packages/OCRKit/Sources/OCRKit/TextRecognizer.swift
 import Foundation
 import CoreGraphics
+import os
 import Vision
+
+private let logger = Logger(subsystem: "com.awesomemacapps.capso", category: "OCRKit")
 
 /// Recognition accuracy level.
 public enum RecognitionLevel: Sendable {
@@ -15,11 +18,61 @@ public enum TextRecognizer {
     /// Recognize text regions in a CGImage.
     /// Returns regions sorted top-to-bottom, left-to-right.
     /// Bounding boxes are in image coordinates (top-left origin, pixel dimensions).
+    ///
+    /// The `.accurate` level runs Vision's neural network on the Apple Neural
+    /// Engine. When that system runtime is degraded — a macOS-wide condition
+    /// that shows up as `E5RT … Code: 13` in the unified log — every accurate
+    /// request fails with `TextRecognition.CRImageReaderError error 1`, while
+    /// the `.fast` level (no neural network) keeps working. Rather than fail
+    /// the whole capture, fall back to `.fast` for that call.
     public static func recognize(
         image: CGImage,
         languages: [String]? = nil,
         level: RecognitionLevel = .accurate,
         detectURLs: Bool = true
+    ) async throws -> [TextRegion] {
+        try await recognize(
+            image: image,
+            languages: languages,
+            level: level,
+            detectURLs: detectURLs,
+            run: recognizeWithVision
+        )
+    }
+
+    /// Recognition with an injectable runner, so the neural-engine fallback
+    /// below can be exercised without a real (and non-reproducible) ANE fault.
+    static func recognize(
+        image: CGImage,
+        languages: [String]?,
+        level: RecognitionLevel,
+        detectURLs: Bool,
+        run: @Sendable (CGImage, [String]?, RecognitionLevel, Bool) async throws -> [TextRegion]
+    ) async throws -> [TextRegion] {
+        do {
+            return try await run(image, languages, level, detectURLs)
+        } catch let accurateError {
+            // Only `.accurate` has a fallback; an explicit `.fast` failure is
+            // the underlying error and must propagate unchanged.
+            guard level == .accurate else { throw accurateError }
+
+            logger.warning("""
+                Accurate OCR failed, retrying with the fast level: \
+                \(accurateError.localizedDescription, privacy: .public)
+                """)
+            do {
+                return try await run(image, languages, .fast, detectURLs)
+            } catch {
+                throw accurateError
+            }
+        }
+    }
+
+    private static func recognizeWithVision(
+        image: CGImage,
+        languages: [String]?,
+        level: RecognitionLevel,
+        detectURLs: Bool
     ) async throws -> [TextRegion] {
         let imageWidth = CGFloat(image.width)
         let imageHeight = CGFloat(image.height)

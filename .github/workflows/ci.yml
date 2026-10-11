@@ -51,6 +51,9 @@ jobs:
       - name: Test RecordingKit
         run: swift test --package-path Packages/RecordingKit
 
+      - name: Test OCRKit
+        run: swift test --package-path Packages/OCRKit
+
       - name: Test Capso app interactions
         run: |
           xcodebuild test -project Capso.xcodeproj \
