@@ -614,13 +614,18 @@ final class RecordingCoordinator {
         // Editor flow renders the cursor from telemetry, so avoid baking the
         // hardware cursor into the source video in that path. The quick-preview
         // flow still keeps the native hardware cursor in the captured file.
-        let config = makeRecordingConfig(
+        var config = makeRecordingConfig(
             format: format == .gif ? .gif : .video,
             fps: 30,
             captureSystemAudio: systemAudioEnabled,
             captureMicrophone: micEnabled,
             showCursor: settings.openEditorAfterRecording ? false : settings.showCursor
         )
+        if micEnabled {
+            // An unplugged device falls back to the system default, matching the toolbar.
+            config.microphoneDeviceID = settings.recordingMicDeviceID
+                .flatMap { AVCaptureDevice(uniqueID: $0)?.uniqueID }
+        }
 
         // Start camera if not already running from toolbar preview.
         // Permission was already requested in onCameraToggled, so this

@@ -30,6 +30,8 @@ public struct RecordingConfig: Sendable {
     public var fps: Int
     public var captureSystemAudio: Bool
     public var captureMicrophone: Bool
+    /// `AVCaptureDevice.uniqueID` to record from; `nil` uses the system default input.
+    public var microphoneDeviceID: String?
     public var showCursor: Bool
 
     public init(

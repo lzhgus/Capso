@@ -180,6 +180,7 @@ public final class ScreenRecorder {
         }
         if config.captureMicrophone {
             sc.captureMicrophone = true
+            sc.microphoneCaptureDeviceID = config.microphoneDeviceID
         }
 
         capsoLog("Stream: \(target.dimensions.w)x\(target.dimensions.h) NV12")

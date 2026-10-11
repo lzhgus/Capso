@@ -32,7 +32,7 @@ final class RecordingMicSelectionTests: XCTestCase {
         XCTAssertEqual(selection, RecordingMicSelection(enabled: true, deviceID: "built-in"))
     }
 
-    func testMissingDeviceWithoutKnownDefaultKeepsMicOn() {
+    func testNoStoredDeviceAndNoKnownDefaultKeepsMicOn() {
         let selection = RecordingMicSelection.restored(
             enabled: true,
             storedDeviceID: nil,
