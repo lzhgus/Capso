@@ -45,16 +45,11 @@ public final class ScreenRecorder {
     private static let excludedWindowLookupDelay: Duration = .milliseconds(30)
     private static let excludedWindowLookupAttempts = 8
 
-    /// `internal(set)` (rather than `private(set)`) so unit tests can drive
-    /// the recorder into an active state without a live ScreenCaptureKit stream.
     public internal(set) var state: RecordingState = .idle
     public private(set) var elapsedTime: TimeInterval = 0
     public private(set) var error: Error?
 
-    /// Called on the main actor when ScreenCaptureKit stops the stream on its
-    /// own while recording (for example, because the captured window was
-    /// closed). The owner should call `stopRecording()` to finalize whatever
-    /// was captured and reset back to `.idle`. Fires at most once per recording.
+    /// Fires at most once per recording when ScreenCaptureKit stops the stream on its own.
     @ObservationIgnored
     public var onStreamInterrupted: (@MainActor (Error) -> Void)?
 
@@ -134,9 +129,6 @@ public final class ScreenRecorder {
         state = .stopping
         stopElapsedTimer()
         writer.deactivate()
-        // If ScreenCaptureKit already stopped the stream (e.g. the captured
-        // window closed), `stopCapture()` throws. Never let that strand the
-        // recorder in `.stopping` — keep going and finalize what was written.
         if let s = stream, !streamInterrupted {
             do {
                 try await s.stopCapture()
@@ -210,9 +202,11 @@ public final class ScreenRecorder {
         output.onVideo = { buf in wr.appendVideo(buf) }
         output.onSystemAudio = { buf in wr.appendSystemAudio(buf) }
         output.onMicAudio = { buf in wr.appendMicAudio(buf) }
+        let outputID = ObjectIdentifier(output)
         output.onStreamStopped = { [weak self] error in
             Task { @MainActor [weak self] in
-                self?.handleStreamStopped(error: error)
+                guard let self, self.streamOutput.map(ObjectIdentifier.init) == outputID else { return }
+                self.handleStreamStopped(error: error)
             }
         }
 
@@ -309,9 +303,6 @@ public final class ScreenRecorder {
         return content
     }
 
-    /// Handles ScreenCaptureKit stopping the stream without being asked to.
-    /// Stops feeding the writer and notifies the owner so it can finalize the
-    /// partial recording through the normal `stopRecording()` path.
     func handleStreamStopped(error: Error) {
         guard state.isActive, !streamInterrupted else {
             capsoLog("Ignoring stream stop in state=\(state.rawValue)")

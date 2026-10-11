@@ -1,10 +1,7 @@
-// Packages/RecordingKit/Tests/RecordingKitTests/ScreenRecorderInterruptionTests.swift
 import Testing
 import Foundation
 @testable import RecordingKit
 
-/// Covers the path where ScreenCaptureKit stops the stream on its own
-/// (e.g. the recorded window is closed — issue #275).
 @Suite("ScreenRecorder interruption")
 @MainActor
 struct ScreenRecorderInterruptionTests {

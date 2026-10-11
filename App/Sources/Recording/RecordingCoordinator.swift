@@ -724,10 +724,6 @@ final class RecordingCoordinator {
         }
     }
 
-    /// ScreenCaptureKit stopped the stream on its own (e.g. the recorded
-    /// window was closed). Finish through the normal stop path so whatever
-    /// was captured is finalized and handed to the editor / preview, and the
-    /// recording UI is torn down so the user can record again.
     private func handleRecordingInterrupted(error: Error) {
         NSLog("[Capso] Recording stream stopped unexpectedly: %@", String(describing: error))
         stopRecording()
