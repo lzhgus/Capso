@@ -515,6 +515,7 @@ final class CaptureAllInOneToolbarWindow {
         }
 
         if modifiers == [.command, .shift], event.keyCode == 8 {
+            if event.isInjectedCopyShortcut { return nil }
             performCopyAction()
             return nil
         }
@@ -529,6 +530,7 @@ final class CaptureAllInOneToolbarWindow {
 
         switch event.charactersIgnoringModifiers?.lowercased() {
         case "c":
+            if event.isInjectedCopyShortcut { return nil }
             // Fall back to copy-image-and-close when no annotation object is
             // selected. While editing text, leave ⌘C to the native text field.
             if annotationOverlay?.isEditingText == true {

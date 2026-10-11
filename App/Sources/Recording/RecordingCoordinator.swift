@@ -88,6 +88,9 @@ final class RecordingCoordinator {
     init(settings: AppSettings) {
         self.settings = settings
         cameraManager.refreshDevices()
+        recorder.onStreamInterrupted = { [weak self] error in
+            self?.handleRecordingInterrupted(error: error)
+        }
     }
 
     // MARK: - Public API
@@ -724,6 +727,11 @@ final class RecordingCoordinator {
                 hideRecordingUI()
             }
         }
+    }
+
+    private func handleRecordingInterrupted(error: Error) {
+        NSLog("[Capso] Recording stream stopped unexpectedly: %@", String(describing: error))
+        stopRecording()
     }
 
     private func restartRecording() {
