@@ -113,7 +113,7 @@ final class InlineAnnotationEditorWindow: NSPanel, NSWindowDelegate {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.isInjectedCommitOrDismissShortcut {
+        if event.isInjectedCopyShortcut {
             return true
         }
         if routeAnnotationClipboardShortcutToCanvas(event) {
@@ -123,7 +123,7 @@ final class InlineAnnotationEditorWindow: NSPanel, NSWindowDelegate {
     }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.isInjectedCommitOrDismissShortcut {
+        if event.isInjectedCopyShortcut {
             return
         }
         if event.type == .keyDown,
