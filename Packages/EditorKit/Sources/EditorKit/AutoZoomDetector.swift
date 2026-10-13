@@ -64,13 +64,15 @@ public enum AutoZoomDetector {
     /// …of at least this many presses.
     static let minTypingKeys = 4
     static let typingPreRoll: TimeInterval = 0.3
+    /// A click this soon before typing starts is taken as the click that focused the field.
+    static let focusingClickWindow: TimeInterval = 2.0
     static let typingPostRoll: TimeInterval = 0.8
     // MARK: - Candidate model (internal)
 
     private enum CandidateKind {
         case click
         case clickBurst(first: TimeInterval, last: TimeInterval, zoomLevel: Double)
-        case typing(first: TimeInterval, last: TimeInterval)
+        case typing(first: TimeInterval, last: TimeInterval, preRoll: TimeInterval)
         case dwell(duration: TimeInterval)
     }
 
@@ -97,10 +99,11 @@ public enum AutoZoomDetector {
         let clickCandidates = buildClickCandidates(from: sortedEvents)
         let dwellCandidates = buildDwellCandidates(from: sortedEvents.filter { $0.type != .keyDown })
         let typingCandidates = buildTypingCandidates(from: sortedEvents)
-        // Step B: rank and filter by spacing. Typing runs skip the filter so a
-        // click on a field followed by typing merges into one zoom in step D.
-        let accepted = filterBySpacing(candidates: clickCandidates + dwellCandidates, videoDuration: duration)
-            + typingCandidates
+        let (typing, remainingClicks) = attachFocusingClicks(typing: typingCandidates, clicks: clickCandidates)
+        let all = remainingClicks + dwellCandidates + typing
+
+        // Step B: rank and filter by spacing
+        let accepted = filterBySpacing(candidates: all, videoDuration: duration)
 
         // Step C: build segments
         let segments = accepted.map { makeSegment(from: $0, videoDuration: duration) }
@@ -151,6 +154,36 @@ public enum AutoZoomDetector {
         }
     }
 
+    /// Folds the click that focused a field into the typing run that follows it,
+    /// so the zoom starts at the click and looks at the field.
+    private static func attachFocusingClicks(
+        typing: [Candidate],
+        clicks: [Candidate]
+    ) -> (typing: [Candidate], clicks: [Candidate]) {
+        var remaining = clicks
+        let attached = typing.map { run -> Candidate in
+            guard case .typing(let first, let last, _) = run.kind else { return run }
+            let lastClickTime: (Candidate) -> TimeInterval = { candidate in
+                if case .clickBurst(_, let last, _) = candidate.kind { return last }
+                return candidate.centerTime
+            }
+            guard let index = remaining.lastIndex(where: {
+                let t = lastClickTime($0)
+                return t <= first && first - t <= focusingClickWindow
+            }) else { return run }
+            let click = remaining.remove(at: index)
+            let clickStart: TimeInterval
+            if case .clickBurst(let burstFirst, _, _) = click.kind { clickStart = burstFirst } else { clickStart = click.centerTime }
+            return Candidate(
+                kind: .typing(first: clickStart, last: last, preRoll: clickPreRoll),
+                centerTime: (clickStart + last) / 2,
+                focus: click.focus,
+                strength: max(run.strength, click.strength)
+            )
+        }
+        return (attached, remaining)
+    }
+
     private static func buildTypingCandidates(from events: [CursorEvent]) -> [Candidate] {
         let keys = events.filter { $0.type == .keyDown }
         var runs: [[CursorEvent]] = []
@@ -164,7 +197,7 @@ public enum AutoZoomDetector {
         return runs.filter { $0.count >= minTypingKeys }.map { run in
             let count = Double(run.count)
             return Candidate(
-                kind: .typing(first: run[0].timestamp, last: run[run.count - 1].timestamp),
+                kind: .typing(first: run[0].timestamp, last: run[run.count - 1].timestamp, preRoll: typingPreRoll),
                 centerTime: (run[0].timestamp + run[run.count - 1].timestamp) / 2,
                 focus: (run.map(\.x).reduce(0, +) / count, run.map(\.y).reduce(0, +) / count),
                 strength: 1000.0 + 100.0 * count
@@ -308,8 +341,8 @@ public enum AutoZoomDetector {
             rawStart = first - clickPreRoll
             rawEnd = min(last + clickPostRoll, rawStart + maxSegmentDuration)
             zoomLevel = level
-        case .typing(let first, let last):
-            rawStart = first - typingPreRoll
+        case .typing(let first, let last, let preRoll):
+            rawStart = first - preRoll
             rawEnd = min(last + typingPostRoll, rawStart + maxSegmentDuration)
         case .dwell(let dwellDuration):
             let desired = max(defaultDuration, dwellDuration + 2 * dwellBuffer)

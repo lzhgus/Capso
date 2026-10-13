@@ -372,4 +372,24 @@ struct AutoZoomDetectorTests {
         #expect(out[0].startTime == 4.0)
         #expect(abs(out[0].endTime - (6.0 + 19 * 0.25 + 0.8)) < 1e-9)
     }
+
+    @Test("Typing doesn't glue onto unrelated clicks before and after it")
+    func typingStaysSeparateFromUnrelatedClicks() {
+        let events = [click(at: 2.0, x: 0.1, y: 0.1)]
+            + keys(from: 4.5, count: 8, every: 0.25, x: 0.5, y: 0.5)
+            + [click(at: 7.5, x: 0.9, y: 0.9)]
+        let out = AutoZoomDetector.detect(events: events, duration: 20)
+        #expect(!out.isEmpty)
+        #expect(out.allSatisfy { $0.duration < 5 })
+    }
+
+    @Test("The click that focused the field sets where a typing zoom looks")
+    func typingFocusesOnTheClickedField() {
+        let events = [click(at: 5.0, x: 0.2, y: 0.8)] + keys(from: 6.0, count: 8, every: 0.25, x: 0.6, y: 0.3)
+        let out = AutoZoomDetector.detect(events: events, duration: 20)
+        #expect(out.count == 1)
+        if case .manual(let x, let y) = out[0].focusMode {
+            #expect(abs(x - 0.2) < 1e-9 && abs(y - 0.8) < 1e-9)
+        }
+    }
 }
