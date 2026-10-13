@@ -57,12 +57,14 @@ enum AnnotationGeometry {
     static func curvePoints(start: CGPoint, control: CGPoint?, end: CGPoint, count: Int) -> [CGPoint] {
         let c = control ?? CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
         return (0...count).map { i in
-            let t = CGFloat(i) / CGFloat(count)
-            let u = 1 - t
-            return CGPoint(
-                x: u * u * start.x + 2 * u * t * c.x + t * t * end.x,
-                y: u * u * start.y + 2 * u * t * c.y + t * t * end.y
-            )
+            let t: CGFloat = CGFloat(i) / CGFloat(count)
+            let u: CGFloat = 1 - t
+            let a: CGFloat = u * u
+            let b: CGFloat = 2 * u * t
+            let d: CGFloat = t * t
+            let x: CGFloat = a * start.x + b * c.x + d * end.x
+            let y: CGFloat = a * start.y + b * c.y + d * end.y
+            return CGPoint(x: x, y: y)
         }
     }
 }
