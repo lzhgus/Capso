@@ -36,6 +36,10 @@ struct AnnotationToolbar: View {
     let isDragDisabled: Bool
     let onCancel: () -> Void
     let onCrop: () -> Void
+    var presets: [AnnotationStylePreset] = []
+    var onApplyPreset: (AnnotationStylePreset) -> Void = { _ in }
+    var onSavePreset: () -> Void = {}
+    var onRemovePreset: (AnnotationStylePreset) -> Void = { _ in }
 
     /// The size slider serves multiple tools: in text / editing mode it means
     /// font size; for other tools it retains its existing role.
@@ -56,6 +60,7 @@ struct AnnotationToolbar: View {
                         colorGroup
                         toolbarDivider
                         strokeGroup
+                        presetsMenu
                         toolbarDivider
                         cropGroup
                         toolbarDivider
@@ -241,6 +246,34 @@ struct AnnotationToolbar: View {
         .toggleStyle(.button)
         .controlSize(.small)
         .help(help)
+    }
+
+    private var presetsMenu: some View {
+        Menu {
+            ForEach(presets) { preset in
+                Button { onApplyPreset(preset) } label: {
+                    Label { Text(preset.title) } icon: { Image(nsImage: preset.swatch) }
+                        .labelStyle(.titleAndIcon)
+                }
+            }
+            if !presets.isEmpty { Divider() }
+            Button("Save Current Style", action: onSavePreset)
+            if !presets.isEmpty {
+                Menu("Remove") {
+                    ForEach(presets) { preset in
+                        Button(preset.title) { onRemovePreset(preset) }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "bookmark")
+                .font(.system(size: 13, weight: .medium))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Style Presets")
+        .disabled(isEditingText)
     }
 
     private var cropGroup: some View {
@@ -451,7 +484,7 @@ extension AnnotationTool {
         AnnotationToolShortcut.helpTitle(localizedToolName, for: self)
     }
 
-    private var localizedToolName: String {
+    var localizedToolName: String {
         switch self {
         case .select: return String(localized: "Select")
         case .arrow: return String(localized: "Arrow")

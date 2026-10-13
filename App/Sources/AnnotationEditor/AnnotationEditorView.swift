@@ -78,6 +78,9 @@ struct AnnotationEditorView: View {
     /// Preserved font size for the Text tool. Swapped in/out of `lineWidth`
     /// as the user toggles tools — same pattern as savedBlockSize etc.
     @AppStorage("annotationTextFontSize") private var savedTextFontSize: Double = 48
+    @AppStorage("annotationStylePresets") private var presetsData = Data()
+    /// Width to load when a preset switches tools, instead of that tool's last width.
+    @State private var pendingPresetWidth: CGFloat?
 
     @State private var lineWidth: CGFloat = 3
     @State private var strokePattern: StrokePattern = .solid
@@ -328,7 +331,11 @@ struct AnnotationEditorView: View {
             onDragEnded: onDragEnded,
             isDragDisabled: isEditingText,
             onCancel: onCancel,
-            onCrop: { isCropMode = true }
+            onCrop: { isCropMode = true },
+            presets: presets,
+            onApplyPreset: applyPreset,
+            onSavePreset: saveCurrentStyleAsPreset,
+            onRemovePreset: removePreset
         )
     }
 
@@ -493,7 +500,42 @@ struct AnnotationEditorView: View {
     private func handleToolChange(oldTool: AnnotationTool, newTool: AnnotationTool) {
         document.clearSelection()
         persistWidth(lineWidth, for: oldTool)
-        lineWidth = savedWidth(for: newTool)
+        lineWidth = pendingPresetWidth ?? savedWidth(for: newTool)
+        pendingPresetWidth = nil
+    }
+
+    private var presets: [AnnotationStylePreset] { AnnotationStylePreset.decodeList(presetsData) }
+
+    private func saveCurrentStyleAsPreset() {
+        let preset = AnnotationStylePreset(
+            tool: currentTool.rawValue, color: currentColor, lineWidth: Double(lineWidth), filled: filled,
+            pattern: strokePattern, arrowHead: arrowHead,
+            textFill: textFillEnabled, textOutline: textOutlineEnabled, textStroke: textStrokeEnabled
+        )
+        let others = presets.filter { var p = $0; p.id = preset.id; return p != preset }
+        presetsData = AnnotationStylePreset.encodeList(others + [preset])
+    }
+
+    private func applyPreset(_ preset: AnnotationStylePreset) {
+        // Switching tools deselects anyway; doing it first keeps a selection from being half restyled.
+        if preset.annotationTool != currentTool { document.clearSelection() }
+        currentColor = preset.color
+        filled = preset.filled
+        strokePattern = preset.pattern
+        arrowHead = preset.arrowHead
+        textFillEnabled = preset.textFill
+        textOutlineEnabled = preset.textOutline
+        textStrokeEnabled = preset.textStroke
+        if preset.annotationTool == currentTool {
+            lineWidth = CGFloat(preset.lineWidth)
+        } else {
+            pendingPresetWidth = CGFloat(preset.lineWidth)
+            currentTool = preset.annotationTool
+        }
+    }
+
+    private func removePreset(_ preset: AnnotationStylePreset) {
+        presetsData = AnnotationStylePreset.encodeList(presets.filter { $0.id != preset.id })
     }
 
     private func handleLineWidthChange(oldValue: CGFloat, newValue: CGFloat) {
