@@ -57,6 +57,13 @@ public final class ScreenRecorder {
     @ObservationIgnored
     public var onDiskSpaceLow: (@MainActor () -> Void)?
 
+    /// Fires at most once per recording for each kind of audio problem.
+    @ObservationIgnored
+    public var onAudioIssue: (@MainActor (AudioIssue) -> Void)?
+
+    @ObservationIgnored
+    let audioMonitor = AudioActivityMonitor()
+
     public static var recordingDirectory: URL { FileManager.default.temporaryDirectory }
     static let diskSpaceCheckInterval: TimeInterval = 10
 
@@ -115,6 +122,11 @@ public final class ScreenRecorder {
             try await stream?.startCapture()
             writer.activate()
             InterruptedRecording.mark(fileURL)
+            audioMonitor.start(
+                expectMicrophone: config.captureMicrophone,
+                expectSystemAudio: config.captureSystemAudio,
+                at: Date()
+            )
 
             state = .recording
             recordingStartTime = Date()
@@ -214,8 +226,15 @@ public final class ScreenRecorder {
 
         let wr = writer
         output.onVideo = { buf in wr.appendVideo(buf) }
-        output.onSystemAudio = { buf in wr.appendSystemAudio(buf) }
-        output.onMicAudio = { buf in wr.appendMicAudio(buf) }
+        let monitor = audioMonitor
+        output.onSystemAudio = { buf in
+            monitor.systemAudioBuffer(at: Date())
+            wr.appendSystemAudio(buf)
+        }
+        output.onMicAudio = { buf in
+            monitor.microphoneBuffer(peakDecibels: AudioLevel.peakDecibels(of: buf), at: Date())
+            wr.appendMicAudio(buf)
+        }
         let outputID = ObjectIdentifier(output)
         output.onStreamStopped = { [weak self] error in
             Task { @MainActor [weak self] in
@@ -337,7 +356,16 @@ public final class ScreenRecorder {
                 guard let self, let s = self.recordingStartTime else { return }
                 self.elapsedTime = base + Date().timeIntervalSince(s)
                 self.checkDiskSpaceIfDue(elapsed: self.elapsedTime)
+                self.reportAudioIssues(at: Date())
             }
+        }
+    }
+
+    func reportAudioIssues(at now: Date) {
+        guard state == .recording else { return }
+        for issue in audioMonitor.newIssues(at: now) {
+            capsoLog("Audio issue: \(issue)")
+            onAudioIssue?(issue)
         }
     }
 

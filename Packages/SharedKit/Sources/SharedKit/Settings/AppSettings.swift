@@ -626,6 +626,12 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "recordingMicDeviceID") }
     }
 
+    /// Warn during a recording when the microphone picks up nothing. Default `true`.
+    public var warnAboutMutedMicrophone: Bool {
+        get { defaults.object(forKey: "warnAboutMutedMicrophone") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "warnAboutMutedMicrophone") }
+    }
+
     /// Warn before recording when the disk is almost full. Default `true`.
     public var warnAboutLowDiskSpace: Bool {
         get { defaults.object(forKey: "warnAboutLowDiskSpace") as? Bool ?? true }

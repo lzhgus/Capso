@@ -30,6 +30,19 @@ struct AppSettingsTests {
         #expect(!AppSettings(defaults: defaults).warnAboutLowDiskSpace)
     }
 
+    @Test("Muted microphone warning defaults on and persists")
+    func mutedMicrophoneWarningPersists() {
+        let suite = "test.warnAboutMutedMicrophone"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        #expect(first.warnAboutMutedMicrophone)
+
+        first.warnAboutMutedMicrophone = false
+        #expect(!AppSettings(defaults: defaults).warnAboutMutedMicrophone)
+    }
+
     @Test("Default export location is Desktop")
     func defaultExportLocation() {
         let settings = AppSettings()

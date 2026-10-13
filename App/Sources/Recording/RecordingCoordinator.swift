@@ -48,6 +48,7 @@ final class RecordingCoordinator {
     private var toolbarWindow: RecordingToolbarWindow?
     private var selectionBorderWindow: SelectionBorderWindow?
     private var controlsWindow: RecordingControlsWindow?
+    private var audioWarningPanel: RecordingWarningPanel?
     private var borderWindow: RecordingBorderWindow?
     private var cameraPiPWindow: CameraPiPWindow?
     private var recordingPreviewWindow: RecordingPreviewWindow?
@@ -93,6 +94,9 @@ final class RecordingCoordinator {
         }
         recorder.onDiskSpaceLow = { [weak self] in
             self?.handleDiskSpaceLow()
+        }
+        recorder.onAudioIssue = { [weak self] issue in
+            self?.showAudioWarning(for: issue)
         }
     }
 
@@ -745,6 +749,42 @@ final class RecordingCoordinator {
         stopRecording()
     }
 
+    private func showAudioWarning(for issue: AudioIssue) {
+        guard let screen = selectedScreen, let anchor = controlsWindow?.frame else { return }
+        let message: String
+        var actions: [RecordingWarningPanel.Action] = [
+            .init(title: String(localized: "Stop Recording"), isProminent: true) { [weak self] in
+                self?.dismissAudioWarning()
+                self?.stopRecording()
+            },
+            .init(title: String(localized: "Ignore"), isProminent: false) { [weak self] in
+                self?.dismissAudioWarning()
+            },
+        ]
+        switch issue {
+        case .microphoneSilent:
+            guard settings.warnAboutMutedMicrophone else { return }
+            message = String(localized: "Your microphone might be muted. No sound has been picked up since the recording started.")
+            actions.insert(.init(title: String(localized: "Don't Warn Again"), isProminent: false) { [weak self] in
+                self?.settings.warnAboutMutedMicrophone = false
+                self?.dismissAudioWarning()
+            }, at: 1)
+        case .microphoneStopped:
+            message = String(localized: "The microphone stopped sending audio. It may have been disconnected.")
+        case .systemAudioStopped:
+            message = String(localized: "System audio stopped being captured. The rest of the recording may have no sound.")
+        }
+
+        dismissAudioWarning()
+        audioWarningPanel = RecordingWarningPanel(message: message, actions: actions, above: anchor, screen: screen)
+        audioWarningPanel?.show()
+    }
+
+    private func dismissAudioWarning() {
+        audioWarningPanel?.close()
+        audioWarningPanel = nil
+    }
+
     private func handleDiskSpaceLow() {
         stopRecording(afterStop: { [weak self] in self?.showDiskSpaceLowAlert() })
     }
@@ -1393,6 +1433,7 @@ final class RecordingCoordinator {
         cursorTelemetry = nil
         controlsWindow?.close()
         controlsWindow = nil
+        dismissAudioWarning()
         borderWindow?.hide()
         borderWindow = nil
         // Force PiP window off screen before closing
