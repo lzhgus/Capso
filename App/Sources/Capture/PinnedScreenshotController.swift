@@ -15,6 +15,7 @@ final class PinnedScreenshotController {
     private let chromeWindow: PinnedScreenshotChromeWindow
 
     private var isLocked = false
+    private var hoverTimer: Timer?
     private var isClosing = false
     private var currentScale: CGFloat = 1.0
 
@@ -96,6 +97,7 @@ final class PinnedScreenshotController {
         guard !isClosing else { return }
         isClosing = true
 
+        hoverTimer?.invalidate()
         contentWindow.removeChildWindow(chromeWindow)
         chromeWindow.close()
 
@@ -112,6 +114,24 @@ final class PinnedScreenshotController {
         contentWindow.alphaValue = isLocked ? 0.72 : 1.0
         contentWindow.ignoresMouseEvents = isLocked
         contentWindow.contentView.map { ($0 as? PinnedScreenshotContentView)?.isResizable = !isLocked }
+
+        hoverTimer?.invalidate()
+        hoverTimer = nil
+        guard isLocked else { return }
+        // A locked pin lets clicks through, so it gets no hover events; poll the pointer instead.
+        hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.fadeWhileHovered() }
+        }
+    }
+
+    /// A locked pin fades almost away while the pointer is over it, to show what's underneath.
+    private func fadeWhileHovered() {
+        let target: CGFloat = contentWindow.frame.contains(NSEvent.mouseLocation) ? 0.08 : 0.72
+        guard contentWindow.alphaValue != target else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            contentWindow.animator().alphaValue = target
+        }
     }
 
 }
