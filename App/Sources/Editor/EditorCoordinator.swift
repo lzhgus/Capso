@@ -663,7 +663,8 @@ final class EditorCoordinator {
         if !project.zoomSegments.isEmpty {
             zoomInterpolator = ZoomInterpolator(
                 segments: project.zoomSegments,
-                frameSize: project.videoSize
+                frameSize: project.videoSize,
+                cursorTimeline: cursorTimeline
             )
         }
         let blurEffects = project.effectSegments.filter { $0.kind == .blur }

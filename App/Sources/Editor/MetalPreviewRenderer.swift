@@ -32,6 +32,8 @@ final class MetalPreviewRenderer: NSObject {
 
     private var compositor: FrameCompositor?
     private var zoomInterpolator: ZoomInterpolator?
+    private var zoomSegments: [ZoomSegment] = []
+    private var zoomFrameSize: CGSize = .zero
     private var blurEffects: [RecordingEffectSegment] = []
     private var cursorTimeline: SmoothedCursorTimeline?
     private var cursorCIImage: CIImage?
@@ -80,9 +82,15 @@ final class MetalPreviewRenderer: NSObject {
 
     /// Rebuilds the zoom interpolator when segments or frame size change.
     func updateZoom(segments: [ZoomSegment], frameSize: CGSize) {
-        zoomInterpolator = segments.isEmpty
+        zoomSegments = segments
+        zoomFrameSize = frameSize
+        rebuildZoomInterpolator()
+    }
+
+    private func rebuildZoomInterpolator() {
+        zoomInterpolator = zoomSegments.isEmpty
             ? nil
-            : ZoomInterpolator(segments: segments, frameSize: frameSize)
+            : ZoomInterpolator(segments: zoomSegments, frameSize: zoomFrameSize, cursorTimeline: cursorTimeline)
         needsRecomposite = true
     }
 
@@ -94,6 +102,7 @@ final class MetalPreviewRenderer: NSObject {
     /// Replaces the cursor timeline used to composite cursor overlays.
     func updateCursorTimeline(_ timeline: SmoothedCursorTimeline?) {
         cursorTimeline = timeline
+        rebuildZoomInterpolator()
         needsRecomposite = true
     }
 

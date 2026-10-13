@@ -21,13 +21,22 @@ public struct ZoomInterpolator: Sendable {
 
     /// Zoom segments sorted by startTime (ascending).
     private let segments: [ZoomSegment]
+    /// Camera paths for follow-cursor segments, aligned with `segments`.
+    private let followPaths: [CursorFollowPath?]
     private let frameWidth: Double
     private let frameHeight: Double
 
     // MARK: - Init
 
-    public init(segments: [ZoomSegment], frameSize: CGSize) {
-        self.segments = Self.resolvingOverlaps(segments)
+    /// - Parameter cursorTimeline: When given, follow-cursor segments hold on
+    ///   places where the cursor settles instead of chasing it every frame.
+    public init(segments: [ZoomSegment], frameSize: CGSize, cursorTimeline: SmoothedCursorTimeline? = nil) {
+        let resolved = Self.resolvingOverlaps(segments)
+        self.segments = resolved
+        self.followPaths = resolved.map { segment in
+            guard case .followCursor = segment.focusMode, let cursorTimeline else { return nil }
+            return CursorFollowPath(timeline: cursorTimeline, from: segment.startTime, to: segment.endTime)
+        }
         self.frameWidth = frameSize.width
         self.frameHeight = frameSize.height
     }
@@ -56,15 +65,14 @@ public struct ZoomInterpolator: Sendable {
         }
         let segment = segments[index]
         let ramp = min(Self.rampDuration, (segment.endTime - segment.startTime) / 2)
-        let target = fullTransform(of: segment, cursorPosition: cursorPosition)
+        let target = fullTransform(ofSegmentAt: index, time: time, cursorPosition: cursorPosition)
 
-        let previous = index > 0 ? segments[index - 1] : nil
         let followsPrevious = index > 0 && connects(index - 1)
         let hasNext = connects(index)
 
         if ramp > 0, time < segment.startTime + ramp, followsPrevious || segment.startTime > 0 {
             let from = followsPrevious
-                ? fullTransform(of: previous!, cursorPosition: cursorPosition)
+                ? fullTransform(ofSegmentAt: index - 1, time: time, cursorPosition: cursorPosition)
                 : Self.unzoomed
             return blend(from: from, to: target, progress: easeInOutCubic((time - segment.startTime) / ramp))
         }
@@ -112,11 +120,16 @@ public struct ZoomInterpolator: Sendable {
         connects(index) ? max(segments[index].endTime, segments[index + 1].startTime) : segments[index].endTime
     }
 
-    private func fullTransform(of segment: ZoomSegment, cursorPosition: (x: Double, y: Double)?) -> FrameTransform {
+    private func fullTransform(
+        ofSegmentAt index: Int,
+        time: TimeInterval,
+        cursorPosition: (x: Double, y: Double)?
+    ) -> FrameTransform {
+        let segment = segments[index]
         let rawFocus: (x: Double, y: Double)
         switch segment.focusMode {
         case .followCursor:
-            rawFocus = cursorPosition ?? (x: 0.5, y: 0.5)
+            rawFocus = followPaths[index]?.position(at: time) ?? cursorPosition ?? (x: 0.5, y: 0.5)
         case .manual(let x, let y):
             rawFocus = (x: x, y: y)
         }
