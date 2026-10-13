@@ -27,7 +27,7 @@ public struct ZoomInterpolator: Sendable {
     // MARK: - Init
 
     public init(segments: [ZoomSegment], frameSize: CGSize) {
-        self.segments = segments.sorted { $0.startTime < $1.startTime }
+        self.segments = Self.resolvingOverlaps(segments)
         self.frameWidth = frameSize.width
         self.frameHeight = frameSize.height
     }
@@ -76,7 +76,32 @@ public struct ZoomInterpolator: Sendable {
 
     // MARK: - Internal Helpers
 
-    /// Whether the segment after `index` starts before (or right when) the one at `index` ends.
+    /// Where segments overlap, the later-starting one wins: earlier segments are
+    /// cut into the parts before and after it. The result is sorted and disjoint.
+    static func resolvingOverlaps(_ segments: [ZoomSegment]) -> [ZoomSegment] {
+        var resolved: [ZoomSegment] = []
+        for segment in segments.sorted(by: { $0.startTime < $1.startTime }) {
+            resolved = resolved.flatMap { earlier -> [ZoomSegment] in
+                guard earlier.startTime < segment.endTime, segment.startTime < earlier.endTime else { return [earlier] }
+                var pieces: [ZoomSegment] = []
+                if earlier.startTime < segment.startTime {
+                    var before = earlier
+                    before.endTime = segment.startTime
+                    pieces.append(before)
+                }
+                if segment.endTime < earlier.endTime {
+                    var after = earlier
+                    after.startTime = segment.endTime
+                    pieces.append(after)
+                }
+                return pieces
+            }
+            resolved.append(segment)
+        }
+        return resolved.sorted { $0.startTime < $1.startTime }
+    }
+
+    /// Whether the segment after `index` starts right when (or just after) the one at `index` ends.
     private func connects(_ index: Int) -> Bool {
         index + 1 < segments.count
             && segments[index + 1].startTime <= segments[index].endTime + Self.adjacencyTolerance

@@ -175,4 +175,22 @@ struct ZoomInterpolatorTests {
             #expect(scale(interp, at: time) >= 2 - 1e-9, "dipped at \(time)")
         }
     }
+
+    @Test("Scale never jumps when segments overlap, start during a ramp, or nest", arguments: [
+        [(2.0, 8.0, 2.0), (2.3, 9.0, 3.0)],
+        [(2.0, 9.0, 2.0), (4.0, 5.0, 3.0)],
+        [(2.0, 6.0, 3.0), (5.0, 9.0, 2.0)],
+    ])
+    func noJumps(spec: [(Double, Double, Double)]) {
+        let interp = makeInterpolator(segments: spec.map {
+            ZoomSegment(startTime: $0.0, endTime: $0.1, zoomLevel: $0.2, focusMode: .manual(x: 0.5, y: 0.5))
+        })
+        var previous = scale(interp, at: 1.0)
+        for step in 1...10_000 {
+            let time = 1.0 + Double(step) * 0.001
+            let s = scale(interp, at: time)
+            #expect(abs(s - previous) < 0.02, "jumped at \(time) from \(previous) to \(s)")
+            previous = s
+        }
+    }
 }
