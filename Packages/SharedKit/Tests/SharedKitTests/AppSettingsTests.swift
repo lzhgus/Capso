@@ -43,6 +43,20 @@ struct AppSettingsTests {
         #expect(!AppSettings(defaults: defaults).warnAboutMutedMicrophone)
     }
 
+    @Test("Automation URL prompt starts unanswered and remembers the answer")
+    func automationURLsAskedPersists() {
+        let suite = "test.automationURLsAsked"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        #expect(!first.automationURLsAsked)
+        #expect(!first.automationURLsEnabled)
+
+        first.automationURLsAsked = true
+        #expect(AppSettings(defaults: defaults).automationURLsAsked)
+    }
+
     @Test("Default export location is Desktop")
     func defaultExportLocation() {
         let settings = AppSettings()

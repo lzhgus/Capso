@@ -373,6 +373,13 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "automationURLsEnabled") }
     }
 
+    /// Whether the user has already answered the prompt shown the first time
+    /// another app sends a `capso://` command while Automation URLs are off.
+    public var automationURLsAsked: Bool {
+        get { defaults.bool(forKey: "automationURLsAsked") }
+        set { defaults.set(newValue, forKey: "automationURLsAsked") }
+    }
+
     // MARK: Export
     public var screenshotFormat: ScreenshotFormat {
         get {
