@@ -84,4 +84,80 @@ struct ZoomInterpolatorTests {
         #expect(abs(t.translateX - 0.25) < 1e-9)
         #expect(abs(t.translateY - 0.25) < 1e-9)
     }
+
+    // MARK: - Transitions
+
+    private func scale(_ interp: ZoomInterpolator, at time: Double) -> Double {
+        interp.transform(at: time, cursorPosition: nil).scale
+    }
+
+    @Test("Zoom-out finishes inside the segment and nothing lingers after it")
+    func zoomOutInsideSegment() {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 2, endTime: 8, zoomLevel: 2, focusMode: .manual(x: 0.5, y: 0.5)),
+        ])
+        #expect(abs(scale(interp, at: 8 - ZoomInterpolator.rampDuration) - 2) < 1e-9)
+        #expect(scale(interp, at: 7.999) < 1.001)
+        #expect(interp.transform(at: 8.0, cursorPosition: nil) == .identity)
+        #expect(interp.transform(at: 8.3, cursorPosition: nil) == .identity)
+    }
+
+    @Test("Ramps ease in and out symmetrically")
+    func easeInOut() {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 2, endTime: 8, zoomLevel: 3, focusMode: .manual(x: 0.5, y: 0.5)),
+        ])
+        let ramp = ZoomInterpolator.rampDuration
+        #expect(abs(scale(interp, at: 2 + ramp / 2) - 2) < 1e-9)
+        let early = scale(interp, at: 2 + ramp * 0.1) - 1
+        let late = 3 - scale(interp, at: 2 + ramp * 0.9)
+        #expect(abs(early - late) < 1e-9)
+        #expect(early < 0.02)
+    }
+
+    @Test("Short segments split their length between the two ramps")
+    func shortSegment() {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 2, endTime: 3, zoomLevel: 2, focusMode: .manual(x: 0.5, y: 0.5)),
+        ])
+        #expect(abs(scale(interp, at: 2.5) - 2) < 1e-9)
+        #expect(scale(interp, at: 2.25) > 1.4 && scale(interp, at: 2.25) < 1.6)
+    }
+
+    @Test("Back-to-back segments move between zooms without returning to 1x")
+    func backToBack() {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 2, endTime: 5, zoomLevel: 2, focusMode: .manual(x: 0.3, y: 0.5)),
+            ZoomSegment(startTime: 5, endTime: 9, zoomLevel: 3, focusMode: .manual(x: 0.7, y: 0.5)),
+        ])
+        var previous = scale(interp, at: 4.5)
+        for step in 1...100 {
+            let s = scale(interp, at: 4.5 + Double(step) * 0.01)
+            #expect(s >= 2 - 1e-9)
+            #expect(abs(s - previous) < 0.05)
+            previous = s
+        }
+        #expect(abs(scale(interp, at: 5 + ZoomInterpolator.rampDuration) - 3) < 1e-9)
+    }
+
+    @Test("A segment at the very start is fully zoomed from the first frame")
+    func segmentAtStart() {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 0, endTime: 4, zoomLevel: 2, focusMode: .manual(x: 0.5, y: 0.5)),
+        ])
+        #expect(abs(scale(interp, at: 0) - 2) < 1e-9)
+    }
+
+    @Test("The viewport stays inside the frame during a ramp toward an edge")
+    func viewportInsideFrameDuringRamp() {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 1, endTime: 6, zoomLevel: 2.5, focusMode: .manual(x: 0.0, y: 1.0)),
+        ])
+        for step in 0...100 {
+            let t = interp.transform(at: 1 + Double(step) * 0.01, cursorPosition: nil)
+            let half = 0.5 / t.scale
+            #expect(t.translateX >= half - 1e-9 && t.translateX <= 1 - half + 1e-9)
+            #expect(t.translateY >= half - 1e-9 && t.translateY <= 1 - half + 1e-9)
+        }
+    }
 }
