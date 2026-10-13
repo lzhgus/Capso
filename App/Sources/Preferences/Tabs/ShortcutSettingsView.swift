@@ -31,6 +31,13 @@ extension KeyboardShortcuts.Name {
     /// Replays the last capture (area / window / fullscreen) without showing
     /// the selection overlay. Unbound by default — user must assign a key.
     static let captureLastArea = Self("captureLastArea")
+
+    static let allCapso: [Self] = [
+        .captureAllInOne, .captureArea, .captureFullscreen, .captureWindow, .captureText, .recordScreen,
+        .recordFullscreen, .captureScrolling, .captureAreaToClipboard, .captureAreaAndShare,
+        .captureAreaAndAnnotate, .pinFromClipboard, .editClipboardImage, .screenshotHistory,
+        .captureAndTranslate, .translateSelectedText, .translateTypedText, .selfTimerCapture, .captureLastArea,
+    ]
 }
 
 struct ShortcutSettingsView: View {
@@ -79,6 +86,8 @@ struct ShortcutSettingsView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.blue.opacity(0.2), lineWidth: 0.5)
             )
+
+            SystemScreenshotShortcutsCard()
 
             SettingGroup(title: "Customizable Shortcuts") {
                 SettingCard {
@@ -279,5 +288,72 @@ private struct ShortcutKeycap: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
             )
+    }
+}
+
+/// Helps hand ⇧⌘3 / ⇧⌘4 / ⇧⌘5 over from the macOS screenshot tool to Capso.
+private struct SystemScreenshotShortcutsCard: View {
+    @State private var systemShortcutsOn = SystemScreenshotShortcuts.areEnabled
+    @State private var capsoUsesAny = Self.capsoUsesAnySystemKey
+
+    private static let assignments: [(KeyboardShortcuts.Name, KeyboardShortcuts.Key)] = [
+        (.captureFullscreen, .three), (.captureArea, .four), (.captureAllInOne, .five),
+    ]
+
+    /// Once any Capso action uses one of these keys, the user has set them up themselves.
+    private static var capsoUsesAnySystemKey: Bool {
+        let systemKeys = assignments.map { KeyboardShortcuts.Shortcut($0.1, modifiers: [.command, .shift]) }
+        return KeyboardShortcuts.Name.allCapso.contains { name in
+            KeyboardShortcuts.getShortcut(for: name).map(systemKeys.contains) ?? false
+        }
+    }
+
+    var body: some View {
+        Group {
+            if systemShortcutsOn {
+                banner(
+                    icon: "exclamationmark.triangle",
+                    tint: .orange,
+                    text: "macOS still uses ⇧⌘3, ⇧⌘4 and ⇧⌘5 for its own screenshots. To use them for Capso, turn off the shortcuts under Keyboard Shortcuts → Screenshots."
+                ) {
+                    Button("Open Keyboard Settings") { NSWorkspace.shared.open(SystemScreenshotShortcuts.settingsURL) }
+                }
+            } else if !capsoUsesAny {
+                banner(
+                    icon: "keyboard",
+                    tint: .blue,
+                    text: "The macOS screenshot shortcuts are off. Capso can take them over: ⇧⌘3 Capture Fullscreen, ⇧⌘4 Capture Area, ⇧⌘5 All-in-One."
+                ) {
+                    Button("Use ⇧⌘3 / ⇧⌘4 / ⇧⌘5") {
+                        for (name, key) in Self.assignments {
+                            KeyboardShortcuts.setShortcut(.init(key, modifiers: [.command, .shift]), for: name)
+                        }
+                        capsoUsesAny = true
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            systemShortcutsOn = SystemScreenshotShortcuts.areEnabled
+            capsoUsesAny = Self.capsoUsesAnySystemKey
+        }
+    }
+
+    private func banner(icon: String, tint: Color, text: LocalizedStringKey, @ViewBuilder action: () -> some View) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon).foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(text)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                action()
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(tint.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(tint.opacity(0.2), lineWidth: 0.5))
     }
 }
