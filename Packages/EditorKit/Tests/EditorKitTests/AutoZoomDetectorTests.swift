@@ -363,4 +363,13 @@ struct AutoZoomDetectorTests {
         #expect(out.count == 1)
         #expect(out[0].zoomLevel == 1.5)
     }
+
+    @Test("Clicking a field and then typing zooms through the end of the typing", arguments: [1, 2])
+    func clickThenType(clicks: Int) {
+        let clickEvents = (0..<clicks).map { click(at: 5.0 + Double($0) * 0.2, x: 0.4, y: 0.6) }
+        let out = AutoZoomDetector.detect(events: clickEvents + keys(from: 6.0, count: 20, every: 0.25), duration: 20)
+        #expect(out.count == 1)
+        #expect(out[0].startTime == 4.0)
+        #expect(abs(out[0].endTime - (6.0 + 19 * 0.25 + 0.8)) < 1e-9)
+    }
 }

@@ -97,10 +97,10 @@ public enum AutoZoomDetector {
         let clickCandidates = buildClickCandidates(from: sortedEvents)
         let dwellCandidates = buildDwellCandidates(from: sortedEvents.filter { $0.type != .keyDown })
         let typingCandidates = buildTypingCandidates(from: sortedEvents)
-        let all = clickCandidates + dwellCandidates + typingCandidates
-
-        // Step B: rank and filter by spacing
-        let accepted = filterBySpacing(candidates: all, videoDuration: duration)
+        // Step B: rank and filter by spacing. Typing runs skip the filter so a
+        // click on a field followed by typing merges into one zoom in step D.
+        let accepted = filterBySpacing(candidates: clickCandidates + dwellCandidates, videoDuration: duration)
+            + typingCandidates
 
         // Step C: build segments
         let segments = accepted.map { makeSegment(from: $0, videoDuration: duration) }
