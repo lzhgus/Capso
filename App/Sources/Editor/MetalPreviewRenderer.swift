@@ -171,6 +171,7 @@ final class MetalPreviewRenderer: NSObject {
                     zoomTransform: zoomTransform,
                     cursorPosition: cursorPos,
                     cursorImage: scaledCursor,
+                    clickRipple: cursorCIImage.flatMap { cursorOverlayProvider?.rippleImage(at: time, fullRadius: $0.extent.height * 1.3) },
                     blurEffects: blurEffects,
                     time: time
                 )

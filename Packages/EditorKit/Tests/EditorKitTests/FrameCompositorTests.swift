@@ -170,4 +170,21 @@ struct FrameCompositorTests {
         #expect(abs(centre.x - position.x * Double(width)) < 10, "x \(centre.x)")
         #expect(abs(centre.y - position.y * Double(height)) < 10, "y \(centre.y)")
     }
+
+    @Test("The click ripple is drawn centred where the cursor is")
+    func rippleUnderCursor() {
+        let (width, height) = (400, 200)
+        let compositor = FrameCompositor(sourceSize: CGSize(width: width, height: height), backgroundStyle: BackgroundStyle(enabled: false), outputScale: 1)
+        let ripple = CIImage(color: .green).cropped(to: CGRect(x: -10, y: -10, width: 20, height: 20))
+        let result = compositor.compose(frame: makeTestImage(width: width, height: height, color: .black),
+                                        zoomTransform: .identity, cursorPosition: CGPoint(x: 0.25, y: 0.5),
+                                        cursorImage: nil, clickRipple: ripple)
+        let bytes = renderedBytes(result, width: width, height: height)
+        var xs: [Int] = [], ys: [Int] = []
+        for row in 0..<height { for x in 0..<width where bytes[(row * width + x) * 4 + 1] > 200 { xs.append(x); ys.append(row) } }
+        #expect(!xs.isEmpty)
+        guard !xs.isEmpty else { return }
+        #expect(abs(Double(xs.min()! + xs.max()!) / 2 - 100) < 2)
+        #expect(abs(Double(ys.min()! + ys.max()!) / 2 - 100) < 2)
+    }
 }

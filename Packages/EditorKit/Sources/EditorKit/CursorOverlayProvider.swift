@@ -13,7 +13,16 @@ public final class CursorOverlayProvider: Sendable {
     /// …and fades out (and back in before it moves again) over this long.
     static let idleFadeDuration: TimeInterval = 0.3
 
+    /// Click ripple: grows in while the button goes down, holds while it's
+    /// held, then widens and fades after release.
+    static let ripplePressDuration: TimeInterval = 0.2
+    static let rippleReleaseDuration: TimeInterval = 0.2
+    /// Used when a recording has no release events (older telemetry).
+    static let assumedPressLength: TimeInterval = 0.1
+
     private let clicks: [CursorEvent]
+    /// Release time for each click, aligned with `clicks`.
+    private let releases: [TimeInterval]
     /// Pauses in pointer activity long enough to hide the cursor, as (last activity, next activity).
     private let idleGaps: [(start: TimeInterval, end: TimeInterval)]
 
@@ -21,7 +30,13 @@ public final class CursorOverlayProvider: Sendable {
     ///   (including while typing) and back in just before it moves again.
     public init(events: [CursorEvent], hidesIdleCursor: Bool = false) {
         let sorted = events.sorted { $0.timestamp < $1.timestamp }
-        self.clicks = sorted.filter { $0.type == .leftClick || $0.type == .rightClick }
+        let clicks = sorted.filter { $0.type == .leftClick || $0.type == .rightClick }
+        let ups = sorted.filter { $0.type == .mouseUp }.map(\.timestamp)
+        self.clicks = clicks
+        self.releases = clicks.enumerated().map { index, click in
+            let nextClick = index + 1 < clicks.count ? clicks[index + 1].timestamp : .infinity
+            return ups.first { $0 >= click.timestamp && $0 < nextClick } ?? click.timestamp + Self.assumedPressLength
+        }
 
         guard hidesIdleCursor else {
             self.idleGaps = []
@@ -48,6 +63,37 @@ public final class CursorOverlayProvider: Sendable {
             return Self.clickMinScale + (1.0 - Self.clickMinScale) * smoothstep(progress)
         }
         return 1.0
+    }
+
+    /// The ripple at `time` as a radius (fraction of the full radius) and opacity, or `nil`.
+    public func ripple(at time: TimeInterval) -> (radius: Double, opacity: Double)? {
+        guard let index = clicks.lastIndex(where: { $0.timestamp <= time }) else { return nil }
+        let down = clicks[index].timestamp
+        let pressed = down + Self.ripplePressDuration
+        let released = max(releases[index], pressed)
+        if time < pressed {
+            return (0.6 + 0.4 * smoothstep((time - down) / Self.ripplePressDuration), 1)
+        }
+        if time < released { return (1, 1) }
+        let fade = (time - released) / Self.rippleReleaseDuration
+        guard fade < 1 else { return nil }
+        return (1 + 0.5 * smoothstep(fade), 1 - smoothstep(fade))
+    }
+
+    /// A soft disc for the ripple, centred on the origin, or `nil` when there is none.
+    /// - Parameter fullRadius: Radius in source pixels at the ripple's full size.
+    public func rippleImage(at time: TimeInterval, fullRadius: CGFloat) -> CIImage? {
+        guard let ripple = ripple(at: time) else { return nil }
+        let radius = fullRadius * CGFloat(ripple.radius)
+        let alpha = 0.35 * CGFloat(ripple.opacity)
+        let gradient = CIFilter(name: "CIRadialGradient", parameters: [
+            "inputCenter": CIVector(x: 0, y: 0),
+            "inputRadius0": radius * 0.82,
+            "inputRadius1": radius,
+            "inputColor0": CIColor(red: 0.25, green: 0.55, blue: 1, alpha: alpha),
+            "inputColor1": CIColor(red: 0.25, green: 0.55, blue: 1, alpha: 0),
+        ])
+        return gradient?.outputImage?.cropped(to: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2))
     }
 
     /// 1 when the cursor is fully shown, 0 when hidden.

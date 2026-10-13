@@ -124,4 +124,45 @@ struct CursorOverlayProviderTests {
         let typingOnly = CursorOverlayProvider(events: keys, hidesIdleCursor: true)
         #expect(typingOnly.opacity(at: 3) == 0)
     }
+
+    // MARK: - Click ripple
+
+    private func clickHold(down: Double, up: Double?) -> [CursorEvent] {
+        var events = [CursorEvent(timestamp: down, x: 0.5, y: 0.5, type: .leftClick),
+                      CursorEvent(timestamp: down, x: 0.5, y: 0.5, type: .leftClick)]  // recorded twice
+        if let up {
+            events += [CursorEvent(timestamp: up, x: 0.5, y: 0.5, type: .mouseUp),
+                       CursorEvent(timestamp: up, x: 0.5, y: 0.5, type: .mouseUp)]
+        }
+        return events
+    }
+
+    @Test("The ripple grows on press, holds while held, then widens and fades after release")
+    func rippleTimeline() throws {
+        let provider = CursorOverlayProvider(events: clickHold(down: 1.0, up: 2.0))
+        #expect(provider.ripple(at: 0.9) == nil)
+        let start = try #require(provider.ripple(at: 1.0))
+        #expect(abs(start.radius - 0.6) < 1e-9 && start.opacity == 1)
+        #expect(try #require(provider.ripple(at: 1.5)).radius == 1)
+        #expect(try #require(provider.ripple(at: 1.99)).opacity == 1)
+        let fading = try #require(provider.ripple(at: 2.1))
+        #expect(fading.radius > 1.1 && fading.radius < 1.4)
+        #expect(fading.opacity > 0.3 && fading.opacity < 0.7)
+        #expect(provider.ripple(at: 2.25) == nil)
+    }
+
+    @Test("Without release events a click counts as a short press")
+    func rippleWithoutRelease() throws {
+        let provider = CursorOverlayProvider(events: clickHold(down: 1.0, up: nil))
+        #expect(provider.ripple(at: 1.19) != nil)
+        #expect(provider.ripple(at: 1.45) == nil)
+    }
+
+    @Test("The ripple image is centred on the origin and fades with the ripple")
+    func rippleImage() throws {
+        let provider = CursorOverlayProvider(events: clickHold(down: 1.0, up: 2.0))
+        let image = try #require(provider.rippleImage(at: 1.5, fullRadius: 20))
+        #expect(image.extent == CGRect(x: -20, y: -20, width: 40, height: 40))
+        #expect(provider.rippleImage(at: 3, fullRadius: 20) == nil)
+    }
 }

@@ -106,6 +106,7 @@ public enum CompositorExporter {
                     zoomTransform: zoomTransform,
                     cursorPosition: cgCursorPos,
                     cursorImage: scaledCursor,
+                    clickRipple: cursorImage.flatMap { cursorOverlayProvider?.rippleImage(at: timeSec, fullRadius: $0.extent.height * 1.3) },
                     blurEffects: blurEffects,
                     time: timeSec
                 )

@@ -145,6 +145,8 @@ public final class CursorTelemetry: @unchecked Sendable {
             | (1 << CGEventType.scrollWheel.rawValue)
             | (1 << CGEventType.leftMouseDown.rawValue)
             | (1 << CGEventType.rightMouseDown.rawValue)
+            | (1 << CGEventType.leftMouseUp.rawValue)
+            | (1 << CGEventType.rightMouseUp.rawValue)
         // Listening to keys needs Input Monitoring; without it the whole tap could fail.
         if CGPreflightListenEventAccess() {
             mask |= 1 << CGEventType.keyDown.rawValue
@@ -261,6 +263,7 @@ public final class CursorTelemetry: @unchecked Sendable {
             .mouseMoved,
             .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
             .leftMouseDown, .rightMouseDown,
+            .leftMouseUp, .rightMouseUp,
             .scrollWheel,
         ]
 
@@ -300,6 +303,7 @@ public final class CursorTelemetry: @unchecked Sendable {
         switch ns.type {
         case .leftMouseDown:  eventType = .leftClick
         case .rightMouseDown: eventType = .rightClick
+        case .leftMouseUp, .rightMouseUp: eventType = .mouseUp
         default:              eventType = .move
         }
 
@@ -389,6 +393,8 @@ public final class CursorTelemetry: @unchecked Sendable {
         case .keyDown:
             guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return }
             eventType = .keyDown
+        case .leftMouseUp, .rightMouseUp:
+            eventType = .mouseUp
         default:
             eventType = .move
         }

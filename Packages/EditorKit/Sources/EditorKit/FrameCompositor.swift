@@ -73,6 +73,7 @@ public final class FrameCompositor: Sendable {
         zoomTransform: FrameTransform,
         cursorPosition: CGPoint?,
         cursorImage: CIImage?,
+        clickRipple: CIImage? = nil,
         blurEffects: [RecordingEffectSegment] = [],
         time: TimeInterval = 0
     ) -> CIImage {
@@ -84,6 +85,9 @@ public final class FrameCompositor: Sendable {
 
         // 3. Cursor overlay — also passed the zoom transform so the cursor
         // lands on the zoomed content, not the original unzoomed position.
+        if let position = cursorPosition, let ripple = clickRipple {
+            result = applyRipple(ripple, at: position, zoomTransform: zoomTransform, over: result)
+        }
         if let position = cursorPosition, let cursor = cursorImage {
             result = applyCursor(cursor, at: position, zoomTransform: zoomTransform, over: result)
         }
@@ -163,37 +167,40 @@ public final class FrameCompositor: Sendable {
 
     // MARK: - Private: Cursor
 
+    /// Where a normalized cursor position lands in the (possibly zoomed) frame, and the zoom scale.
+    private func placement(of position: CGPoint, zoomTransform: FrameTransform) -> (point: CGPoint, scale: CGFloat) {
+        let w = sourceSize.width
+        let h = sourceSize.height
+        // `.identity` (no zoom) carries a (0, 0) focus; without zoom the view is centred.
+        let focus = zoomTransform == .identity
+            ? CGPoint(x: 0.5, y: 0.5)
+            : CGPoint(x: zoomTransform.translateX, y: zoomTransform.translateY)
+        let s = CGFloat(zoomTransform.scale)
+        let x = (position.x * w - focus.x * w) * s + w / 2
+        let y = ((1 - position.y) * h - (1 - focus.y) * h) * s + h / 2
+        return (CGPoint(x: x, y: y), s)
+    }
+
+    private func applyRipple(_ ripple: CIImage, at position: CGPoint, zoomTransform: FrameTransform, over background: CIImage) -> CIImage {
+        let (point, s) = placement(of: position, zoomTransform: zoomTransform)
+        let placed = ripple
+            .transformed(by: CGAffineTransform(scaleX: s, y: s))
+            .transformed(by: CGAffineTransform(translationX: point.x, y: point.y))
+        return placed.composited(over: background).cropped(to: background.extent)
+    }
+
     private func applyCursor(
         _ cursor: CIImage,
         at position: CGPoint,
         zoomTransform: FrameTransform,
         over background: CIImage
     ) -> CIImage {
-        let w = sourceSize.width
-        let h = sourceSize.height
-
-        // `position` uses top-left origin (screen coords); CIImage uses bottom-left.
-        // Convert to the cursor's raw frame coordinates first.
-        let origX = position.x * w
-        let origY = (1.0 - position.y) * h
-
-        // Zoom transforms the scene with: p_out = (p_in - focus) * s + center
-        // The cursor must follow the same transform, otherwise it renders at
-        // the UNZOOMED position and drifts away from the content it should be
-        // attached to. The cursor image itself is also scaled by `s` so it
-        // integrates visually with the zoomed scene.
-        // `.identity` (no zoom) carries a (0, 0) focus; without zoom the view is centred.
-        let focus = zoomTransform == .identity
-            ? CGPoint(x: 0.5, y: 0.5)
-            : CGPoint(x: zoomTransform.translateX, y: zoomTransform.translateY)
-        let s = CGFloat(zoomTransform.scale)
-        let focusX = focus.x * w
-        let focusY = (1.0 - focus.y) * h
-        let centerX = w / 2.0
-        let centerY = h / 2.0
-
-        let x = (origX - focusX) * s + centerX
-        let y = (origY - focusY) * s + centerY
+        // Zoom transforms the scene with: p_out = (p_in - focus) * s + center.
+        // The cursor follows the same transform so it stays on the content it
+        // points at, and is scaled by `s` to match the zoomed scene.
+        let (point, s) = placement(of: position, zoomTransform: zoomTransform)
+        let x = point.x
+        let y = point.y
 
         // Align the cursor hotspot (tip), not the image centre, to the tracked
         // position — hotspot offsets scale along with the image.
