@@ -95,6 +95,9 @@ final class MenuBarController: NSObject {
         pinFromClipboard.setShortcut(for: .pinFromClipboard)
         pinFromClipboard.toolTip = String(localized: "Float copied images, text, colors, or files above other windows")
         menu.addItem(pinFromClipboard)
+        let togglePins = menuItem(String(localized: "Hide All Pins"), action: #selector(togglePins))
+        togglePins.setShortcut(for: .togglePins)
+        menu.addItem(togglePins)
 
         let editClipboardImage = menuItem(String(localized: "Edit Clipboard Image"), action: #selector(editClipboardImage))
         editClipboardImage.setShortcut(for: .editClipboardImage)
@@ -323,6 +326,10 @@ final class MenuBarController: NSObject {
         NSApp.terminate(nil)
     }
 
+    @objc private func togglePins() {
+        captureCoordinator.togglePinsVisibility()
+    }
+
     @objc private func toggleDesktopIcons() {
         desktopIconsCover.setHiddenManually(!desktopIconsCover.isHiddenManually)
     }
@@ -336,6 +343,12 @@ extension MenuBarController: NSMenuDelegate {
         for item in menu.items {
             switch item.action {
             case #selector(toggleDesktopIcons): item.state = desktopIconsCover.isHiddenManually ? .on : .off
+            case #selector(togglePins):
+                item.title = captureCoordinator.arePinsHidden
+                    ? String(localized: "Show All Pins")
+                    : String(localized: "Hide All Pins")
+                item.isHidden = !captureCoordinator.hasPins
+                item.setShortcut(for: .togglePins)
             case #selector(captureAllInOne): item.setShortcut(for: .captureAllInOne)
             case #selector(captureArea): item.setShortcut(for: .captureArea)
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)

@@ -1972,6 +1972,15 @@ final class CaptureCoordinator {
         controller.show()
     }
 
+    var hasPins: Bool { !pinnedControllers.isEmpty }
+    var arePinsHidden: Bool { !pinnedControllers.isEmpty && pinnedControllers.allSatisfy(\.isHidden) }
+
+    /// Hides every pin if any is showing, otherwise shows them all again.
+    func togglePinsVisibility() {
+        let hide = !arePinsHidden
+        pinnedControllers.forEach { $0.setHidden(hide) }
+    }
+
     private func copyRenderedScreenshotToClipboard(_ image: CGImage) {
         let temporaryFileStore = QuickAccessDragFileStore()
         ScreenshotClipboard.copy(

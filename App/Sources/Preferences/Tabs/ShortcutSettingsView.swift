@@ -31,12 +31,14 @@ extension KeyboardShortcuts.Name {
     /// Replays the last capture (area / window / fullscreen) without showing
     /// the selection overlay. Unbound by default — user must assign a key.
     static let captureLastArea = Self("captureLastArea")
+    /// Unbound by default.
+    static let togglePins = Self("togglePins")
 
     static let allCapso: [Self] = [
         .captureAllInOne, .captureArea, .captureFullscreen, .captureWindow, .captureText, .recordScreen,
         .recordFullscreen, .captureScrolling, .captureAreaToClipboard, .captureAreaAndShare,
         .captureAreaAndAnnotate, .pinFromClipboard, .editClipboardImage, .screenshotHistory,
-        .captureAndTranslate, .translateSelectedText, .translateTypedText, .selfTimerCapture, .captureLastArea,
+        .captureAndTranslate, .translateSelectedText, .translateTypedText, .selfTimerCapture, .captureLastArea, .togglePins,
     ]
 }
 
@@ -113,6 +115,7 @@ struct ShortcutSettingsView: View {
                         showDivider: true,
                         help: "Open the image currently copied to the clipboard in Annotate"
                     )
+                    shortcutRow("Hide / Show All Pins", name: .togglePins, showDivider: true)
                     shortcutRow("Capture & Translate", name: .captureAndTranslate, showDivider: true)
                     shortcutRow("Translate Selected Text", name: .translateSelectedText, showDivider: true)
                     shortcutRow("Translate Typed Text", name: .translateTypedText, showDivider: true)

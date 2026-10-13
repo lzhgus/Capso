@@ -72,6 +72,18 @@ final class PinnedScreenshotController {
         }
     }
 
+    var isHidden: Bool { !contentWindow.isVisible }
+
+    /// Hides or shows the pin and its controls without closing it.
+    func setHidden(_ hidden: Bool) {
+        if hidden {
+            contentWindow.orderOut(nil)
+        } else {
+            contentWindow.orderFrontRegardless()
+            chromeWindow.orderFrontRegardless()
+        }
+    }
+
     func updateZoomHUD(scalePercent: Int) {
         chromeWindow.chromeView.showZoom(scalePercent)
     }

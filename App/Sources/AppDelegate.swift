@@ -171,6 +171,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .pinFromClipboard) { [weak self] in
             self?.captureCoordinator?.pinFromClipboard()
         }
+        KeyboardShortcuts.onKeyDown(for: .togglePins) { [weak self] in
+            self?.captureCoordinator?.togglePinsVisibility()
+        }
         KeyboardShortcuts.onKeyDown(for: .editClipboardImage) { [weak self] in
             self?.captureCoordinator?.editClipboardImage()
         }
