@@ -196,7 +196,7 @@ struct HistoryItemView: View {
                 dragImageSize: CGSize(width: 180, height: 112),
                 fileURLProvider: { coordinator.dragFileURL(for: entry) },
                 onDragStarted: {},
-                onDragEnded: {}
+                onDragEnded: { _ in }
             )
             .frame(width: 30, height: 30)
             .accessibilityHidden(true)

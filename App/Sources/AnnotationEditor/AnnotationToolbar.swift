@@ -308,7 +308,7 @@ struct AnnotationToolbar: View {
                 fileURLProvider: onDragFileURL,
                 dragImageProvider: onDragPreviewImage,
                 onDragStarted: onDragStarted,
-                onDragEnded: onDragEnded
+                onDragEnded: { _ in onDragEnded() }
             )
             .frame(width: 34, height: 26)
             .disabled(isDragDisabled)

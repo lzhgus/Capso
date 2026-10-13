@@ -555,6 +555,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var quickAccessCloseAfterDrag: Bool {
+        get {
+            access(keyPath: \.quickAccessCloseAfterDrag)
+            return settings.quickAccessCloseAfterDrag
+        }
+        set {
+            withMutation(keyPath: \.quickAccessCloseAfterDrag) {
+                settings.quickAccessCloseAfterDrag = newValue
+            }
+        }
+    }
     var quickAccessAutoClose: Bool {
         get {
             access(keyPath: \.quickAccessAutoClose)

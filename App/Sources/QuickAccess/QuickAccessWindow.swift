@@ -94,7 +94,8 @@ final class QuickAccessWindow: NSPanel {
             onPin:       { [weak self] in self?.onPin?() },
             onPreview:   { [weak self] in self?.onPreview?() },
             onDragStarted: { [weak self] in self?.hideDuringExternalDrag() },
-            onDragEnded:   { [weak self] in self?.showAfterExternalDrag() },
+            onDragEnded:   { [weak self] dropped in self?.finishExternalDrag(dropped: dropped) },
+            onHoverChanged: { [weak self] hovering in self?.hoverChanged(hovering) },
             onClose:     { [weak self] in self?.onClose?() }
         )
 
@@ -121,6 +122,24 @@ final class QuickAccessWindow: NSPanel {
         alphaValueBeforeDrag = alphaValue
         alphaValue = 0
         ignoresMouseEvents = true
+    }
+
+    private func finishExternalDrag(dropped: Bool) {
+        if dropped && settings.quickAccessCloseAfterDrag {
+            onClose?()
+        } else {
+            showAfterExternalDrag()
+        }
+    }
+
+    /// Auto-close waits while the pointer is over the preview, then starts over.
+    private func hoverChanged(_ hovering: Bool) {
+        guard alphaValueBeforeDrag == nil else { return }
+        if hovering {
+            stopAutoDismissTimer()
+        } else {
+            scheduleAutoDismissTimerIfNeeded()
+        }
     }
 
     private func showAfterExternalDrag() {

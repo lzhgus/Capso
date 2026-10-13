@@ -52,6 +52,11 @@ struct QuickAccessSettingsView: View {
                         .frame(width: 180)
                         .disabled(!viewModel.quickAccessAutoClose)
                     }
+                    SettingRow(label: "Close After Dragging", sublabel: "Close the preview once it's dropped into another app", showDivider: true) {
+                        Toggle("", isOn: $viewModel.quickAccessCloseAfterDrag)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                 }
             }
         }

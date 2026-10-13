@@ -57,6 +57,19 @@ struct AppSettingsTests {
         #expect(AppSettings(defaults: defaults).automationURLsAsked)
     }
 
+    @Test("Closing Quick Access after a drag defaults on and persists")
+    func quickAccessCloseAfterDragPersists() {
+        let suite = "test.quickAccessCloseAfterDrag"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        #expect(first.quickAccessCloseAfterDrag)
+
+        first.quickAccessCloseAfterDrag = false
+        #expect(!AppSettings(defaults: defaults).quickAccessCloseAfterDrag)
+    }
+
     @Test("Default export location is Desktop")
     func defaultExportLocation() {
         let settings = AppSettings()

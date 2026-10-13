@@ -8,7 +8,8 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
     let fileURLProvider: () -> URL?
     let dragImageProvider: () -> NSImage?
     let onDragStarted: () -> Void
-    let onDragEnded: () -> Void
+    /// Called with `true` when the file was dropped somewhere, `false` when the drag was cancelled.
+    let onDragEnded: (Bool) -> Void
 
     init(
         thumbnail: NSImage,
@@ -16,7 +17,7 @@ struct QuickAccessDragSourceView: NSViewRepresentable {
         fileURLProvider: @escaping () -> URL?,
         dragImageProvider: @escaping () -> NSImage? = { nil },
         onDragStarted: @escaping () -> Void,
-        onDragEnded: @escaping () -> Void
+        onDragEnded: @escaping (Bool) -> Void
     ) {
         self.thumbnail = thumbnail
         self.dragImageSize = dragImageSize
@@ -55,7 +56,7 @@ final class DragSourceNSView: NSView, NSDraggingSource {
     var fileURLProvider: () -> URL?
     var dragImageProvider: () -> NSImage?
     var onDragStarted: () -> Void
-    var onDragEnded: () -> Void
+    var onDragEnded: (Bool) -> Void
 
     private var mouseDownEvent: NSEvent?
     private var isDragging = false
@@ -66,7 +67,7 @@ final class DragSourceNSView: NSView, NSDraggingSource {
         fileURLProvider: @escaping () -> URL?,
         dragImageProvider: @escaping () -> NSImage?,
         onDragStarted: @escaping () -> Void,
-        onDragEnded: @escaping () -> Void
+        onDragEnded: @escaping (Bool) -> Void
     ) {
         self.thumbnail = thumbnail
         self.dragImageSize = dragImageSize
@@ -121,7 +122,7 @@ final class DragSourceNSView: NSView, NSDraggingSource {
     ) {
         guard isDragging else { return }
         isDragging = false
-        onDragEnded()
+        onDragEnded(!operation.isEmpty)
     }
 
     private func beginDrag(for fileURL: URL, from event: NSEvent, previewImage: NSImage) {

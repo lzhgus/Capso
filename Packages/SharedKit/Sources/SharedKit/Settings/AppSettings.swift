@@ -523,6 +523,12 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue.rawValue, forKey: "quickAccessPosition") }
     }
 
+    /// Close the preview once its file has been dropped into another app. Default `true`.
+    public var quickAccessCloseAfterDrag: Bool {
+        get { defaults.object(forKey: "quickAccessCloseAfterDrag") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "quickAccessCloseAfterDrag") }
+    }
+
     public var quickAccessAutoClose: Bool {
         get { defaults.object(forKey: "quickAccessAutoClose") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "quickAccessAutoClose") }

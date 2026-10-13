@@ -28,7 +28,8 @@ struct QuickAccessView: View {
     let onPin: () -> Void
     let onPreview: () -> Void
     let onDragStarted: () -> Void
-    let onDragEnded: () -> Void
+    let onDragEnded: (Bool) -> Void
+    let onHoverChanged: (Bool) -> Void
     let onClose: () -> Void
 
     @State private var isHovering = false
@@ -93,7 +94,10 @@ struct QuickAccessView: View {
         .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
         .offset(y: isRevealed ? -2 : 0)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.26), value: isRevealed)
-        .onHover { isHovering = $0 }
+        .onHover { hovering in
+            isHovering = hovering
+            onHoverChanged(hovering)
+        }
         .onAppear {
             prepareDragFileIfNeeded()
             startAutoUploadIfNeeded()
