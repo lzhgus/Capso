@@ -17,6 +17,19 @@ struct AppSettingsTests {
         #expect(AppSettings(defaults: defaults).recordingAutoCopy)
     }
 
+    @Test("Low disk space warning defaults on and persists")
+    func lowDiskSpaceWarningPersists() {
+        let suite = "test.warnAboutLowDiskSpace"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+
+        let first = AppSettings(defaults: defaults)
+        #expect(first.warnAboutLowDiskSpace)
+
+        first.warnAboutLowDiskSpace = false
+        #expect(!AppSettings(defaults: defaults).warnAboutLowDiskSpace)
+    }
+
     @Test("Default export location is Desktop")
     func defaultExportLocation() {
         let settings = AppSettings()

@@ -91,6 +91,9 @@ final class RecordingCoordinator {
         recorder.onStreamInterrupted = { [weak self] error in
             self?.handleRecordingInterrupted(error: error)
         }
+        recorder.onDiskSpaceLow = { [weak self] in
+            self?.handleDiskSpaceLow()
+        }
     }
 
     // MARK: - Public API
@@ -601,6 +604,12 @@ final class RecordingCoordinator {
         // Resolve Input Monitoring before creating any recording UI. Opening
         // System Settings cancels this attempt, as the alert instructs the user
         // to grant access and start recording again.
+        guard confirmStartDespiteLowDiskSpace() else {
+            dismissToolbarUI()
+            selectedTarget = nil
+            return
+        }
+
         let keyPressOverlayDecision = prepareKeyPressOverlayPermission()
         guard keyPressOverlayDecision != .cancelRecording else {
             dismissToolbarUI()
@@ -688,8 +697,9 @@ final class RecordingCoordinator {
 
     // MARK: - Step 4: During Recording
 
-    func stopRecording() {
+    func stopRecording(afterStop: (@MainActor () -> Void)? = nil) {
         Task {
+            defer { afterStop?() }
             do {
                 let result = try await recorder.stopRecording()
                 let cursorTelemetryURL = stopCursorTelemetry()
@@ -732,6 +742,40 @@ final class RecordingCoordinator {
     private func handleRecordingInterrupted(error: Error) {
         NSLog("[Capso] Recording stream stopped unexpectedly: %@", String(describing: error))
         stopRecording()
+    }
+
+    private func handleDiskSpaceLow() {
+        stopRecording(afterStop: { [weak self] in self?.showDiskSpaceLowAlert() })
+    }
+
+    private func showDiskSpaceLowAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Recording stopped because your disk is almost full")
+        alert.informativeText = String(localized: "The recording was stopped and saved to prevent data loss. Free up disk space before recording again.")
+        alert.addButton(withTitle: String(localized: "OK"))
+        alert.runModal()
+    }
+
+    private func confirmStartDespiteLowDiskSpace() -> Bool {
+        guard settings.warnAboutLowDiskSpace,
+              let available = DiskSpace.availableBytes(at: ScreenRecorder.recordingDirectory),
+              available < DiskSpace.recommendedToStartRecording else { return true }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Your disk is almost full")
+        let free = ByteCountFormatter.string(fromByteCount: available, countStyle: .file)
+        alert.informativeText = String(localized: "Only \(free) is free. The recording will be stopped automatically if space runs out.")
+        alert.addButton(withTitle: String(localized: "Record Anyway"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = String(localized: "Don't warn me again")
+        let response = alert.runModal()
+        if alert.suppressionButton?.state == .on {
+            settings.warnAboutLowDiskSpace = false
+        }
+        return response == .alertFirstButtonReturn
     }
 
     private func restartRecording() {

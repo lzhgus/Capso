@@ -53,6 +53,18 @@ public final class ScreenRecorder {
     @ObservationIgnored
     public var onStreamInterrupted: (@MainActor (Error) -> Void)?
 
+    /// Fires at most once per recording when free disk space drops below `DiskSpace.minimumToKeepRecording`.
+    @ObservationIgnored
+    public var onDiskSpaceLow: (@MainActor () -> Void)?
+
+    public static var recordingDirectory: URL { FileManager.default.temporaryDirectory }
+    static let diskSpaceCheckInterval: TimeInterval = 10
+
+    @ObservationIgnored
+    var availableDiskBytes: (URL) -> Int64? = DiskSpace.availableBytes(at:)
+    private var lastDiskSpaceCheck: TimeInterval = 0
+    private var diskSpaceLowReported = false
+
     private var stream: SCStream?
     private var streamOutput: StreamOutput?
     private var recordingQueue: DispatchQueue?
@@ -79,7 +91,7 @@ public final class ScreenRecorder {
         recordingConfig = config
 
         do {
-            let fileURL = FileManager.default.temporaryDirectory
+            let fileURL = Self.recordingDirectory
                 .appendingPathComponent("capso_recording_\(UUID().uuidString).mov")
             outputFileURL = fileURL
 
@@ -324,8 +336,20 @@ public final class ScreenRecorder {
             Task { @MainActor [weak self] in
                 guard let self, let s = self.recordingStartTime else { return }
                 self.elapsedTime = base + Date().timeIntervalSince(s)
+                self.checkDiskSpaceIfDue(elapsed: self.elapsedTime)
             }
         }
+    }
+
+    func checkDiskSpaceIfDue(elapsed: TimeInterval) {
+        guard state == .recording, !diskSpaceLowReported,
+              elapsed - lastDiskSpaceCheck >= Self.diskSpaceCheckInterval else { return }
+        lastDiskSpaceCheck = elapsed
+        guard let available = availableDiskBytes(Self.recordingDirectory),
+              available < DiskSpace.minimumToKeepRecording else { return }
+        capsoLog("Free disk space low (\(available) bytes), stopping recording")
+        diskSpaceLowReported = true
+        onDiskSpaceLow?()
     }
 
     private func stopElapsedTimer() {
@@ -335,6 +359,7 @@ public final class ScreenRecorder {
     private func cleanup() {
         stream = nil; streamOutput = nil; recordingConfig = nil; recordingQueue = nil; recordingSourceSize = nil
         streamInterrupted = false
+        lastDiskSpaceCheck = 0; diskSpaceLowReported = false
         writer.reset(); stopElapsedTimer()
         InterruptedRecording.clear()
     }

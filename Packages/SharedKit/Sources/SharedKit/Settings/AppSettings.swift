@@ -626,6 +626,12 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "recordingMicDeviceID") }
     }
 
+    /// Warn before recording when the disk is almost full. Default `true`.
+    public var warnAboutLowDiskSpace: Bool {
+        get { defaults.object(forKey: "warnAboutLowDiskSpace") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "warnAboutLowDiskSpace") }
+    }
+
     /// When `true`, the recording editor opens after every recording stops.
     /// When `false` (default), the quick-preview flow is used instead.
     /// Default is `false` to preserve existing behaviour for existing users.
