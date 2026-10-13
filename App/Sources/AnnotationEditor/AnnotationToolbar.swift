@@ -8,6 +8,7 @@ struct AnnotationToolbar: View {
     @Binding var currentColor: AnnotationColor
     @Binding var lineWidth: CGFloat
     @Binding var strokePattern: StrokePattern
+    @Binding var arrowHead: ArrowHeadStyle
     @Binding var filled: Bool
     @Binding var textFillEnabled: Bool
     @Binding var textOutlineEnabled: Bool
@@ -186,6 +187,18 @@ struct AnnotationToolbar: View {
                 .labelsHidden()
                 .frame(width: 104)
                 .help("Stroke Pattern")
+            }
+            if currentTool == .arrow {
+                Picker("", selection: $arrowHead) {
+                    ForEach(ArrowHeadStyle.allCases, id: \.self) { style in
+                        ArrowHeadGlyph(style: style)
+                            .tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 136)
+                .help("Arrow Style")
             }
             // Fill toggle is meaningless for counter / highlighter / text.
             if currentTool != .counter
@@ -453,26 +466,55 @@ extension AnnotationTool {
     }
 }
 
+/// Segmented pickers on macOS only draw `Image` / `Text` labels, so glyphs are
+/// rendered into template images (tinted for light and dark mode by the system).
+private func templateGlyph(width: CGFloat, height: CGFloat, draw: @escaping (CGContext, CGSize) -> Void) -> Image {
+    let size = NSSize(width: width, height: height)
+    let image = NSImage(size: size, flipped: true) { _ in
+        if let ctx = NSGraphicsContext.current?.cgContext { draw(ctx, size) }
+        return true
+    }
+    image.isTemplate = true
+    return Image(nsImage: image)
+}
+
+/// A small sample arrow drawn with the real renderer, so the picker matches the canvas.
+struct ArrowHeadGlyph: View {
+    let style: ArrowHeadStyle
+
+    var body: some View {
+        templateGlyph(width: 24, height: 14) { ctx, size in
+            let arrow = ArrowObject(
+                start: CGPoint(x: 3, y: size.height / 2),
+                end: CGPoint(x: size.width - 3, y: size.height / 2),
+                style: AnnotationKit.StrokeStyle(color: .black, lineWidth: 2, arrowHead: style)
+            )
+            arrow.headLength = 6
+            arrow.render(in: ctx)
+        }
+    }
+}
+
 struct StrokePatternGlyph: View {
     let pattern: StrokePattern
 
     var body: some View {
-        Canvas { context, size in
-            var path = Path()
-            path.move(to: CGPoint(x: 3, y: size.height / 2))
-            path.addLine(to: CGPoint(x: size.width - 3, y: size.height / 2))
-
-            let style: SwiftUI.StrokeStyle
+        templateGlyph(width: 22, height: 14) { ctx, size in
+            ctx.setStrokeColor(NSColor.black.cgColor)
+            ctx.setLineCap(.round)
             switch pattern {
             case .solid:
-                style = SwiftUI.StrokeStyle(lineWidth: 2, lineCap: .round)
+                ctx.setLineWidth(2)
             case .dashed:
-                style = SwiftUI.StrokeStyle(lineWidth: 2, lineCap: .round, dash: [7, 5])
+                ctx.setLineWidth(2)
+                ctx.setLineDash(phase: 0, lengths: [7, 5])
             case .dotted:
-                style = SwiftUI.StrokeStyle(lineWidth: 2.4, lineCap: .round, dash: [0, 5])
+                ctx.setLineWidth(2.4)
+                ctx.setLineDash(phase: 0, lengths: [0, 5])
             }
-            context.stroke(path, with: .color(.primary), style: style)
+            ctx.move(to: CGPoint(x: 3, y: size.height / 2))
+            ctx.addLine(to: CGPoint(x: size.width - 3, y: size.height / 2))
+            ctx.strokePath()
         }
-        .frame(width: 22, height: 14)
     }
 }

@@ -205,7 +205,8 @@ private struct InlineAnnotationEditorView: View {
             lineWidth: lineWidth,
             opacity: currentTool == .highlighter ? 0.35 : 1.0,
             filled: filled,
-            pattern: strokePattern
+            pattern: strokePattern,
+            arrowHead: ArrowHeadStyle(rawValue: UserDefaults.standard.string(forKey: "annotationArrowHead") ?? "") ?? .standard
         )
     }
 

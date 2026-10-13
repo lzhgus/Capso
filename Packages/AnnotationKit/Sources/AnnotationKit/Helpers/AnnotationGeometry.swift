@@ -52,4 +52,17 @@ enum AnnotationGeometry {
         }
         return atan2(end.y - start.y, end.x - start.x)
     }
+
+    /// Points along a straight line or quadratic curve from `start` to `end`.
+    static func curvePoints(start: CGPoint, control: CGPoint?, end: CGPoint, count: Int) -> [CGPoint] {
+        let c = control ?? CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
+        return (0...count).map { i in
+            let t = CGFloat(i) / CGFloat(count)
+            let u = 1 - t
+            return CGPoint(
+                x: u * u * start.x + 2 * u * t * c.x + t * t * end.x,
+                y: u * u * start.y + 2 * u * t * c.y + t * t * end.y
+            )
+        }
+    }
 }

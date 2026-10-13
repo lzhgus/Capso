@@ -71,6 +71,7 @@ struct AnnotationEditorView: View {
     @AppStorage("annotationHighlighterWidth") private var savedHighlighterWidth: Double = 20
     @AppStorage("annotationRedactionMode") private var redactionMode: RedactionMode = .pixelate
     @AppStorage("annotationStrokePattern") private var savedStrokePattern: StrokePattern = .solid
+    @AppStorage("annotationArrowHead") private var arrowHead: ArrowHeadStyle = .standard
     @AppStorage("annotationTextFillEnabled") private var textFillEnabled: Bool = false
     @AppStorage("annotationTextOutlineEnabled") private var textOutlineEnabled: Bool = false
     @AppStorage("annotationTextStrokeEnabled") private var textStrokeEnabled: Bool = true
@@ -152,7 +153,8 @@ struct AnnotationEditorView: View {
             lineWidth: lineWidth,
             opacity: currentTool == .highlighter ? 0.35 : 1.0,
             filled: filled,
-            pattern: strokePattern
+            pattern: strokePattern,
+            arrowHead: arrowHead
         )
     }
 
@@ -303,6 +305,7 @@ struct AnnotationEditorView: View {
             currentColor: $currentColor,
             lineWidth: $lineWidth,
             strokePattern: $strokePattern,
+            arrowHead: $arrowHead,
             filled: $filled,
             textFillEnabled: $textFillEnabled,
             textOutlineEnabled: $textOutlineEnabled,
@@ -343,6 +346,7 @@ struct AnnotationEditorView: View {
             .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
             .onChange(of: lineWidth, handleLineWidthChange)
             .onChange(of: strokePattern, handleStrokePatternChange)
+            .onChange(of: arrowHead) { _, _ in updateSelectedStyle() }
             .onChange(of: filled) { _, _ in updateSelectedStyle() }
             .onChange(of: textFillEnabled) { _, _ in updateSelectedStyle() }
             .onChange(of: textOutlineEnabled) { _, _ in updateSelectedStyle() }

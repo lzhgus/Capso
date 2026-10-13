@@ -43,25 +43,40 @@ public enum StrokePattern: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public enum ArrowHeadStyle: String, Codable, CaseIterable, Sendable {
+    /// Open "V" head.
+    case standard
+    /// Solid triangle head.
+    case filled
+    /// Solid heads at both ends.
+    case double
+    /// Shaft widens from tail to a solid head.
+    case tapered
+}
+
 public struct StrokeStyle: Sendable {
     public var color: AnnotationColor
     public var lineWidth: CGFloat
     public var opacity: CGFloat
     public var filled: Bool
     public var pattern: StrokePattern
+    /// Only arrows use this.
+    public var arrowHead: ArrowHeadStyle
 
     public init(
         color: AnnotationColor = .red,
         lineWidth: CGFloat = 3,
         opacity: CGFloat = 1,
         filled: Bool = false,
-        pattern: StrokePattern = .solid
+        pattern: StrokePattern = .solid,
+        arrowHead: ArrowHeadStyle = .standard
     ) {
         self.color = color
         self.lineWidth = lineWidth
         self.opacity = opacity
         self.filled = filled
         self.pattern = pattern
+        self.arrowHead = arrowHead
     }
 }
 
