@@ -149,4 +149,25 @@ struct FrameCompositorTests {
                 renderedBytes(inactive, width: 120, height: 80)
         )
     }
+
+    @Test("Without zoom the cursor is drawn where it was", arguments: [
+        CGPoint(x: 0.5, y: 0.5), CGPoint(x: 0.2, y: 0.3), CGPoint(x: 0.8, y: 0.75),
+    ])
+    func cursorPlacedWithoutZoom(position: CGPoint) {
+        let (width, height) = (400, 200)
+        let compositor = FrameCompositor(sourceSize: CGSize(width: width, height: height), backgroundStyle: BackgroundStyle(enabled: false), outputScale: 1)
+        let cursor = CIImage(color: .white).cropped(to: CGRect(x: 0, y: 0, width: 8, height: 8))
+        let result = compositor.compose(frame: makeTestImage(width: width, height: height, color: .black),
+                                        zoomTransform: .identity, cursorPosition: position, cursorImage: cursor)
+        let bytes = renderedBytes(result, width: width, height: height)
+        var xs: [Int] = [], ys: [Int] = []
+        for row in 0..<height { for x in 0..<width where bytes[(row * width + x) * 4] > 200 {
+            xs.append(x); ys.append(row)  // bitmap rows run top to bottom, like the normalized position
+        } }
+        #expect(!xs.isEmpty, "cursor not drawn inside the frame")
+        guard !xs.isEmpty else { return }
+        let centre = (x: Double(xs.min()! + xs.max()!) / 2, y: Double(ys.min()! + ys.max()!) / 2)
+        #expect(abs(centre.x - position.x * Double(width)) < 10, "x \(centre.x)")
+        #expect(abs(centre.y - position.y * Double(height)) < 10, "y \(centre.y)")
+    }
 }

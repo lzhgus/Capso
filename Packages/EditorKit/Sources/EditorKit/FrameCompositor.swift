@@ -182,9 +182,13 @@ public final class FrameCompositor: Sendable {
         // the UNZOOMED position and drifts away from the content it should be
         // attached to. The cursor image itself is also scaled by `s` so it
         // integrates visually with the zoomed scene.
+        // `.identity` (no zoom) carries a (0, 0) focus; without zoom the view is centred.
+        let focus = zoomTransform == .identity
+            ? CGPoint(x: 0.5, y: 0.5)
+            : CGPoint(x: zoomTransform.translateX, y: zoomTransform.translateY)
         let s = CGFloat(zoomTransform.scale)
-        let focusX = CGFloat(zoomTransform.translateX) * w
-        let focusY = (1.0 - CGFloat(zoomTransform.translateY)) * h
+        let focusX = focus.x * w
+        let focusY = (1.0 - focus.y) * h
         let centerX = w / 2.0
         let centerY = h / 2.0
 
