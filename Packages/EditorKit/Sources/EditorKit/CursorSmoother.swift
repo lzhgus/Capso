@@ -182,6 +182,15 @@ public final class CursorSmoother: Sendable {
                 xs[i] = pos.x
                 ys[i] = pos.y
             }
+
+            // Run the same spring backwards over the result. The two passes'
+            // delays cancel, so the smoothed cursor no longer trails the real one.
+            spring.reset(x: xs[count - 1], y: ys[count - 1])
+            for i in stride(from: count - 1, through: 0, by: -1) {
+                let pos = spring.step(towardX: xs[i], y: ys[i], deltaTime: dt)
+                xs[i] = pos.x
+                ys[i] = pos.y
+            }
         } else {
             // Smoothing disabled: copy raw positions verbatim.
             for i in 0..<count {

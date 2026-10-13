@@ -92,8 +92,8 @@ struct CursorSmootherTests {
 
     // MARK: - Smoothed timeline tests
 
-    @Test("Smoothed position lags behind raw position")
-    func smoothedPositionLagsBehindRaw() {
+    @Test("Smoothing rounds off a sharp turn")
+    func smoothingRoundsOffSharpTurn() {
         let smoother = CursorSmoother(
             telemetry: makeTelemetry(),
             config: .smooth        // enabled = true
@@ -101,7 +101,7 @@ struct CursorSmootherTests {
         let timeline = smoother.buildSmoothedTimeline(fps: 60, duration: 2.0)
         let raw = smoother.rawPosition(at: 0.5)
         let smoothed = timeline.position(at: 0.5)
-        // Smoothing introduces lag — smoothed position must differ from raw at t=0.5
+        // The path turns sharply at t=0.5; the smoothed path cuts the corner.
         let distanceX = abs(smoothed.x - raw.x)
         let distanceY = abs(smoothed.y - raw.y)
         #expect(distanceX > 1e-4 || distanceY > 1e-4)
@@ -153,6 +153,26 @@ struct CursorSmootherTests {
                     "x mismatch at sample \(i) (t=\(t)): smoothed=\(smoothed.x) raw=\(raw.x)")
             #expect(abs(smoothed.y - raw.y) < 1e-10,
                     "y mismatch at sample \(i) (t=\(t)): smoothed=\(smoothed.y) raw=\(raw.y)")
+        }
+    }
+
+    @Test("Smoothing doesn't trail a cursor moving at a steady speed", arguments: [
+        CursorSmoothingConfig.snappy, .smooth, .floaty,
+    ])
+    func noLagOnSteadyMotion(config: CursorSmoothingConfig) {
+        let events = (0...240).map { i in
+            let t = Double(i) / 60
+            return CursorEvent(timestamp: t, x: 0.1 + 0.2 * t, y: 0.8 - 0.15 * t, type: .move)
+        }
+        let smoother = CursorSmoother(
+            telemetry: CursorTelemetryData(recordingAreaWidth: 1280, recordingAreaHeight: 720, events: events),
+            config: config
+        )
+        let timeline = smoother.buildSmoothedTimeline(fps: 60, duration: 4.0)
+        for t in stride(from: 1.5, through: 2.5, by: 0.25) {
+            let raw = smoother.rawPosition(at: t)
+            let smoothed = timeline.position(at: t)
+            #expect(abs(smoothed.x - raw.x) < 0.001 && abs(smoothed.y - raw.y) < 0.001, "lag at \(t)")
         }
     }
 }
