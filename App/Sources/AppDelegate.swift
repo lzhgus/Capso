@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureCoordinator!.shareCoordinator = shareCoordinator
         historyCoordinator!.shareCoordinator = shareCoordinator
         recordingCoordinator!.historyCoordinator = historyCoordinator
+        recordingCoordinator!.recoverInterruptedRecording()
         preferencesWindow = PreferencesWindow(settings: settings, permissionManager: permissionManager, updateManager: updateManager)
         if settings.diagnosticLoggingEnabled {
             DiagnosticLogger.append(

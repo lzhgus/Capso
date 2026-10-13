@@ -102,6 +102,7 @@ public final class ScreenRecorder {
             }
             try await stream?.startCapture()
             writer.activate()
+            InterruptedRecording.mark(fileURL)
 
             state = .recording
             recordingStartTime = Date()
@@ -335,6 +336,7 @@ public final class ScreenRecorder {
         stream = nil; streamOutput = nil; recordingConfig = nil; recordingQueue = nil; recordingSourceSize = nil
         streamInterrupted = false
         writer.reset(); stopElapsedTimer()
+        InterruptedRecording.clear()
     }
 }
 
@@ -400,6 +402,7 @@ private final class RecordingWriter: @unchecked Sendable {
         let w: AVAssetWriter
         do { w = try AVAssetWriter(outputURL: outputURL, fileType: .mov) }
         catch { throw RecordingError.writerSetupFailed(error.localizedDescription) }
+        w.movieFragmentInterval = CMTime(seconds: 5, preferredTimescale: 600)
 
         // Video input: H.264, no B-frames
         let pixels = Float(videoWidth * videoHeight)

@@ -832,6 +832,23 @@ final class RecordingCoordinator {
         }
     }
 
+    func recoverInterruptedRecording() {
+        guard let url = InterruptedRecording.take() else { return }
+        Task {
+            let duration = (try? await AVURLAsset(url: url).load(.duration).seconds) ?? 0
+            guard duration > 0 else {
+                try? FileManager.default.removeItem(at: url)
+                return
+            }
+            guard let savedURL = await exportRecording(url, format: .video) else { return }
+            saveRecordingToHistory(url: savedURL, format: .video, entryID: UUID())
+            CaptureCoordinator.postNotification(
+                title: String(localized: "Recording recovered"),
+                body: String(localized: "Capso quit unexpectedly during a recording. What was captured has been saved to \(savedURL.deletingLastPathComponent().path).")
+            )
+        }
+    }
+
     private func showRecordingSaveFailureAlert(format: RecordingKit.RecordingFormat) {
         let alert = NSAlert()
         alert.alertStyle = .warning
