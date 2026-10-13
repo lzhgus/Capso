@@ -697,9 +697,9 @@ final class RecordingCoordinator {
 
     // MARK: - Step 4: During Recording
 
+    /// `afterStop` runs only once the recording was stopped and saved.
     func stopRecording(afterStop: (@MainActor () -> Void)? = nil) {
         Task {
-            defer { afterStop?() }
             do {
                 let result = try await recorder.stopRecording()
                 let cursorTelemetryURL = stopCursorTelemetry()
@@ -732,6 +732,7 @@ final class RecordingCoordinator {
                     showRecordingPreview(thumbnail: nsThumb, duration: duration, fileSize: size,
                                         tempURL: tempURL, format: format)
                 }
+                afterStop?()
             } catch {
                 print("Failed to stop/save recording: \(error)")
                 hideRecordingUI()
