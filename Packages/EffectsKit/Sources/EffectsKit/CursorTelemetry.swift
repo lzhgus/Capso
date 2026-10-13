@@ -138,13 +138,17 @@ public final class CursorTelemetry: @unchecked Sendable {
         startTime = ProcessInfo.processInfo.systemUptime
         receivedEventCount = 0
 
-        let mask: CGEventMask =
+        var mask: CGEventMask =
             (1 << CGEventType.mouseMoved.rawValue)
             | (1 << CGEventType.leftMouseDragged.rawValue)
             | (1 << CGEventType.rightMouseDragged.rawValue)
             | (1 << CGEventType.scrollWheel.rawValue)
             | (1 << CGEventType.leftMouseDown.rawValue)
             | (1 << CGEventType.rightMouseDown.rawValue)
+        // Listening to keys needs Input Monitoring; without it the whole tap could fail.
+        if CGPreflightListenEventAccess() {
+            mask |= 1 << CGEventType.keyDown.rawValue
+        }
 
         // Retain self so the C callback can reach it. Store the opaque pointer
         // so we can release it exactly once from stop() or deinit.
@@ -382,6 +386,9 @@ public final class CursorTelemetry: @unchecked Sendable {
             eventType = .leftClick
         case .rightMouseDown:
             eventType = .rightClick
+        case .keyDown:
+            guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return }
+            eventType = .keyDown
         default:
             eventType = .move
         }

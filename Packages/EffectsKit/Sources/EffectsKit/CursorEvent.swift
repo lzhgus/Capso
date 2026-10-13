@@ -7,6 +7,8 @@ public enum CursorEventType: String, Codable, Sendable {
     case move
     case leftClick
     case rightClick
+    /// A key press (no key identity is stored); the position is where the cursor was.
+    case keyDown
 }
 
 /// A single cursor event captured during a recording session.

@@ -5,10 +5,13 @@ import EffectsKit
 
 /// Detects "interesting moments" in cursor telemetry and proposes zoom segments.
 ///
-/// Two independent candidate streams are built:
-///   1. Clicks (left / right) — each click produces a candidate at its position.
+/// Three candidate streams are built:
+///   1. Clicks (left / right) — a lone click produces a candidate at its
+///      position; a burst of nearby clicks becomes one longer candidate, zoomed
+///      further when the clicks come in quick succession.
 ///   2. Dwells — either dense sampled runs where the cursor is nearly stationary,
 ///      or sparse same-position gaps between interactions, produce a candidate.
+///   3. Typing — a run of key presses produces a candidate where the cursor is.
 ///
 /// Candidates are ranked by a "significance" strength (in ms-equivalent units),
 /// then a greedy spacing filter drops any two candidates whose center times are
@@ -44,10 +47,28 @@ public enum AutoZoomDetector {
     static let dwellBuffer: TimeInterval = 0.5
     static let defaultZoomLevel: Double = 1.5
     static let defaultDuration: TimeInterval = 3.0
+    /// Clicks join a burst when each follows the previous within this time…
+    static let clickBurstGap: TimeInterval = 3.0
+    /// …and lands within this normalized distance of it.
+    static let clickBurstRadius: Double = 0.25
+    /// Follow-up clicks this quick count extra towards a burst's density.
+    static let quickClickGap: TimeInterval = 0.5
+    /// Bursts at least this dense zoom in further.
+    static let denseBurstScore: Double = 3.0
+    static let denseBurstZoomLevel: Double = 2.0
+    static let maxSegmentDuration: TimeInterval = 60
+    /// Key presses closer together than this form one typing run…
+    static let typingGap: TimeInterval = 0.5
+    /// …of at least this many presses.
+    static let minTypingKeys = 4
+    static let typingPreRoll: TimeInterval = 0.3
+    static let typingPostRoll: TimeInterval = 0.8
     // MARK: - Candidate model (internal)
 
     private enum CandidateKind {
         case click
+        case clickBurst(first: TimeInterval, last: TimeInterval, zoomLevel: Double)
+        case typing(first: TimeInterval, last: TimeInterval)
         case dwell(duration: TimeInterval)
     }
 
@@ -55,8 +76,9 @@ public enum AutoZoomDetector {
         let kind: CandidateKind
         let centerTime: TimeInterval
         let focus: (x: Double, y: Double)
-        /// Ranking strength in ms-equivalent units. Clicks = 1000, dwells use
-        /// a capped duration so long pauses still qualify without dominating.
+        /// Ranking strength in ms-equivalent units. Clicks = 1000 (bursts and
+        /// typing rank higher), dwells use a capped duration so long pauses
+        /// still qualify without dominating.
         let strength: Double
     }
 
@@ -71,11 +93,12 @@ public enum AutoZoomDetector {
         // Step A: build candidates
         let sortedEvents = events.sorted { $0.timestamp < $1.timestamp }
         let clickCandidates = buildClickCandidates(from: sortedEvents)
-        let dwellCandidates = buildDwellCandidates(from: sortedEvents)
-        let all = clickCandidates + dwellCandidates
+        let dwellCandidates = buildDwellCandidates(from: sortedEvents.filter { $0.type != .keyDown })
+        let typingCandidates = buildTypingCandidates(from: sortedEvents)
+        let all = clickCandidates + dwellCandidates + typingCandidates
 
         // Step B: rank and filter by spacing
-        let accepted = filterBySpacing(candidates: all)
+        let accepted = filterBySpacing(candidates: all, videoDuration: duration)
 
         // Step C: build segments
         let segments = accepted.map { makeSegment(from: $0, videoDuration: duration) }
@@ -89,13 +112,57 @@ public enum AutoZoomDetector {
     // MARK: - Step A: candidates
 
     private static func buildClickCandidates(from events: [CursorEvent]) -> [Candidate] {
-        events.compactMap { event in
-            guard event.type == .leftClick || event.type == .rightClick else { return nil }
+        let clicks = events.filter { $0.type == .leftClick || $0.type == .rightClick }
+        var bursts: [[CursorEvent]] = []
+        for click in clicks {
+            if let last = bursts.last?.last,
+               click.timestamp - last.timestamp <= clickBurstGap,
+               hypot(click.x - last.x, click.y - last.y) <= clickBurstRadius {
+                bursts[bursts.count - 1].append(click)
+            } else {
+                bursts.append([click])
+            }
+        }
+
+        return bursts.map { burst in
+            let first = burst[0]
+            guard burst.count > 1, let last = burst.last else {
+                return Candidate(kind: .click, centerTime: first.timestamp, focus: (first.x, first.y), strength: 1000.0)
+            }
+            let score = zip(burst, burst.dropFirst()).reduce(0.0) { score, pair in
+                score + 1 + (pair.1.timestamp - pair.0.timestamp <= quickClickGap ? 1.5 : 0)
+            }
+            let count = Double(burst.count)
             return Candidate(
-                kind: .click,
-                centerTime: event.timestamp,
-                focus: (event.x, event.y),
-                strength: 1000.0
+                kind: .clickBurst(
+                    first: first.timestamp,
+                    last: last.timestamp,
+                    zoomLevel: score >= denseBurstScore ? denseBurstZoomLevel : defaultZoomLevel
+                ),
+                centerTime: (first.timestamp + last.timestamp) / 2,
+                focus: (burst.map(\.x).reduce(0, +) / count, burst.map(\.y).reduce(0, +) / count),
+                strength: 1000.0 * (1 + score)
+            )
+        }
+    }
+
+    private static func buildTypingCandidates(from events: [CursorEvent]) -> [Candidate] {
+        let keys = events.filter { $0.type == .keyDown }
+        var runs: [[CursorEvent]] = []
+        for key in keys {
+            if let last = runs.last?.last, key.timestamp - last.timestamp <= typingGap {
+                runs[runs.count - 1].append(key)
+            } else {
+                runs.append([key])
+            }
+        }
+        return runs.filter { $0.count >= minTypingKeys }.map { run in
+            let count = Double(run.count)
+            return Candidate(
+                kind: .typing(first: run[0].timestamp, last: run[run.count - 1].timestamp),
+                centerTime: (run[0].timestamp + run[run.count - 1].timestamp) / 2,
+                focus: (run.map(\.x).reduce(0, +) / count, run.map(\.y).reduce(0, +) / count),
+                strength: 1000.0 + 100.0 * count
             )
         }
     }
@@ -193,17 +260,25 @@ public enum AutoZoomDetector {
 
     // MARK: - Step B: spacing filter
 
-    private static func filterBySpacing(candidates: [Candidate]) -> [Candidate] {
+    private static func filterBySpacing(candidates: [Candidate], videoDuration: TimeInterval) -> [Candidate] {
         // Sort by strength descending; ties broken by earlier centerTime.
         let sorted = candidates.sorted { lhs, rhs in
             if lhs.strength != rhs.strength { return lhs.strength > rhs.strength }
             return lhs.centerTime < rhs.centerTime
         }
 
+        // Bursts and typing runs can be long, so also keep their segments apart.
+        func span(_ c: Candidate) -> (start: TimeInterval, end: TimeInterval) {
+            guard let segment = makeSegment(from: c, videoDuration: videoDuration) else { return (c.centerTime, c.centerTime) }
+            return (segment.startTime, segment.endTime)
+        }
         var accepted: [Candidate] = []
         for candidate in sorted {
+            let candidateSpan = span(candidate)
             let conflicts = accepted.contains { other in
-                abs(candidate.centerTime - other.centerTime) < minSpacing
+                let otherSpan = span(other)
+                return abs(candidate.centerTime - other.centerTime) < minSpacing
+                    || (candidateSpan.start < otherSpan.end + mergeGap && otherSpan.start < candidateSpan.end + mergeGap)
             }
             if !conflicts {
                 accepted.append(candidate)
@@ -219,10 +294,18 @@ public enum AutoZoomDetector {
         videoDuration: TimeInterval
     ) -> ZoomSegment? {
         let (rawStart, rawEnd): (TimeInterval, TimeInterval)
+        var zoomLevel = defaultZoomLevel
         switch candidate.kind {
         case .click:
             rawStart = candidate.centerTime - clickPreRoll
             rawEnd = candidate.centerTime + clickPostRoll
+        case .clickBurst(let first, let last, let level):
+            rawStart = first - clickPreRoll
+            rawEnd = min(last + clickPostRoll, rawStart + maxSegmentDuration)
+            zoomLevel = level
+        case .typing(let first, let last):
+            rawStart = first - typingPreRoll
+            rawEnd = min(last + typingPostRoll, rawStart + maxSegmentDuration)
         case .dwell(let dwellDuration):
             let desired = max(defaultDuration, dwellDuration + 2 * dwellBuffer)
             let half = desired / 2.0
@@ -247,7 +330,7 @@ public enum AutoZoomDetector {
         return ZoomSegment(
             startTime: start,
             endTime: end,
-            zoomLevel: defaultZoomLevel,
+            zoomLevel: zoomLevel,
             focusMode: .manual(x: candidate.focus.x, y: candidate.focus.y),
             source: .auto
         )
@@ -278,7 +361,7 @@ public enum AutoZoomDetector {
                     id: prev.id,
                     startTime: prev.startTime,
                     endTime: max(prev.endTime, next.endTime),
-                    zoomLevel: defaultZoomLevel,
+                    zoomLevel: max(prev.zoomLevel, next.zoomLevel),
                     focusMode: .manual(x: mx, y: my),
                     source: .auto
                 )
