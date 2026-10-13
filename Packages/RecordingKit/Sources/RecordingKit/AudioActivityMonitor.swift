@@ -88,13 +88,16 @@ enum AudioLevel {
             flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: &block
         ) == noErr else { return nil }
 
-        var peak: Float = 0
-        for channel in UnsafeMutableAudioBufferListPointer(list) {
-            guard let data = channel.mData else { continue }
-            var channelPeak: Float = 0
-            vDSP_maxmgv(data.assumingMemoryBound(to: Float.self), 1, &channelPeak,
-                        vDSP_Length(channel.mDataByteSize) / vDSP_Length(MemoryLayout<Float>.size))
-            peak = max(peak, channelPeak)
+        let peak: Float = withExtendedLifetime(block) {
+            var peak: Float = 0
+            for channel in UnsafeMutableAudioBufferListPointer(list) {
+                guard let data = channel.mData else { continue }
+                var channelPeak: Float = 0
+                vDSP_maxmgv(data.assumingMemoryBound(to: Float.self), 1, &channelPeak,
+                            vDSP_Length(channel.mDataByteSize) / vDSP_Length(MemoryLayout<Float>.size))
+                peak = max(peak, channelPeak)
+            }
+            return peak
         }
         return 20 * log10(max(peak, 1e-8))
     }
