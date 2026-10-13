@@ -57,4 +57,23 @@ struct CursorFollowPathTests {
             previous = p
         }
     }
+
+    @Test("Waypoints closer together than the pan duration are still continuous")
+    func closelySpacedWaypoints() {
+        let path = CursorFollowPath(waypoints: [
+            .init(time: 0, x: 0.2, y: 0.2),
+            .init(time: 1.0, x: 0.5, y: 0.5),
+            .init(time: 1.3, x: 0.8, y: 0.3),
+            .init(time: 1.6, x: 0.3, y: 0.7),
+        ])
+        var previous = path.position(at: 0)
+        for step in 1...3000 {
+            let time = Double(step) * 0.001
+            let p = path.position(at: time)
+            #expect(hypot(p.x - previous.x, p.y - previous.y) < 0.01, "jumped at \(time)")
+            previous = p
+        }
+        #expect(path.position(at: 1.3) == (0.8, 0.3))
+        #expect(path.position(at: 2.0) == (0.3, 0.7))
+    }
 }

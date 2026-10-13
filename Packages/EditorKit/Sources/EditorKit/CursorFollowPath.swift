@@ -43,10 +43,11 @@ public struct CursorFollowPath: Sendable {
         guard let first = waypoints.first else { return (0.5, 0.5) }
         var current = first
         for next in waypoints.dropFirst() {
-            let panStart = next.time - Self.panDuration
+            // A pan never starts before the previous one arrives, so close waypoints get shorter pans.
+            let panStart = max(next.time - Self.panDuration, current.time)
             if time < panStart { break }
             if time < next.time {
-                let p = Self.easeInOutCubic((time - panStart) / Self.panDuration)
+                let p = Self.easeInOutCubic((time - panStart) / (next.time - panStart))
                 return (current.x + (next.x - current.x) * p, current.y + (next.y - current.y) * p)
             }
             current = next
