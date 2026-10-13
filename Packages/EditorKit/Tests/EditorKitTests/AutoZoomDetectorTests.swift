@@ -353,4 +353,14 @@ struct AutoZoomDetectorTests {
         #expect(out.count == 1)
         #expect(out[0].zoomLevel == 2.0)
     }
+
+    @Test("Clicks recorded twice by the telemetry count once")
+    func duplicateClicksCountOnce() {
+        let out = AutoZoomDetector.detect(
+            events: [click(at: 3.0), click(at: 3.0), click(at: 4.0), click(at: 4.001)],
+            duration: 15
+        )
+        #expect(out.count == 1)
+        #expect(out[0].zoomLevel == 1.5)
+    }
 }

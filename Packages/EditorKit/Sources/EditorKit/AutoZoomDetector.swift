@@ -57,6 +57,8 @@ public enum AutoZoomDetector {
     static let denseBurstScore: Double = 3.0
     static let denseBurstZoomLevel: Double = 2.0
     static let maxSegmentDuration: TimeInterval = 60
+    /// Telemetry can record the same click twice (event tap and event monitor).
+    static let duplicateClickWindow: TimeInterval = 0.05
     /// Key presses closer together than this form one typing run…
     static let typingGap: TimeInterval = 0.5
     /// …of at least this many presses.
@@ -115,6 +117,9 @@ public enum AutoZoomDetector {
         let clicks = events.filter { $0.type == .leftClick || $0.type == .rightClick }
         var bursts: [[CursorEvent]] = []
         for click in clicks {
+            if let last = bursts.last?.last, click.timestamp - last.timestamp < duplicateClickWindow {
+                continue
+            }
             if let last = bursts.last?.last,
                click.timestamp - last.timestamp <= clickBurstGap,
                hypot(click.x - last.x, click.y - last.y) <= clickBurstRadius {
