@@ -281,6 +281,13 @@ struct EditorSettingsPanel: View {
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: coordinator.project.cursorSmoothing.enabled)
+
+            settingCard {
+                settingToggleRow(
+                    "Hide when idle",
+                    isOn: $coordinator.project.hidesIdleCursor
+                )
+            }
         }
     }
 

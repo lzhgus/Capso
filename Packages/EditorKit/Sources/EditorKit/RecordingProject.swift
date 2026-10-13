@@ -105,6 +105,8 @@ public struct RecordingProject: Codable, Sendable {
     public var backgroundStyle: BackgroundStyle
     /// Cursor motion smoothing parameters.
     public var cursorSmoothing: CursorSmoothingConfig
+    /// Fade the rendered cursor out while the mouse is still (or the user is typing).
+    public var hidesIdleCursor: Bool
     public var createdAt: Date
 
     public init(
@@ -119,6 +121,7 @@ public struct RecordingProject: Codable, Sendable {
         zoomSegments: [ZoomSegment] = [],
         backgroundStyle: BackgroundStyle = .default,
         cursorSmoothing: CursorSmoothingConfig = .smooth,
+        hidesIdleCursor: Bool = true,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -132,6 +135,7 @@ public struct RecordingProject: Codable, Sendable {
         self.effectSegments = zoomSegments.map(RecordingEffectSegment.init(zoom:))
         self.backgroundStyle = backgroundStyle
         self.cursorSmoothing = cursorSmoothing
+        self.hidesIdleCursor = hidesIdleCursor
         self.createdAt = createdAt
     }
 
@@ -149,7 +153,7 @@ public struct RecordingProject: Codable, Sendable {
         case id, sourceVideoURL, cursorTelemetryURL, showsCursor, videoDuration
         case videoSizeWidth, videoSizeHeight
         case recordingAreaWidth, recordingAreaHeight
-        case trimRegions, zoomSegments, effectSegments, backgroundStyle, cursorSmoothing, createdAt
+        case trimRegions, zoomSegments, effectSegments, backgroundStyle, cursorSmoothing, hidesIdleCursor, createdAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -174,6 +178,7 @@ public struct RecordingProject: Codable, Sendable {
         }
         backgroundStyle = try c.decode(BackgroundStyle.self, forKey: .backgroundStyle)
         cursorSmoothing = try c.decode(CursorSmoothingConfig.self, forKey: .cursorSmoothing)
+        hidesIdleCursor = try c.decodeIfPresent(Bool.self, forKey: .hidesIdleCursor) ?? true
         createdAt = try c.decode(Date.self, forKey: .createdAt)
     }
 
@@ -193,6 +198,7 @@ public struct RecordingProject: Codable, Sendable {
         try c.encode(effectSegments, forKey: .effectSegments)
         try c.encode(backgroundStyle, forKey: .backgroundStyle)
         try c.encode(cursorSmoothing, forKey: .cursorSmoothing)
+        try c.encode(hidesIdleCursor, forKey: .hidesIdleCursor)
         try c.encode(createdAt, forKey: .createdAt)
     }
 

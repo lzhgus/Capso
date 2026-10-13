@@ -405,16 +405,17 @@ final class EditorCoordinator {
     }
 
     private var _cursorOverlayProvider: CursorOverlayProvider?
-    private var _cursorOverlayProviderBuilt = false
+    /// The `hidesIdleCursor` value the cached provider was built with.
+    private var _cursorOverlayProviderHidesIdle: Bool?
 
     var cursorOverlayProvider: CursorOverlayProvider? {
         guard shouldRenderCursorOverlay else { return nil }
-        if !_cursorOverlayProviderBuilt {
-            _cursorOverlayProviderBuilt = true
+        let hidesIdle = project.hidesIdleCursor
+        if _cursorOverlayProviderHidesIdle != hidesIdle {
+            _cursorOverlayProviderHidesIdle = hidesIdle
             if let url = project.cursorTelemetryURL,
                let data = try? CursorTelemetry.load(from: url) {
-                let clicks = data.events.filter { $0.type == .leftClick || $0.type == .rightClick }
-                _cursorOverlayProvider = CursorOverlayProvider(clickEvents: clicks)
+                _cursorOverlayProvider = CursorOverlayProvider(events: data.events, hidesIdleCursor: hidesIdle)
             }
         }
         return _cursorOverlayProvider

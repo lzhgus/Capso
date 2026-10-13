@@ -161,16 +161,9 @@ final class MetalPreviewRenderer: NSObject {
                     zoomTransform = .identity
                 }
 
-                // Compute click-scaled cursor image
-                var scaledCursor: CIImage? = nil
-                if let cursorImg = cursorCIImage {
-                    let clickScale = cursorOverlayProvider?.clickScale(at: time) ?? 1.0
-                    if clickScale < 1.0 {
-                        let cs = CGFloat(clickScale)
-                        scaledCursor = cursorImg.transformed(by: CGAffineTransform(scaleX: cs, y: cs))
-                    } else {
-                        scaledCursor = cursorImg
-                    }
+                // Cursor image with click squeeze and idle fade applied
+                let scaledCursor: CIImage? = cursorCIImage.flatMap { cursorImg in
+                    cursorOverlayProvider.map { $0.styledCursor(cursorImg, at: time) } ?? cursorImg
                 }
 
                 frameImage = comp.compose(
