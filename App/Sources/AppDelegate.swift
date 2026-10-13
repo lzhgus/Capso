@@ -385,7 +385,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let destination = try? ShareDestinationFactory.make(config: config, accessKey: access, secretKey: secret) else {
             return nil
         }
-        return ShareCoordinator(destination: destination)
+        return ShareCoordinator(destination: destination) { [settings] in
+            settings.cloudShareCopyLinkWhenUploadStarts
+        }
     }
 
     /// Read a string from Keychain. Returns nil on missing entry or known recoverable errors.

@@ -122,6 +122,15 @@ struct CloudShareSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(
+                        label: "Copy Link When Upload Starts",
+                        sublabel: "Paste the link right away; it works once the upload finishes",
+                        showDivider: true
+                    ) {
+                        Toggle("", isOn: $viewModel.cloudShareCopyLinkWhenUploadStarts)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                 }
             }
 

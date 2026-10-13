@@ -18,6 +18,9 @@ public enum UploadState: Sendable {
 public final class ShareCoordinator {
     public private(set) var state: UploadState = .idle
     public let destination: ShareDestination
+    /// Read when each upload starts; when `true` the link is copied right away
+    /// instead of after the upload finishes.
+    private let copiesLinkWhenUploadStarts: @MainActor () -> Bool
     private var uploadQueue: [UploadRequest] = []
     private var isProcessingQueue = false
 
@@ -27,11 +30,13 @@ public final class ShareCoordinator {
         let continuation: CheckedContinuation<URL, Error>
     }
 
-    public init(destination: ShareDestination) {
+    public init(destination: ShareDestination, copiesLinkWhenUploadStarts: @escaping @MainActor () -> Bool = { false }) {
         self.destination = destination
+        self.copiesLinkWhenUploadStarts = copiesLinkWhenUploadStarts
     }
 
-    /// Uploads `file`, copies the resulting URL to clipboard on success.
+    /// Uploads `file` and copies its URL to the clipboard — on success, or as soon
+    /// as the upload starts when `copiesLinkWhenUploadStarts` says so.
     /// Returns the URL on success; throws on failure. Updates `state` for observers.
     /// Clipboard is **never** written on failure.
     @discardableResult
@@ -59,6 +64,10 @@ public final class ShareCoordinator {
             let id = IDGenerator.shortID()
             let ext = request.file.pathExtension
             let key = ext.isEmpty ? id : "\(id).\(ext)"
+            let copiedEarly = copiesLinkWhenUploadStarts()
+            if copiedEarly {
+                copyToClipboard(destination.publicURL(for: key))
+            }
 
             do {
                 let url = try await destination.upload(
@@ -67,7 +76,7 @@ public final class ShareCoordinator {
                     contentType: request.contentType
                 )
                 state = .succeeded(url)
-                copyToClipboard(url)
+                if !copiedEarly { copyToClipboard(url) }
                 request.continuation.resume(returning: url)
             } catch let error as ShareError {
                 state = .failed(error)

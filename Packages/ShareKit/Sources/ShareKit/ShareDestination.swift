@@ -11,6 +11,10 @@ public protocol ShareDestination: Sendable {
     /// Upload `file` under `key` and return the public URL.
     func upload(file: URL, key: String, contentType: String) async throws -> URL
 
+    /// The public URL `upload(file:key:contentType:)` will return for `key`,
+    /// known before the upload starts.
+    nonisolated func publicURL(for key: String) -> URL
+
     /// Delete an object by key. No-op if it doesn't exist.
     func delete(key: String) async throws
 

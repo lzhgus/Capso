@@ -2,9 +2,10 @@
 
 import Testing
 import Foundation
+import AppKit
 @testable import ShareKit
 
-@Suite("ShareCoordinator")
+@Suite("ShareCoordinator", .serialized)
 @MainActor
 struct ShareCoordinatorTests {
     actor StubDestination: ShareDestination {
@@ -20,6 +21,7 @@ struct ShareCoordinatorTests {
         func delete(key: String) async throws {
             if let err = shouldFail { throw err }
         }
+        nonisolated func publicURL(for key: String) -> URL { URL(string: "https://stub/\(key)")! }
         func validateConfig() async throws {
             if let err = shouldFail { throw err }
         }
@@ -57,6 +59,7 @@ struct ShareCoordinatorTests {
 
         func delete(key: String) async throws {}
         func validateConfig() async throws {}
+        nonisolated func publicURL(for key: String) -> URL { URL(string: "https://stub/\(key)")! }
 
         func waitUntilFirstStarts() async {
             if firstStarted { return }
@@ -239,5 +242,53 @@ struct ShareCoordinatorTests {
         gate.finish()
         let retryStarted = gate.begin()
         #expect(retryStarted)
+    }
+
+    @Test("Copy-when-upload-starts puts the link on the clipboard while the upload is still running")
+    func copiesLinkWhenUploadStarts() async throws {
+        let destination = BlockingDestination()
+        let coord = ShareCoordinator(destination: destination) { true }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("before", forType: .string)
+
+        let upload = Task { @MainActor in
+            try await coord.upload(file: URL(fileURLWithPath: "/tmp/shot.png"), contentType: "image/png")
+        }
+        await destination.waitUntilFirstStarts()
+        let early = try #require(NSPasteboard.general.string(forType: .string))
+        #expect(early.hasPrefix("https://stub/") && early.hasSuffix(".png"))
+
+        await destination.releaseFirst()
+        _ = try await upload.value
+        #expect(NSPasteboard.general.string(forType: .string) == early)
+    }
+
+    @Test("By default the link is only copied once the upload finishes")
+    func copiesLinkAfterUploadByDefault() async throws {
+        let destination = BlockingDestination()
+        let coord = ShareCoordinator(destination: destination)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("before", forType: .string)
+
+        let upload = Task { @MainActor in
+            try await coord.upload(file: URL(fileURLWithPath: "/tmp/shot.png"), contentType: "image/png")
+        }
+        await destination.waitUntilFirstStarts()
+        #expect(NSPasteboard.general.string(forType: .string) == "before")
+
+        await destination.releaseFirst()
+        let url = try await upload.value
+        #expect(NSPasteboard.general.string(forType: .string) == url.absoluteString)
+    }
+
+    @Test("Every provider knows its public URL before uploading", arguments: [
+        ShareConfig(provider: .r2, urlPrefix: "https://cdn.example.com", bucket: "capso", fields: ["accountID": "abc123", "pathPrefix": "shots"]),
+        ShareConfig(provider: .s3, urlPrefix: "https://cdn.example.com", bucket: "capso", fields: ["region": "us-east-1", "pathPrefix": "shots"]),
+        ShareConfig(provider: .tencentCOS, urlPrefix: "https://cdn.example.com", bucket: "capso-123456", fields: ["region": "ap-guangzhou", "pathPrefix": "shots"]),
+        ShareConfig(provider: .aliyunOSS, urlPrefix: "https://cdn.example.com", bucket: "capso", fields: ["region": "oss-cn-hangzhou", "pathPrefix": "shots"]),
+    ])
+    func publicURLBeforeUpload(config: ShareConfig) throws {
+        let destination = try ShareDestinationFactory.make(config: config, accessKey: "AK", secretKey: "SK")
+        #expect(destination.publicURL(for: "Ab3x9.png").absoluteString == "https://cdn.example.com/shots/Ab3x9.png")
     }
 }

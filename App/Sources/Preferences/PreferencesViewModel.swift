@@ -889,6 +889,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var cloudShareCopyLinkWhenUploadStarts: Bool {
+        get {
+            access(keyPath: \.cloudShareCopyLinkWhenUploadStarts)
+            return settings.cloudShareCopyLinkWhenUploadStarts
+        }
+        set {
+            withMutation(keyPath: \.cloudShareCopyLinkWhenUploadStarts) {
+                settings.cloudShareCopyLinkWhenUploadStarts = newValue
+            }
+        }
+    }
     var cloudShareAutoUploadEnabled: Bool {
         get {
             access(keyPath: \.cloudShareAutoUploadEnabled)

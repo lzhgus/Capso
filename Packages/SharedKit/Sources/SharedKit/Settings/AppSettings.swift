@@ -1230,6 +1230,12 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "cloudShareAutoUploadEnabled") }
     }
 
+    /// Copy the share link as soon as an upload starts instead of when it finishes.
+    public var cloudShareCopyLinkWhenUploadStarts: Bool {
+        get { defaults.bool(forKey: "cloudShareCopyLinkWhenUploadStarts") }
+        set { defaults.set(newValue, forKey: "cloudShareCopyLinkWhenUploadStarts") }
+    }
+
     public var isCloudShareConfigured: Bool {
         guard
             let provider = cloudShareProvider,

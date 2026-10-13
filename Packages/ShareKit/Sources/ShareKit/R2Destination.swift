@@ -11,6 +11,10 @@ public actor R2Destination: ShareDestination {
         self.secretKey = secretKey
     }
 
+    public nonisolated func publicURL(for key: String) -> URL {
+        config.publicURL(forObjectKey: config.objectKey(for: key))
+    }
+
     public func upload(file: URL, key: String, contentType: String) async throws -> URL {
         let objectKey = config.objectKey(for: key)
         let target = S3CompatibleHTTP.r2Target(
