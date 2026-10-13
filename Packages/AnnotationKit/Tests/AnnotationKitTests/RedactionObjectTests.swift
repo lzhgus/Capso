@@ -56,6 +56,31 @@ struct RedactionObjectTests {
         #expect(sampleRGBA(rendered, x: 1, y: 1) == sampleRGBA(source, x: 1, y: 1))
     }
 
+    @Test("Blur keeps nothing finer than a block, so it can't be reversed")
+    func blurDropsDetailInsideBlocks() throws {
+        let size = 192
+        func blurred(squareAt origin: CGPoint) throws -> CGImage {
+            let context = try #require(makeBitmapContext(width: size, height: size))
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            context.setFillColor(CGColor(gray: 1, alpha: 1))
+            context.fill(CGRect(origin: origin, size: CGSize(width: 12, height: 12)))
+            let source = try #require(context.makeImage())
+            let redaction = PixelateObject(rect: CGRect(x: 0, y: 0, width: size, height: size), blockSize: 12, mode: .blur)
+            return try #require(AnnotationRenderer.render(sourceImage: source, objects: [redaction]))
+        }
+        // Opposite corners of the same 24 px block.
+        let a = try blurred(squareAt: CGPoint(x: 96, y: 96))
+        let b = try blurred(squareAt: CGPoint(x: 108, y: 108))
+        var largest = 0
+        for y in stride(from: 48, to: 160, by: 4) {
+            for x in stride(from: 48, to: 160, by: 4) {
+                largest = max(largest, abs(Int(sampleRGBA(a, x: x, y: y).r) - Int(sampleRGBA(b, x: x, y: y).r)))
+            }
+        }
+        #expect(largest <= 2)
+    }
+
     @Test("Pixelate redaction renders repeated block pixels")
     func pixelateRedactionRendersBlockPixels() throws {
         let source = try makeHorizontalGradientImage(width: 16, height: 16)

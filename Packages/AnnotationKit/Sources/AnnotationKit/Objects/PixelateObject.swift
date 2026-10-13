@@ -92,7 +92,9 @@ public final class PixelateObject: AnnotationObject, @unchecked Sendable {
         case .pixelate:
             makePixelatedImage(from: image, blockSize: blockSize)
         case .blur:
-            makeBlurredImage(from: image, radius: max(4, blockSize * 0.9))
+            // Pixelating first leaves only block averages, so the blur can't be undone to reveal text.
+            makePixelatedImage(from: image, blockSize: blockSize)
+                .flatMap { makeBlurredImage(from: $0, radius: max(4, blockSize * 0.9)) }
         case .solid:
             nil
         }
