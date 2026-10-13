@@ -19,6 +19,7 @@ final class QuickAccessWindow: NSPanel {
     var onPin: (() -> Void)?
     var onPreview: (() -> Void)?
     var onClose: (() -> Void)?
+    var onDismissedUnused: (() -> Void)?
     /// Called with the public URL string when a cloud upload succeeds.
     var onUploadSucceeded: ((String) -> Void)?
 

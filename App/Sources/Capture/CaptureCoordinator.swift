@@ -22,6 +22,9 @@ final class CaptureCoordinator {
     /// - When the stack overflows, `[0]` (the oldest) slides off-screen to
     ///   the left and the rest shift down one slot
     private var quickAccessWindows: [QuickAccessWindow] = []
+    /// Brings back the last Quick Access screenshot that was closed, timed out or pushed out of the stack.
+    /// ponytail: only the last one, so at most one extra screenshot is kept in memory.
+    private var reopenLastClosedQuickAccess: (() -> Void)?
     /// Maximum previews kept on-screen. Oldest is evicted when exceeded.
     private let maxQuickAccessStackSize = 5
     private var quickAccessPreviewWindow: QuickAccessPreviewWindow?
@@ -1629,6 +1632,7 @@ final class CaptureCoordinator {
         // previews will slide down one slot as part of the restack below.
         while quickAccessWindows.count >= maxQuickAccessStackSize {
             let oldest = quickAccessWindows.removeFirst()
+            oldest.onDismissedUnused?()
             oldest.slideOffLeftAndClose()
         }
 
@@ -1701,8 +1705,14 @@ final class CaptureCoordinator {
             self.dismissQuickAccessWindow(window)
             self.translationCoordinator?.translate(image: result.image, anchorScreen: anchor)
         }
+        window.onDismissedUnused = { [weak self] in
+            self?.reopenLastClosedQuickAccess = { [weak self] in
+                self?.showQuickAccess(for: result, entryID: entryID, autoUpload: false, preferredFileURL: preferredFileURL, pasteboard: pasteboard)
+            }
+        }
         window.onClose = { [weak self, weak window] in
             guard let self, let window else { return }
+            window.onDismissedUnused?()
             self.dismissQuickAccessWindow(window)
         }
 
@@ -1710,6 +1720,25 @@ final class CaptureCoordinator {
         restackQuickAccessWindows(excluding: window)
         window.show()
         return window
+    }
+
+    var hasQuickAccess: Bool { !quickAccessWindows.isEmpty }
+    var canReopenQuickAccess: Bool { reopenLastClosedQuickAccess != nil }
+
+    func saveAllQuickAccess() {
+        quickAccessWindows.forEach { $0.onSave?() }
+    }
+
+    func closeAllQuickAccess() {
+        let windows = quickAccessWindows
+        quickAccessWindows = []
+        windows.forEach { $0.close() }
+    }
+
+    func reopenQuickAccess() {
+        let reopen = reopenLastClosedQuickAccess
+        reopenLastClosedQuickAccess = nil
+        reopen?()
     }
 
     private func openQuickAccessPreview(_ result: CaptureResult, anchorScreen: NSScreen?) {

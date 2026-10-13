@@ -98,6 +98,9 @@ final class MenuBarController: NSObject {
         let togglePins = menuItem(String(localized: "Hide All Pins"), action: #selector(togglePins))
         togglePins.setShortcut(for: .togglePins)
         menu.addItem(togglePins)
+        menu.addItem(menuItem(String(localized: "Save All in Quick Access"), action: #selector(saveAllQuickAccess)))
+        menu.addItem(menuItem(String(localized: "Close Quick Access"), action: #selector(closeAllQuickAccess)))
+        menu.addItem(menuItem(String(localized: "Reopen Last Closed Screenshot"), action: #selector(reopenQuickAccess)))
 
         let editClipboardImage = menuItem(String(localized: "Edit Clipboard Image"), action: #selector(editClipboardImage))
         editClipboardImage.setShortcut(for: .editClipboardImage)
@@ -330,6 +333,18 @@ final class MenuBarController: NSObject {
         captureCoordinator.togglePinsVisibility()
     }
 
+    @objc private func saveAllQuickAccess() {
+        captureCoordinator.saveAllQuickAccess()
+    }
+
+    @objc private func closeAllQuickAccess() {
+        captureCoordinator.closeAllQuickAccess()
+    }
+
+    @objc private func reopenQuickAccess() {
+        captureCoordinator.reopenQuickAccess()
+    }
+
     @objc private func toggleDesktopIcons() {
         desktopIconsCover.setHiddenManually(!desktopIconsCover.isHiddenManually)
     }
@@ -349,6 +364,9 @@ extension MenuBarController: NSMenuDelegate {
                     : String(localized: "Hide All Pins")
                 item.isHidden = !captureCoordinator.hasPins
                 item.setShortcut(for: .togglePins)
+            case #selector(saveAllQuickAccess), #selector(closeAllQuickAccess):
+                item.isHidden = !captureCoordinator.hasQuickAccess
+            case #selector(reopenQuickAccess): item.isHidden = !captureCoordinator.canReopenQuickAccess
             case #selector(captureAllInOne): item.setShortcut(for: .captureAllInOne)
             case #selector(captureArea): item.setShortcut(for: .captureArea)
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)
