@@ -12,104 +12,82 @@ public enum StitchResult: Sendable {
 /// Incrementally stitches captured frames into a single tall image.
 /// The offset is detected externally (by ScrollCaptureController via Vision)
 /// and passed in. This class only handles the pixel compositing.
+///
+/// Rows inside a sticky footer are never appended while scrolling; the most
+/// recent frame's footer is added once at the bottom of `mergedImage`.
 public final class ScrollStitcher: @unchecked Sendable {
-    private(set) var mergedImage: CGImage?
-    private var previousFrame: CGImage?
-    private(set) var headerHeight: Int = 0
-    private(set) var scrollbarWidth: Int = 0
+    private var body: CGImage?
+    private var lastFrame: CGImage?
+    private var footerHeight = 0
     private(set) var totalHeight: Int = 0
-    private var isFirstStitch = true
 
     public init() {}
 
-    public func setInitialFrame(_ frame: CGImage) {
-        mergedImage = frame
-        previousFrame = frame
-        totalHeight = frame.height
-        isFirstStitch = true
+    /// The stitched page including the sticky footer, if any.
+    var mergedImage: CGImage? {
+        guard let body else { return nil }
+        guard footerHeight > 0, let lastFrame,
+              let footer = lastFrame.cropping(to: CGRect(
+                  x: 0, y: lastFrame.height - footerHeight,
+                  width: lastFrame.width, height: footerHeight
+              )) else { return body }
+        return Self.stack(top: body, bottom: footer)
     }
 
-    /// Stitch a new frame with a pre-computed offset (from Vision).
-    /// `detectedOffset` is the absolute number of new pixel rows (always positive).
+    public func setInitialFrame(_ frame: CGImage) {
+        body = frame
+        lastFrame = frame
+        footerHeight = 0
+        totalHeight = frame.height
+    }
+
+    /// Excludes the bottom `height` rows of every frame from the stitched body.
+    func setFooterHeight(_ height: Int) {
+        guard let body, height > 0, height < body.height else { return }
+        footerHeight = height
+        self.body = body.cropping(to: CGRect(x: 0, y: 0, width: body.width, height: body.height - height))
+    }
+
+    /// Stitch a new frame that is scrolled `detectedOffset` pixel rows further down.
     public func stitch(newFrame: CGImage, detectedOffset: Int) -> StitchResult {
-        guard let previousFrame, let mergedImage else {
+        guard let body else {
             setInitialFrame(newFrame)
             return .stitched(yOffset: 0)
         }
+        guard detectedOffset > 0 else { return detectedOffset < 0 ? .reversedScroll : .noChange }
 
-        // Detect scrollbar and header on the first stitch only
-        if isFirstStitch {
-            scrollbarWidth = ScrollbarDetector.detectScrollbarWidth(
-                frame1: previousFrame, frame2: newFrame
-            )
-            headerHeight = HeaderDetector.detectHeaderHeight(
-                frame1: previousFrame, frame2: newFrame
-            )
-            isFirstStitch = false
+        let contentBottom = newFrame.height - footerHeight
+        guard detectedOffset < contentBottom,
+              let newRows = newFrame.cropping(to: CGRect(
+                  x: 0, y: contentBottom - detectedOffset,
+                  width: newFrame.width, height: detectedOffset
+              )),
+              let stacked = Self.stack(top: body, bottom: newRows) else {
+            return .alignmentFailed
         }
 
-        let newRows = detectedOffset
-        guard newRows > 0 else { return .noChange }
+        self.body = stacked
+        lastFrame = newFrame
+        totalHeight = stacked.height + footerHeight
+        return .stitched(yOffset: detectedOffset)
+    }
 
-        let frameHeight = newFrame.height
-
-        // If offset is larger than the frame, clamp to frame height
-        // (this means the user scrolled past one full frame — no overlap)
-        let clampedRows = min(newRows, frameHeight)
-
-        let mergedWidth = mergedImage.width
-        let newMergedHeight = totalHeight + clampedRows
-
+    private static func stack(top: CGImage, bottom: CGImage) -> CGImage? {
+        let width = top.width
+        let height = top.height + bottom.height
         guard let ctx = CGContext(
             data: nil,
-            width: mergedWidth,
-            height: newMergedHeight,
+            width: width,
+            height: height,
             bitsPerComponent: 8,
             bytesPerRow: 0,
-            space: mergedImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            space: top.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        ) else {
-            return .alignmentFailed
-        }
+        ) else { return nil }
 
         // CGContext origin is bottom-left.
-        //
-        // Canvas layout:
-        //   top:    existing merged image
-        //   bottom: newly revealed rows from the current frame
-
-        // 1. Draw existing merged image at the top
-        ctx.draw(mergedImage, in: CGRect(
-            x: 0,
-            y: clampedRows,
-            width: mergedWidth,
-            height: totalHeight
-        ))
-
-        // 2. Append only the newly revealed bottom rows. Re-drawing the full
-        //    frame would also re-draw fixed page elements whenever header
-        //    detection misses a dynamic pixel.
-        guard let newContent = newFrame.cropping(to: CGRect(
-            x: 0,
-            y: frameHeight - clampedRows,
-            width: newFrame.width,
-            height: clampedRows
-        )) else {
-            return .alignmentFailed
-        }
-        ctx.draw(newContent, in: CGRect(
-            x: 0,
-            y: 0,
-            width: mergedWidth,
-            height: clampedRows
-        ))
-
-        if let result = ctx.makeImage() {
-            self.mergedImage = result
-            self.totalHeight = newMergedHeight
-        }
-
-        self.previousFrame = newFrame
-        return .stitched(yOffset: clampedRows)
+        ctx.draw(top, in: CGRect(x: 0, y: bottom.height, width: width, height: top.height))
+        ctx.draw(bottom, in: CGRect(x: 0, y: 0, width: width, height: bottom.height))
+        return ctx.makeImage()
     }
 }

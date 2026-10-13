@@ -40,8 +40,9 @@ public final class ScrollCaptureController: @unchecked Sendable {
     private var isCancelled = false
     private var frameCount = 0
 
-    /// A/B frame model
+    /// A/B frame model. `shotA` is the last frame that was stitched.
     private var shotA: CGImage?
+    private var fixedRegions: FixedRegions?
 
     /// Cached ScreenCaptureKit objects (created once, reused)
     private var cachedFilter: SCContentFilter?
@@ -104,17 +105,17 @@ public final class ScrollCaptureController: @unchecked Sendable {
                 continue
             }
 
-            guard let rawOffset = detectOffset(imageA: shotA!, imageB: shotB) else {
-                shotA = shotB
-                continue
+            if fixedRegions == nil {
+                let regions = FixedRegions.detect(frame1: shotA!, frame2: shotB)
+                fixedRegions = regions
+                stitcher.setFooterHeight(regions.footer)
             }
 
-            let absOffset = abs(rawOffset)
-            if absOffset < 3 { continue }
+            guard let offset = fixedRegions.flatMap({ Self.verticalOffset(from: shotA!, to: shotB, ignoring: $0) }),
+                  offset >= 3 else { continue }
 
-            let result = stitcher.stitch(newFrame: shotB, detectedOffset: absOffset)
-
-            if case .stitched = result {
+            if case .stitched = stitcher.stitch(newFrame: shotB, detectedOffset: offset) {
+                shotA = shotB
                 frameCount += 1
                 onProgress(ScrollCaptureProgress(
                     currentHeight: stitcher.totalHeight,
@@ -122,8 +123,6 @@ public final class ScrollCaptureController: @unchecked Sendable {
                     frameCount: frameCount
                 ))
             }
-
-            shotA = shotB
         }
 
         return stitcher.mergedImage
@@ -185,24 +184,43 @@ public final class ScrollCaptureController: @unchecked Sendable {
 
     // MARK: - Vision Offset Detection
 
-    /// Detect Y offset between two frames using VNTranslationalImageRegistrationRequest.
-    /// Each call creates a fresh VNImageRequestHandler (stateless, reliable).
-    private func detectOffset(imageA: CGImage, imageB: CGImage) -> Int? {
-        let request = VNTranslationalImageRegistrationRequest(targetedCGImage: imageA)
-        let handler = VNImageRequestHandler(cgImage: imageB, options: [:])
+    /// Rows that stay put while the page scrolls.
+    struct FixedRegions: Equatable {
+        var header = 0
+        var footer = 0
 
+        static func detect(frame1: CGImage, frame2: CGImage) -> FixedRegions {
+            FixedRegions(
+                header: HeaderDetector.detectHeaderHeight(frame1: frame1, frame2: frame2),
+                footer: HeaderDetector.detectFooterHeight(frame1: frame1, frame2: frame2)
+            )
+        }
+
+        func scrollingArea(in frame: CGImage) -> CGRect? {
+            let rect = CGRect(
+                x: 0, y: header,
+                width: frame.width, height: frame.height - header - footer
+            )
+            return rect.height > 0 ? rect : nil
+        }
+    }
+
+    /// How many pixel rows `later` is scrolled down relative to `earlier`
+    /// (negative when scrolled up), measured only inside the scrolling area.
+    static func verticalOffset(from earlier: CGImage, to later: CGImage, ignoring fixed: FixedRegions) -> Int? {
+        guard let area = fixed.scrollingArea(in: earlier),
+              let a = earlier.cropping(to: area),
+              let b = later.cropping(to: area) else { return nil }
+
+        let request = VNTranslationalImageRegistrationRequest(targetedCGImage: a)
         do {
-            try handler.perform([request])
+            try VNImageRequestHandler(cgImage: b, options: [:]).perform([request])
         } catch {
             return nil
         }
-
-        guard let observation = request.results?.first
-                as? VNImageTranslationAlignmentObservation else {
+        guard let observation = request.results?.first as? VNImageTranslationAlignmentObservation else {
             return nil
         }
-
-        let ty = observation.alignmentTransform.ty
-        return Int(round(ty))
+        return Int(observation.alignmentTransform.ty.rounded())
     }
 }

@@ -15,6 +15,15 @@ enum HeaderDetector {
     /// Detect the sticky header height by comparing two consecutive frames.
     /// Returns the number of pixel rows at the top that are identical (frozen).
     static func detectHeaderHeight(frame1: CGImage, frame2: CGImage) -> Int {
+        unchangedRowCount(frame1: frame1, frame2: frame2, fromBottom: false)
+    }
+
+    /// Number of pixel rows at the bottom that are identical (a sticky footer).
+    static func detectFooterHeight(frame1: CGImage, frame2: CGImage) -> Int {
+        unchangedRowCount(frame1: frame1, frame2: frame2, fromBottom: true)
+    }
+
+    private static func unchangedRowCount(frame1: CGImage, frame2: CGImage, fromBottom: Bool) -> Int {
         let width = min(frame1.width, frame2.width)
         let height = min(frame1.height, frame2.height)
         let maxScanRows = Int(Double(height) * maxScanPercent)
@@ -32,7 +41,8 @@ enum HeaderDetector {
         let colStep = max(1, width / sampleColumns)
         var headerHeight = 0
 
-        for row in 0..<maxScanRows {
+        for scanned in 0..<maxScanRows {
+            let row = fromBottom ? height - 1 - scanned : scanned
             var rowMatches = true
             var col = 0
             while col < width {
@@ -51,7 +61,7 @@ enum HeaderDetector {
             }
 
             if rowMatches {
-                headerHeight = row + 1
+                headerHeight = scanned + 1
             } else {
                 break
             }
