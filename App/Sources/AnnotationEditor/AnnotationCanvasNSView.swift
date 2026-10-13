@@ -405,6 +405,13 @@ final class AnnotationCanvasNSView: NSView {
         }
 
         if let doc = document {
+            if let img = sourceImage {
+                SpotlightObject.renderDim(
+                    for: doc.objects,
+                    canvas: CGRect(x: 0, y: 0, width: img.width, height: img.height),
+                    in: ctx
+                )
+            }
             for object in doc.objects {
                 // While a TextObject is being re-edited inline, hide it from
                 // the canvas render so we don't double-draw the text under
@@ -793,7 +800,7 @@ final class AnnotationCanvasNSView: NSView {
 
         switch currentTool {
         case .arrow, .line: ctx.move(to: start); ctx.addLine(to: end); ctx.strokePath()
-        case .rectangle: ctx.stroke(rect)
+        case .rectangle, .spotlight: ctx.stroke(rect)
         case .ellipse: ctx.strokeEllipse(in: rect)
         case .pixelate: ctx.setFillColor(CGColor(gray: 0.5, alpha: 0.3)); ctx.fill(rect)
         case .counter:
@@ -1051,6 +1058,7 @@ final class AnnotationCanvasNSView: NSView {
 
         // Apply to the object
         if let rect = obj as? RectangleObject { rect.rect = newRect }
+        else if let spotlight = obj as? SpotlightObject { spotlight.rect = newRect }
         else if let ellipse = obj as? EllipseObject { ellipse.rect = newRect }
         else if let pixelate = obj as? PixelateObject { pixelate.rect = newRect }
         else if let text = obj as? TextObject {
@@ -1177,6 +1185,12 @@ final class AnnotationCanvasNSView: NSView {
                                   width: abs(end.x - start.x), height: abs(end.y - start.y))
                 if rect.width > 3 / zoomScale && rect.height > 3 / zoomScale {
                     doc.addObject(RectangleObject(rect: rect, style: currentStyle))
+                }
+            case .spotlight:
+                let rect = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
+                                  width: abs(end.x - start.x), height: abs(end.y - start.y))
+                if rect.width > 3 / zoomScale && rect.height > 3 / zoomScale {
+                    doc.addObject(SpotlightObject(rect: rect, style: currentStyle))
                 }
             case .ellipse:
                 let rect = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),

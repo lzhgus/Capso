@@ -755,7 +755,7 @@ private struct AllInOneAnnotationToolbarView: View {
     }
 
     private var overflowTools: [AnnotationTool] {
-        [.ellipse, .pixelate, .counter, .highlighter]
+        [.ellipse, .pixelate, .counter, .highlighter, .spotlight]
     }
 
     private var compactStatus: some View {
@@ -1236,6 +1236,7 @@ private struct AllInOneAnnotationToolbarView: View {
         case .pixelate: return "eye.slash.fill"
         case .counter: return "number.circle.fill"
         case .highlighter: return "highlighter"
+        case .spotlight: return "flashlight.on.fill"
         }
     }
 
@@ -1251,6 +1252,7 @@ private struct AllInOneAnnotationToolbarView: View {
         case .pixelate: return String(localized: "Pixel")
         case .counter: return String(localized: "Count")
         case .highlighter: return String(localized: "Mark")
+        case .spotlight: return String(localized: "Spotlight")
         }
     }
 }

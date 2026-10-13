@@ -17,7 +17,7 @@ public enum AnnotationDragConstraintKind: Sendable, Equatable {
 public enum AnnotationDragConstraint {
     public static func kind(for tool: AnnotationTool) -> AnnotationDragConstraintKind {
         switch tool {
-        case .rectangle, .ellipse, .pixelate:
+        case .rectangle, .ellipse, .pixelate, .spotlight:
             return .square
         case .arrow, .line:
             return .angle

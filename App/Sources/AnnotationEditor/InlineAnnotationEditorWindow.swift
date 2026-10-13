@@ -952,6 +952,7 @@ private struct InlineAnnotationToolbar: View {
         case .pixelate: return "eye.slash.fill"
         case .counter: return "number.circle.fill"
         case .highlighter: return "highlighter"
+        case .spotlight: return "flashlight.on.fill"
         }
     }
 

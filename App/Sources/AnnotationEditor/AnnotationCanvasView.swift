@@ -45,7 +45,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
     /// its own inline-edit flow and crop is naturally one-per-image.
     private static let stickyTools: Set<AnnotationTool> = [
         .arrow, .line, .rectangle, .ellipse, .pixelate,
-        .counter, .freehand, .highlighter
+        .counter, .freehand, .highlighter, .spotlight
     ]
 
     func makeNSView(context: Context) -> AnnotationCanvasNSView {

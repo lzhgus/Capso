@@ -31,6 +31,7 @@ public enum AnnotationRenderer {
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)
 
+        SpotlightObject.renderDim(for: objects, canvas: CGRect(x: 0, y: 0, width: width, height: height), in: ctx)
         for object in objects {
             if let pixelate = object as? PixelateObject {
                 pixelate.renderWithSource(in: ctx, sourceImage: sourceImage)

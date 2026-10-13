@@ -97,6 +97,7 @@ struct AnnotationToolbar: View {
             toolButton(.pixelate, icon: "eye.slash.fill")
             toolButton(.counter, icon: "number.circle.fill")
             toolButton(.highlighter, icon: "highlighter")
+            toolButton(.spotlight, icon: "flashlight.on.fill")
         }
     }
 
@@ -462,6 +463,7 @@ extension AnnotationTool {
         case .pixelate: return String(localized: "Pixelate / Blur")
         case .counter: return String(localized: "Counter")
         case .highlighter: return String(localized: "Highlighter")
+        case .spotlight: return String(localized: "Spotlight")
         }
     }
 }

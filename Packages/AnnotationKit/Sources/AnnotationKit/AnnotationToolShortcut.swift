@@ -17,6 +17,7 @@ public enum AnnotationToolShortcut {
         "c": .counter,
         "n": .counter,
         "h": .highlighter,
+        "g": .spotlight,
     ]
 
     private static let displayKeys: [AnnotationTool: String] = [
@@ -30,6 +31,7 @@ public enum AnnotationToolShortcut {
         .pixelate: "P",
         .counter: "C",
         .highlighter: "H",
+        .spotlight: "G",
     ]
 
     public static func tool(for key: String) -> AnnotationTool? {
