@@ -17,6 +17,8 @@ struct AnnotationCanvasView: NSViewRepresentable {
     let textOutlineColor: AnnotationColor?
     let textGlyphStrokeColor: AnnotationColor?
     let zoomScale: CGFloat
+    /// Top-left of the visible canvas in image coordinates; negative once annotations grow it past the image.
+    var canvasOrigin: CGPoint = .zero
     let refreshTrigger: Int
     var textRegions: [CGRect] = []
     var commitEditingTrigger: Int = 0
@@ -60,6 +62,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         view.currentTextOutlineColor = textOutlineColor
         view.currentTextGlyphStrokeColor = textGlyphStrokeColor
         view.zoomScale = zoomScale
+        view.canvasOrigin = canvasOrigin
         view.textRegions = textRegions
         view.onDocumentChanged = { onDocumentChanged?() }
         view.onObjectCreated = {
@@ -95,6 +98,7 @@ struct AnnotationCanvasView: NSViewRepresentable {
         nsView.currentTextOutlineColor = textOutlineColor
         nsView.currentTextGlyphStrokeColor = textGlyphStrokeColor
         nsView.zoomScale = zoomScale
+        nsView.canvasOrigin = canvasOrigin
         nsView.textRegions = textRegions
         nsView.onDocumentChanged = { onDocumentChanged?() }
         nsView.onObjectCreated = {

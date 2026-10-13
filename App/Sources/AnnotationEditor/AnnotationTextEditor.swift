@@ -208,7 +208,7 @@ final class AnnotationTextEditor: NSScrollView {
 
     private func maxAutoWidth() -> CGFloat {
         guard let superview else { return 420 }
-        let remaining = (superview.bounds.width - imageOrigin.x * zoomScale - 12) / max(zoomScale, 0.1)
+        let remaining = (superview.bounds.maxX - imageOrigin.x * zoomScale - 12) / max(zoomScale, 0.1)
         return max(minBoxSize().width, remaining)
     }
 

@@ -140,6 +140,7 @@ final class AnnotationCanvasNSView: NSView {
 
     var zoomScale: CGFloat = 1.0 {
         didSet {
+            updateBoundsOrigin()
             guard zoomScale != oldValue, let editor = textEditor else { return }
             editor.zoomScale = zoomScale
             repositionEditor()
@@ -247,6 +248,19 @@ final class AnnotationCanvasNSView: NSView {
         } else {
             super.scrollWheel(with: event)
         }
+    }
+
+    var canvasOrigin: CGPoint = .zero {
+        didSet { updateBoundsOrigin() }
+    }
+
+    /// Shifting the bounds keeps view coordinates equal to image coordinates × zoom,
+    /// so a canvas grown past the image's top-left needs no other conversions.
+    private func updateBoundsOrigin() {
+        let origin = CGPoint(x: canvasOrigin.x * zoomScale, y: canvasOrigin.y * zoomScale)
+        guard bounds.origin != origin else { return }
+        setBoundsOrigin(origin)
+        needsDisplay = true
     }
 
     private func toImagePoint(_ viewPoint: CGPoint) -> CGPoint {
@@ -385,11 +399,37 @@ final class AnnotationCanvasNSView: NSView {
 
     // MARK: - Drawing
 
+    /// Checkerboard for the transparent area a grown canvas adds around the image.
+    private func drawTransparencyChecker(ctx: CGContext, outside imageRect: CGRect, dirtyRect: CGRect) {
+        let area = bounds.intersection(dirtyRect)
+        guard !imageRect.contains(area) else { return }
+        let tile: CGFloat = 8
+        ctx.saveGState()
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(area)
+        ctx.setFillColor(CGColor(gray: 0.85, alpha: 1))
+        var y = (area.minY / tile).rounded(.down) * tile
+        while y < area.maxY {
+            var x = (area.minX / tile).rounded(.down) * tile
+            if Int((x + y) / tile) % 2 != 0 { x += tile }
+            while x < area.maxX {
+                ctx.addRect(CGRect(x: x, y: y, width: tile, height: tile))
+                x += tile * 2
+            }
+            y += tile
+        }
+        ctx.fillPath()
+        ctx.restoreGState()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
 
         ctx.setFillColor(CGColor(gray: 0.12, alpha: 1))
         ctx.fill(bounds)
+        if let img = sourceImage {
+            drawTransparencyChecker(ctx: ctx, outside: CGRect(x: 0, y: 0, width: CGFloat(img.width) * zoomScale, height: CGFloat(img.height) * zoomScale), dirtyRect: dirtyRect)
+        }
 
         ctx.saveGState()
         ctx.scaleBy(x: zoomScale, y: zoomScale)
@@ -408,7 +448,8 @@ final class AnnotationCanvasNSView: NSView {
             if let img = sourceImage {
                 SpotlightObject.renderDim(
                     for: doc.objects,
-                    canvas: CGRect(x: 0, y: 0, width: img.width, height: img.height),
+                    canvas: CGRect(origin: canvasOrigin, size: CGSize(width: bounds.width / zoomScale, height: bounds.height / zoomScale))
+                        .union(CGRect(x: 0, y: 0, width: img.width, height: img.height)),
                     in: ctx
                 )
             }

@@ -104,19 +104,23 @@ struct AnnotationEditorView: View {
         var fileURL: URL?
     }
 
-    private var imageWidth: CGFloat { CGFloat(sourceImage.width) }
-    private var imageHeight: CGFloat { CGFloat(sourceImage.height) }
+    /// The image, grown to hold annotations drawn past its edges. A crop turns growing off.
+    private var canvasRect: CGRect {
+        let imageSize = CGSize(width: sourceImage.width, height: sourceImage.height)
+        guard document.cropRect == nil else { return CGRect(origin: .zero, size: imageSize) }
+        return AnnotationRenderer.canvasRect(imageSize: imageSize, objects: document.objects)
+    }
 
     /// Visible image width after applying any committed crop. The canvas view
     /// is still rendered at full image size but clipped+offset to show only
     /// this region, so annotations stay in full-image coordinates while layout
     /// and Save output reflect the crop.
     private var effectiveImageWidth: CGFloat {
-        document.cropRect?.width ?? imageWidth
+        document.cropRect?.width ?? canvasRect.width
     }
 
     private var effectiveImageHeight: CGFloat {
-        document.cropRect?.height ?? imageHeight
+        document.cropRect?.height ?? canvasRect.height
     }
 
     private var cropOffsetX: CGFloat {
@@ -383,6 +387,7 @@ struct AnnotationEditorView: View {
             textOutlineColor: textOutlineColor,
             textGlyphStrokeColor: textGlyphStrokeColor,
             zoomScale: zoomScale,
+            canvasOrigin: canvasRect.origin,
             refreshTrigger: refreshTrigger,
             textRegions: textRegions,
             commitEditingTrigger: commitEditingTrigger,
@@ -391,7 +396,7 @@ struct AnnotationEditorView: View {
             onTextEditingStarted: handleTextEditingStarted,
             onTextEditingEnded: handleTextEditingEnded
         )
-        .frame(width: imageWidth * zoomScale, height: imageHeight * zoomScale)
+        .frame(width: canvasRect.width * zoomScale, height: canvasRect.height * zoomScale)
         .offset(x: cropOffsetX, y: cropOffsetY)
         .frame(
             width: effectiveImageWidth * zoomScale,
@@ -599,7 +604,8 @@ struct AnnotationEditorView: View {
         guard let annotated = AnnotationRenderer.render(
             sourceImage: sourceImage,
             objects: document.objects,
-            cropRect: document.cropRect
+            cropRect: document.cropRect,
+            expandsCanvas: true
         ) else {
             return nil
         }
