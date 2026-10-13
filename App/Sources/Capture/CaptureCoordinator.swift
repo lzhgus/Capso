@@ -515,6 +515,15 @@ final class CaptureCoordinator {
     /// `pendingAction` is reset to `.default` on every branch so a previous
     /// `Capture Area & Annotate` (or any other mode-specific entry point)
     /// that left `pendingAction` non-default can't leak into the replay.
+    /// Set by automation commands that capture with no on-screen step. A capture
+    /// that completes before it expires posts a notification; a failed or
+    /// skipped capture just lets it lapse.
+    private var automatedCaptureDeadline: Date?
+
+    func markNextCaptureAsAutomated() {
+        automatedCaptureDeadline = Date().addingTimeInterval(10)
+    }
+
     func replayLastCapture() {
         guard let selection = settings.lastCaptureSelection else { return }
         switch selection {
@@ -1515,6 +1524,14 @@ final class CaptureCoordinator {
     }
 
     private func handleCaptureResult(_ capturedResult: CaptureResult) {
+        if let deadline = automatedCaptureDeadline, Date() < deadline {
+            Self.postNotification(
+                title: String(localized: "Screenshot taken by another app"),
+                body: String(localized: "Another app used Capso to capture your screen.")
+            )
+        }
+        automatedCaptureDeadline = nil
+
         let result = captureResultWithPendingSource(capturedResult)
         let outputResult = timestampedResultIfNeeded(result)
         lastCaptureResult = result

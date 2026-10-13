@@ -264,8 +264,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .captureArea:
             captureCoordinator.captureArea()
         case .captureFullscreen:
+            captureCoordinator.markNextCaptureAsAutomated()
             captureCoordinator.captureFullscreen()
-            notifyAutomatedCapture()
         case .captureWindow:
             captureCoordinator.captureWindow()
         case .captureAllInOne:
@@ -275,8 +275,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .captureSelfTimer:
             captureCoordinator.captureAreaWithSelfTimer()
         case .captureLastArea:
+            captureCoordinator.markNextCaptureAsAutomated()
             captureCoordinator.replayLastCapture()
-            notifyAutomatedCapture()
         case .captureAreaToClipboard:
             captureCoordinator.captureAreaToClipboard()
         case .captureAreaAndShare:
@@ -307,14 +307,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showPreferences()
         }
         logAutomationURL("Performed action \(String(describing: action))")
-    }
-
-    /// These commands capture without any on-screen step, so say that it happened.
-    private func notifyAutomatedCapture() {
-        CaptureCoordinator.postNotification(
-            title: String(localized: "Screenshot taken by another app"),
-            body: String(localized: "Another app used Capso to capture your screen.")
-        )
     }
 
     private func logAutomationURL(_ message: String) {
