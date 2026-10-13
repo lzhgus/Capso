@@ -112,4 +112,16 @@ struct CursorOverlayProviderTests {
                            format: .RGBA8, colorSpace: nil)
         #expect(pixel[3] > 100 && pixel[3] < 155)
     }
+
+    @Test("Stillness at the start of a recording, or typing only, also hides the cursor")
+    func stillFromTheStart() {
+        let lateStart = CursorOverlayProvider(events: moves(during: [4...6]), hidesIdleCursor: true)
+        #expect(lateStart.opacity(at: 0) == 1)
+        #expect(lateStart.opacity(at: 2) == 0)
+        #expect(lateStart.opacity(at: 4) == 1)
+
+        let keys = stride(from: 0.5, through: 5, by: 0.2).map { CursorEvent(timestamp: $0, x: 0.5, y: 0.5, type: .keyDown) }
+        let typingOnly = CursorOverlayProvider(events: keys, hidesIdleCursor: true)
+        #expect(typingOnly.opacity(at: 3) == 0)
+    }
 }

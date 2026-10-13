@@ -27,7 +27,9 @@ public final class CursorOverlayProvider: Sendable {
             self.idleGaps = []
             return
         }
-        let activity = sorted.filter { $0.type != .keyDown }.map(\.timestamp)
+        // The start of the recording counts as activity, so a cursor that never
+        // moves (or only types) fades like any other pause.
+        let activity = [0] + sorted.filter { $0.type != .keyDown && $0.timestamp > 0 }.map(\.timestamp)
         var gaps = zip(activity, activity.dropFirst())
             .filter { $1 - $0 >= Self.idleThreshold }
             .map { (start: $0, end: $1) }
