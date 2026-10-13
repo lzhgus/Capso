@@ -639,6 +639,12 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "warnAboutMutedMicrophone") }
     }
 
+    /// Cover desktop icons with the wallpaper while recording. Default `false`.
+    public var hideDesktopIconsWhileRecording: Bool {
+        get { defaults.bool(forKey: "hideDesktopIconsWhileRecording") }
+        set { defaults.set(newValue, forKey: "hideDesktopIconsWhileRecording") }
+    }
+
     /// Warn before recording when the disk is almost full. Default `true`.
     public var warnAboutLowDiskSpace: Bool {
         get { defaults.object(forKey: "warnAboutLowDiskSpace") as? Bool ?? true }

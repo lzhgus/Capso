@@ -17,15 +17,17 @@ final class MenuBarController: NSObject {
     private let ocrCoordinator: OCRCoordinator
     private let translationCoordinator: TranslationCoordinator
     private let historyCoordinator: HistoryCoordinator
+    private let desktopIconsCover: DesktopIconsCover
     private let onShowPreferences: () -> Void
 
-    init(settings: AppSettings, captureCoordinator: CaptureCoordinator, recordingCoordinator: RecordingCoordinator, ocrCoordinator: OCRCoordinator, translationCoordinator: TranslationCoordinator, historyCoordinator: HistoryCoordinator, onShowPreferences: @escaping () -> Void) {
+    init(settings: AppSettings, captureCoordinator: CaptureCoordinator, recordingCoordinator: RecordingCoordinator, ocrCoordinator: OCRCoordinator, translationCoordinator: TranslationCoordinator, historyCoordinator: HistoryCoordinator, desktopIconsCover: DesktopIconsCover, onShowPreferences: @escaping () -> Void) {
         self.settings = settings
         self.captureCoordinator = captureCoordinator
         self.recordingCoordinator = recordingCoordinator
         self.ocrCoordinator = ocrCoordinator
         self.translationCoordinator = translationCoordinator
         self.historyCoordinator = historyCoordinator
+        self.desktopIconsCover = desktopIconsCover
         self.onShowPreferences = onShowPreferences
         super.init()
         applyVisibility()
@@ -145,6 +147,7 @@ final class MenuBarController: NSObject {
         let screenshotHistory = menuItem(String(localized: "Screenshot History..."), action: #selector(openHistory))
         screenshotHistory.setShortcut(for: .screenshotHistory)
         menu.addItem(screenshotHistory)
+        menu.addItem(menuItem(String(localized: "Hide Desktop Icons"), action: #selector(toggleDesktopIcons)))
         menu.addItem(.separator())
 
         menu.addItem(menuItem(String(localized: "Preferences..."), action: #selector(openPreferences), key: ",", modifiers: [.command]))
@@ -319,6 +322,10 @@ final class MenuBarController: NSObject {
     @objc private func quitApp() {
         NSApp.terminate(nil)
     }
+
+    @objc private func toggleDesktopIcons() {
+        desktopIconsCover.setHiddenManually(!desktopIconsCover.isHiddenManually)
+    }
 }
 
 // MARK: - Update shortcut display when menu opens
@@ -328,6 +335,7 @@ extension MenuBarController: NSMenuDelegate {
         // Refresh shortcut display from KeyboardShortcuts in case user changed them
         for item in menu.items {
             switch item.action {
+            case #selector(toggleDesktopIcons): item.state = desktopIconsCover.isHiddenManually ? .on : .off
             case #selector(captureAllInOne): item.setShortcut(for: .captureAllInOne)
             case #selector(captureArea): item.setShortcut(for: .captureArea)
             case #selector(captureFullscreen): item.setShortcut(for: .captureFullscreen)

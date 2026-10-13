@@ -419,6 +419,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var hideDesktopIconsWhileRecording: Bool {
+        get {
+            access(keyPath: \.hideDesktopIconsWhileRecording)
+            return settings.hideDesktopIconsWhileRecording
+        }
+        set {
+            withMutation(keyPath: \.hideDesktopIconsWhileRecording) {
+                settings.hideDesktopIconsWhileRecording = newValue
+            }
+        }
+    }
     var openEditorAfterRecording: Bool {
         get {
             access(keyPath: \.openEditorAfterRecording)

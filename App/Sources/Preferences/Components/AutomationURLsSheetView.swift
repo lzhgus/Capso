@@ -64,6 +64,15 @@ struct AutomationURLsSheetView: View {
             ]
         ),
         AutomationCommandSection(
+            id: "desktop",
+            title: "Desktop",
+            items: [
+                AutomationCommandItem(id: "hide-desktop-icons", name: "Hide Desktop Icons", urlString: "capso://grab/hide-desktop-icons"),
+                AutomationCommandItem(id: "show-desktop-icons", name: "Show Desktop Icons", urlString: "capso://grab/show-desktop-icons"),
+                AutomationCommandItem(id: "toggle-desktop-icons", name: "Toggle Desktop Icons", urlString: "capso://grab/toggle-desktop-icons")
+            ]
+        ),
+        AutomationCommandSection(
             id: "app-history",
             title: "History & Settings",
             items: [

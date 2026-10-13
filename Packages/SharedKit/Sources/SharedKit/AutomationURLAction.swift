@@ -22,6 +22,9 @@ public enum AutomationURLAction: Equatable, Sendable {
     case recordFullscreen
     case openHistory
     case openPreferences
+    case hideDesktopIcons
+    case showDesktopIcons
+    case toggleDesktopIcons
 
     public init?(url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -57,6 +60,9 @@ public enum AutomationURLAction: Equatable, Sendable {
         case "/record-fullscreen", "/record-full-screen": self = .recordFullscreen
         case "/history", "/screenshot-history": self = .openHistory
         case "/preferences", "/settings": self = .openPreferences
+        case "/hide-desktop-icons": self = .hideDesktopIcons
+        case "/show-desktop-icons": self = .showDesktopIcons
+        case "/toggle-desktop-icons": self = .toggleDesktopIcons
         default: return nil
         }
     }

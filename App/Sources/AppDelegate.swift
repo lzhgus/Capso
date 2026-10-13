@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let permissionManager = PermissionManager()
     private(set) var captureCoordinator: CaptureCoordinator?
     private(set) var recordingCoordinator: RecordingCoordinator?
+    let desktopIconsCover = DesktopIconsCover()
     private(set) var ocrCoordinator: OCRCoordinator?
     private(set) var translationCoordinator: TranslationCoordinator?
     private(set) var historyCoordinator: HistoryCoordinator?
@@ -57,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureCoordinator!.shareCoordinator = shareCoordinator
         historyCoordinator!.shareCoordinator = shareCoordinator
         recordingCoordinator!.historyCoordinator = historyCoordinator
+        recordingCoordinator!.desktopIconsCover = desktopIconsCover
         recordingCoordinator!.recoverInterruptedRecording()
         preferencesWindow = PreferencesWindow(settings: settings, permissionManager: permissionManager, updateManager: updateManager)
         if settings.diagnosticLoggingEnabled {
@@ -72,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ocrCoordinator: ocrCoordinator!,
             translationCoordinator: translationCoordinator!,
             historyCoordinator: historyCoordinator!,
+            desktopIconsCover: desktopIconsCover,
             onShowPreferences: { [weak self] in self?.showPreferences() }
         )
         registerGlobalShortcuts()
@@ -305,6 +308,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             historyCoordinator?.showWindow()
         case .openPreferences:
             showPreferences()
+        case .hideDesktopIcons:
+            desktopIconsCover.setHiddenManually(true)
+        case .showDesktopIcons:
+            desktopIconsCover.setHiddenManually(false)
+        case .toggleDesktopIcons:
+            desktopIconsCover.setHiddenManually(!desktopIconsCover.isHiddenManually)
         }
         logAutomationURL("Performed action \(String(describing: action))")
     }

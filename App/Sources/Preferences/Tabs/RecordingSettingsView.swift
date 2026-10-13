@@ -50,6 +50,11 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    SettingRow(label: "Hide Desktop Icons", sublabel: "Cover desktop icons with the wallpaper while recording", showDivider: true) {
+                        Toggle("", isOn: $viewModel.hideDesktopIconsWhileRecording)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
                     SettingRow(label: "Open Editor After Recording", sublabel: "Edit, trim, and add effects before exporting", showDivider: true) {
                         Toggle("", isOn: $viewModel.openEditorAfterRecording)
                             .toggleStyle(.switch)

@@ -41,6 +41,7 @@ final class RecordingCoordinator {
     let recorder = ScreenRecorder()
     let cameraManager = CameraManager()
     var historyCoordinator: HistoryCoordinator?
+    var desktopIconsCover: DesktopIconsCover?
 
     private var overlayWindows: [CaptureOverlayWindow] = []
     private var selectionModeWindow: RecordingSelectionModeWindow?
@@ -547,6 +548,7 @@ final class RecordingCoordinator {
 
         countdownWindow?.cancel()
         countdownWindow = nil
+        desktopIconsCover?.setHiddenForRecording(false)
         dismissToolbarUI()
         selectedTarget = nil
     }
@@ -651,6 +653,10 @@ final class RecordingCoordinator {
             showCameraPiP(restorationState: restoredCameraPiPState)
         }
 
+        if settings.hideDesktopIconsWhileRecording {
+            desktopIconsCover?.setHiddenForRecording(true)
+        }
+
         let actuallyStart: @MainActor () -> Void = { [weak self] in
             guard let self else { return }
             Task { @MainActor in
@@ -675,6 +681,7 @@ final class RecordingCoordinator {
                     self.showRecordingControls()
                 } catch {
                     print("Recording failed to start: \(error)")
+                    self.desktopIconsCover?.setHiddenForRecording(false)
                     self.borderWindow?.hide()
                     self.borderWindow = nil
                     if cameraEnabled {
@@ -1433,6 +1440,7 @@ final class RecordingCoordinator {
         cursorTelemetry = nil
         controlsWindow?.close()
         controlsWindow = nil
+        desktopIconsCover?.setHiddenForRecording(false)
         dismissAudioWarning()
         borderWindow?.hide()
         borderWindow = nil
