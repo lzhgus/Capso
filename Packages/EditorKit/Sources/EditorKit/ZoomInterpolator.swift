@@ -11,7 +11,7 @@ public struct ZoomInterpolator: Sendable {
 
     /// Upper bound for each zoom-in / zoom-out ramp; short segments use half their length.
     static let rampDuration: TimeInterval = 0.75
-    /// Segments whose end and start are closer than this are treated as back-to-back.
+    /// A segment starting within this long after the previous one ends is treated as back-to-back.
     private static let adjacencyTolerance: TimeInterval = 0.05
     private static let edgeSnapRatio: Double = 0.25
     /// No zoom, focused on the centre — the state ramps start from and return to.
@@ -49,7 +49,9 @@ public struct ZoomInterpolator: Sendable {
         at time: TimeInterval,
         cursorPosition: (x: Double, y: Double)?
     ) -> FrameTransform {
-        guard let index = segments.lastIndex(where: { $0.startTime <= time && time < $0.endTime }) else {
+        guard let index = segments.indices.last(where: {
+            segments[$0].startTime <= time && time < effectiveEnd(ofSegmentAt: $0)
+        }) else {
             return .identity
         }
         let segment = segments[index]
@@ -57,9 +59,8 @@ public struct ZoomInterpolator: Sendable {
         let target = fullTransform(of: segment, cursorPosition: cursorPosition)
 
         let previous = index > 0 ? segments[index - 1] : nil
-        let followsPrevious = previous.map { abs($0.endTime - segment.startTime) < Self.adjacencyTolerance } ?? false
-        let hasNext = index + 1 < segments.count
-            && abs(segments[index + 1].startTime - segment.endTime) < Self.adjacencyTolerance
+        let followsPrevious = index > 0 && connects(index - 1)
+        let hasNext = connects(index)
 
         if ramp > 0, time < segment.startTime + ramp, followsPrevious || segment.startTime > 0 {
             let from = followsPrevious
@@ -74,6 +75,17 @@ public struct ZoomInterpolator: Sendable {
     }
 
     // MARK: - Internal Helpers
+
+    /// Whether the segment after `index` starts before (or right when) the one at `index` ends.
+    private func connects(_ index: Int) -> Bool {
+        index + 1 < segments.count
+            && segments[index + 1].startTime <= segments[index].endTime + Self.adjacencyTolerance
+    }
+
+    /// A connected segment stays in charge until the next one starts, so tiny gaps don't flash to 1×.
+    private func effectiveEnd(ofSegmentAt index: Int) -> TimeInterval {
+        connects(index) ? max(segments[index].endTime, segments[index + 1].startTime) : segments[index].endTime
+    }
 
     private func fullTransform(of segment: ZoomSegment, cursorPosition: (x: Double, y: Double)?) -> FrameTransform {
         let rawFocus: (x: Double, y: Double)

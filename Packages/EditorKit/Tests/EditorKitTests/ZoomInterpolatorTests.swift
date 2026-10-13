@@ -160,4 +160,19 @@ struct ZoomInterpolatorTests {
             #expect(t.translateY >= half - 1e-9 && t.translateY <= 1 - half + 1e-9)
         }
     }
+
+    @Test("Segments separated by a tiny gap or overlapping never dip below the lower zoom", arguments: [
+        (5.0, 5.03),
+        (5.0, 4.2),
+    ])
+    func nearlyTouchingOrOverlapping(firstEnd: Double, secondStart: Double) {
+        let interp = makeInterpolator(segments: [
+            ZoomSegment(startTime: 2, endTime: firstEnd, zoomLevel: 2, focusMode: .manual(x: 0.3, y: 0.5)),
+            ZoomSegment(startTime: secondStart, endTime: 9, zoomLevel: 3, focusMode: .manual(x: 0.7, y: 0.5)),
+        ])
+        for step in 0...300 {
+            let time = 3.0 + Double(step) * 0.01
+            #expect(scale(interp, at: time) >= 2 - 1e-9, "dipped at \(time)")
+        }
+    }
 }
