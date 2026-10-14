@@ -16,9 +16,13 @@ public enum QuickAccessStackGeometry {
         precondition(stackIndex >= 0 && stackIndex < stackCount, "Stack index must be within the stack")
 
         let stackStep = windowSize.height + stackSpacing
-        let centeredStackHeight = CGFloat(stackCount) * windowSize.height
+        let stackHeight = CGFloat(stackCount) * windowSize.height
             + CGFloat(stackCount - 1) * stackSpacing
-        let centeredStackMinY = screenFrame.midY - centeredStackHeight / 2
+        let centeredStackMinY = visibleFrame.midY - stackHeight / 2 - 48
+        let boundedCenteredStackMinY = min(
+            max(centeredStackMinY, visibleFrame.minY + edgeInset),
+            visibleFrame.maxY - edgeInset - stackHeight
+        )
 
         let origin: CGPoint = switch position {
         case .bottomLeft:
@@ -28,8 +32,8 @@ public enum QuickAccessStackGeometry {
             )
         case .centerScreen:
             CGPoint(
-                x: screenFrame.midX - windowSize.width / 2,
-                y: centeredStackMinY + CGFloat(stackIndex) * stackStep
+                x: visibleFrame.midX - windowSize.width / 2,
+                y: boundedCenteredStackMinY + CGFloat(stackIndex) * stackStep
             )
         case .bottomRight:
             CGPoint(

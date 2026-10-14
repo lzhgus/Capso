@@ -56,6 +56,115 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertEqual(closeCount, 1)
     }
 
+    func testEvictionDuringEntranceStaysHiddenAndDoesNotRestartAutoClose() throws {
+        let (window, defaultsSuiteName) = try makeWindow(autoClose: true, interval: 1)
+        defer {
+            window.orderOut(nil)
+            UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
+        }
+        var closeCount = 0
+        window.onClose = { closeCount += 1 }
+
+        window.show(from: NSRect(x: 100, y: 100, width: 640, height: 480))
+        window.slideOffLeftAndClose()
+        settleRunLoop(for: 0.8)
+
+        XCTAssertFalse(window.isVisible)
+        settleRunLoop(for: 1.2)
+        XCTAssertFalse(window.isVisible)
+        XCTAssertEqual(closeCount, 0)
+    }
+
+    func testRapidCapturesKeepOnlyFiveVisibleAndDismissiblePreviews() throws {
+        let suiteName = "QuickAccessWindowPresentationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let settings = AppSettings(defaults: defaults)
+        settings.quickAccessAutoClose = false
+        let coordinator = CaptureCoordinator(settings: settings)
+        let result = CaptureResult(
+            image: try makeImage(),
+            mode: .area,
+            captureRect: CGRect(x: 100, y: 100, width: 640, height: 480)
+        )
+        var windows: [QuickAccessWindow] = []
+        defer {
+            windows.forEach { $0.orderOut(nil) }
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        for _ in 0..<6 {
+            windows.append(coordinator.showQuickAccess(
+                for: result,
+                entryID: UUID(),
+                autoUpload: false,
+                animationSourceFrame: result.captureRect
+            ))
+        }
+        settleRunLoop(for: 0.8)
+
+        XCTAssertFalse(windows[0].isVisible)
+        XCTAssertEqual(windows.filter(\.isVisible).count, 5)
+
+        windows.forEach { $0.onClose?() }
+        settleRunLoop(for: 0.8)
+        XCTAssertTrue(windows.allSatisfy { !$0.isVisible })
+    }
+
+    func testCloseAllDuringEntranceStaysClosed() throws {
+        let suiteName = "QuickAccessWindowPresentationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let settings = AppSettings(defaults: defaults)
+        settings.quickAccessAutoClose = false
+        let coordinator = CaptureCoordinator(settings: settings)
+        defer {
+            coordinator.closeAllQuickAccess()
+            settleRunLoop(for: 0.4)
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let result = CaptureResult(
+            image: try makeImage(), mode: .area,
+            captureRect: CGRect(x: 100, y: 100, width: 640, height: 480)
+        )
+        let window = coordinator.showQuickAccess(
+            for: result, entryID: UUID(), autoUpload: false,
+            animationSourceFrame: result.captureRect
+        )
+
+        coordinator.closeAllQuickAccess()
+        settleRunLoop(for: 0.8)
+        XCTAssertFalse(window.isVisible)
+        XCTAssertFalse(coordinator.hasQuickAccess)
+    }
+
+    func testReopenDuringCloseAnimationKeepsTheNewPreview() throws {
+        let suiteName = "QuickAccessWindowPresentationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let settings = AppSettings(defaults: defaults)
+        settings.quickAccessAutoClose = false
+        let coordinator = CaptureCoordinator(settings: settings)
+        defer {
+            coordinator.closeAllQuickAccess()
+            settleRunLoop(for: 0.4)
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let result = CaptureResult(
+            image: try makeImage(), mode: .area,
+            captureRect: CGRect(x: 100, y: 100, width: 640, height: 480)
+        )
+        let window = coordinator.showQuickAccess(
+            for: result, entryID: UUID(), autoUpload: false,
+            animationSourceFrame: result.captureRect
+        )
+
+        window.onClose?()
+        XCTAssertTrue(coordinator.canReopenQuickAccess)
+        coordinator.reopenQuickAccess()
+        settleRunLoop(for: 0.8)
+
+        XCTAssertTrue(coordinator.hasQuickAccess)
+        XCTAssertFalse(window.isVisible, "The cancelled entrance must not restore the old card")
+    }
+
     private func makeWindow(
         autoClose: Bool,
         interval: Int = 5

@@ -8,8 +8,8 @@ struct QuickAccessStackGeometryTests {
     private let visibleFrame = CGRect(x: 100, y: 90, width: 1160, height: 740)
     private let previewSize = CGSize(width: 288, height: 200)
 
-    @Test("A single center-screen preview is centered on the display")
-    func singlePreviewIsCentered() {
+    @Test("A single center-screen preview sits below the visible center")
+    func singlePreviewSitsBelowVisibleCenter() {
         let frame = QuickAccessStackGeometry.frame(
             position: .centerScreen,
             screenFrame: screenFrame,
@@ -19,8 +19,8 @@ struct QuickAccessStackGeometryTests {
             stackCount: 1
         )
 
-        #expect(frame.midX == screenFrame.midX)
-        #expect(frame.midY == screenFrame.midY)
+        #expect(frame.midX == visibleFrame.midX)
+        #expect(frame.midY == visibleFrame.midY - 48)
     }
 
     @Test("A two-preview stack is centered as a group")
@@ -43,9 +43,9 @@ struct QuickAccessStackGeometryTests {
         )
 
         let stackMidY = (firstFrame.minY + secondFrame.maxY) / 2
-        #expect(firstFrame.midX == screenFrame.midX)
-        #expect(secondFrame.midX == screenFrame.midX)
-        #expect(stackMidY == screenFrame.midY)
+        #expect(firstFrame.midX == visibleFrame.midX)
+        #expect(secondFrame.midX == visibleFrame.midX)
+        #expect(stackMidY == visibleFrame.midY - 48)
         #expect(secondFrame.minY - firstFrame.maxY == 12)
     }
 

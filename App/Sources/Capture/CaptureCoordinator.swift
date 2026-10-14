@@ -15,6 +15,7 @@ final class CaptureCoordinator {
     private let settings: AppSettings
     private var overlayWindows: [CaptureOverlayWindow] = []
     private var isSelectionFlowStarting = false
+    private var pendingSelectionWorkItem: DispatchWorkItem?
     /// Stack of active preview windows:
     /// - `[0]` is the OLDEST preview, anchored at the bottom-left primary slot
     /// - `[N]` is the NEWEST preview, sitting at the top of the visual stack
@@ -54,7 +55,7 @@ final class CaptureCoordinator {
     var shareCoordinator: ShareCoordinator?
 
     /// Post-capture action override. When set, ignores Settings toggles.
-    private var pendingAction: PostCaptureAction = .default
+    private(set) var pendingAction: PostCaptureAction = .default
     private var pendingSourceApplication: SourceApplication?
 
     private struct SourceApplication: Sendable {
@@ -162,23 +163,19 @@ final class CaptureCoordinator {
     }
 
     func captureArea() {
-        pendingAction = .default
-        startAreaCapture()
+        startAreaCapture(action: .default)
     }
 
     func captureAreaToClipboard() {
-        pendingAction = .clipboard
-        startAreaCapture()
+        startAreaCapture(action: .clipboard)
     }
 
     func captureAreaAndAnnotate() {
-        pendingAction = .annotate
-        startAreaCapture()
+        startAreaCapture(action: .annotate)
     }
 
     func captureAreaAndPin() {
-        pendingAction = .pin
-        startAreaCapture()
+        startAreaCapture(action: .pin)
     }
 
     func pinFromClipboard(pasteboard: NSPasteboard = .general) {
@@ -384,29 +381,38 @@ final class CaptureCoordinator {
 
         // Upload requests are serialized by ShareCoordinator, so a capture made
         // during another upload waits in FIFO order instead of being dropped.
-        pendingAction = .share
-        startAreaCapture()
+        startAreaCapture(action: .share)
     }
 
     func captureAllInOne() {
+        guard !isCaptureSelectionActive else { return }
         isSelectionFlowStarting = true
         pendingAction = .default
         rememberSourceApplication()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        scheduleSelectionStart { [weak self] in
             self?.showFrozenAllInOneOverlay()
         }
     }
 
-    private func startAreaCapture() {
+    private func startAreaCapture(action: PostCaptureAction) {
+        guard !isCaptureSelectionActive else { return }
+        pendingAction = action
         isSelectionFlowStarting = true
         rememberSourceApplication()
         // Always freeze the screen first, then show the selection overlay on top
         // of the frozen backdrop. Freezing captures the current frame (including
         // any open dropdowns/popovers/menus) BEFORE the overlay takes key-window
         // status and dismisses that transient UI. See showFrozenOverlay().
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        scheduleSelectionStart { [weak self] in
             self?.showFrozenOverlay()
         }
+    }
+
+    private func scheduleSelectionStart(_ action: @escaping () -> Void) {
+        pendingSelectionWorkItem?.cancel()
+        let workItem = DispatchWorkItem(block: action)
+        pendingSelectionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
     func captureFullscreen() {
@@ -456,12 +462,13 @@ final class CaptureCoordinator {
     }
 
     func captureScrolling() {
+        guard !isCaptureSelectionActive else { return }
         isSelectionFlowStarting = true
         rememberSourceApplication()
         // Freeze first (preserves open dropdowns), then select area on the
         // frozen backdrop. After selection, dismiss the freeze layer and run
         // the live scrolling capture on the real desktop.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        scheduleSelectionStart { [weak self] in
             self?.showFrozenOverlay { rect, screen in
                 self?.startScrollingCapture(rect: rect, screen: screen)
             }
@@ -471,6 +478,7 @@ final class CaptureCoordinator {
     /// Self-timer area capture: pick area, show countdown HUD, then capture.
     /// Uses `settings.selfTimerDurationSeconds` as the delay.
     func captureAreaWithSelfTimer() {
+        guard !isCaptureSelectionActive else { return }
         isSelectionFlowStarting = true
         pendingAction = .default
         rememberSourceApplication()
@@ -478,7 +486,7 @@ final class CaptureCoordinator {
         // Freeze first (preserves open dropdowns), then select area on the
         // frozen backdrop. After selection, dismiss the freeze layer and run
         // the self-timer countdown + live capture.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        scheduleSelectionStart { [weak self] in
             self?.showFrozenOverlay { rect, screen in
                 self?.runSelfTimerThenCapture(rect: rect, screen: screen, seconds: seconds)
             }
@@ -1009,7 +1017,6 @@ final class CaptureCoordinator {
             imageView.image = NSImage(cgImage: frozenImage, size: screen.frame.size)
             imageView.imageScaling = .scaleAxesIndependently
             freezeWin.contentView = imageView
-            freezeWin.displayIfNeeded()
             freezeWin.orderFrontRegardless()
             freezeWindows.append(freezeWin)
         }
@@ -1188,6 +1195,8 @@ final class CaptureCoordinator {
     }
 
     private func dismissOverlay(notifyingCaptureEnd: Bool = true) {
+        pendingSelectionWorkItem?.cancel()
+        pendingSelectionWorkItem = nil
         isSelectionFlowStarting = false
         dismissSelectionOverlays()
         dismissFreezeWindows()
@@ -1351,6 +1360,45 @@ final class CaptureCoordinator {
             } catch {
                 print("Area capture failed: \(error)")
             }
+        }
+    }
+
+    private func quickAccessAnimationSourceFrame(for result: CaptureResult) -> NSRect? {
+        guard let screen = screenFor(result: result) else { return nil }
+
+        switch result.mode {
+        case .area, .scrolling:
+            // Area and scrolling captures store a display-local, top-left
+            // capture rect. Convert it back to AppKit's global bottom-left
+            // coordinate space for the window animation.
+            let localRect = CaptureDisplayGeometry.screenLocalRect(
+                fromTopLeftCaptureRect: result.captureRect,
+                screenHeight: screen.frame.height
+            )
+            guard localRect.width > 0, localRect.height > 0 else { return nil }
+            return globalRect(fromScreenLocalRect: localRect, screen: screen)
+
+        case .fullscreen:
+            // Fullscreen results carry a global display frame. The AppKit
+            // screen frame is already the exact animation source rectangle.
+            return screen.frame
+
+        case .window:
+            // Window and multi-window results carry global ScreenCaptureKit
+            // coordinates. First make them local to the originating display;
+            // treating them as local (as area captures are) double-applies
+            // the display origin on secondary monitors.
+            let displayBounds = CGDisplayBounds(screen.displayID)
+            let localTopLeftRect = CaptureDisplayGeometry.displayLocalRect(
+                fromGlobalTopLeftRect: result.captureRect,
+                displayBounds: displayBounds
+            )
+            guard !localTopLeftRect.isNull, !localTopLeftRect.isEmpty else { return nil }
+            let localRect = CaptureDisplayGeometry.screenLocalRect(
+                fromTopLeftCaptureRect: localTopLeftRect,
+                screenHeight: displayBounds.height
+            )
+            return globalRect(fromScreenLocalRect: localRect, screen: screen)
         }
     }
 
@@ -1592,7 +1640,8 @@ final class CaptureCoordinator {
                     for: outputResult,
                     entryID: entryID,
                     autoUpload: shouldAutoUpload,
-                    preferredFileURL: savedFileURL
+                    preferredFileURL: savedFileURL,
+                    animationSourceFrame: quickAccessAnimationSourceFrame(for: outputResult)
                 )
             } else if shouldAutoUpload, let coord = shareCoordinator {
                 Task {
@@ -1630,7 +1679,8 @@ final class CaptureCoordinator {
         entryID: UUID,
         autoUpload: Bool,
         preferredFileURL: URL? = nil,
-        pasteboard: NSPasteboard = .general
+        pasteboard: NSPasteboard = .general,
+        animationSourceFrame: NSRect? = nil
     ) -> QuickAccessWindow {
         // If the stack is full, evict the oldest (the one anchored at the
         // bottom slot) with a slide-off-left animation. The remaining
@@ -1723,7 +1773,7 @@ final class CaptureCoordinator {
 
         quickAccessWindows.append(window)
         restackQuickAccessWindows(excluding: window)
-        window.show()
+        window.show(from: animationSourceFrame)
         return window
     }
 
@@ -2276,15 +2326,18 @@ final class CaptureCoordinator {
     /// Deprecated in macOS 14+ but still functional — loaded via dlsym
     /// to bypass the compile-time unavailability annotation.
     /// Required for freeze-screen: must capture before any window appears.
-    private static func syncCaptureDisplay(_ displayID: CGDirectDisplayID) -> CGImage? {
-        typealias CGDisplayCreateImageFunc = @convention(c) (CGDirectDisplayID) -> CGImage?
+    private typealias CGDisplayCreateImageFunc = @convention(c) (CGDirectDisplayID) -> CGImage?
+
+    private static let cgDisplayCreateImage: CGDisplayCreateImageFunc? = {
         guard let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY),
               let sym = dlsym(handle, "CGDisplayCreateImage") else {
             return nil
         }
-        defer { dlclose(handle) }
-        let fn = unsafeBitCast(sym, to: CGDisplayCreateImageFunc.self)
-        return fn(displayID)
+        return unsafeBitCast(sym, to: CGDisplayCreateImageFunc.self)
+    }()
+
+    private static func syncCaptureDisplay(_ displayID: CGDirectDisplayID) -> CGImage? {
+        cgDisplayCreateImage?(displayID)
     }
 }
 
