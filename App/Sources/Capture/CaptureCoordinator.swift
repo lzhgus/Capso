@@ -176,6 +176,11 @@ final class CaptureCoordinator {
         startAreaCapture()
     }
 
+    func captureAreaAndPin() {
+        pendingAction = .pin
+        startAreaCapture()
+    }
+
     func pinFromClipboard(pasteboard: NSPasteboard = .general) {
         let screen = NSScreen.screens.first {
             NSMouseInRect(NSEvent.mouseLocation, $0.frame, false)

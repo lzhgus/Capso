@@ -4,6 +4,12 @@ import HistoryKit
 
 struct HistoryView: View {
     let coordinator: HistoryCoordinator
+    var onQuickLook: ([URL]) -> Void = { _ in }
+
+    @State private var selection: Set<UUID> = []
+    @State private var anchorID: UUID?
+    @State private var columns = 1
+    @FocusState private var isGridFocused: Bool
 
     private var groupedEntries: [(String, [HistoryEntry])] {
         let calendar = Calendar.current
@@ -49,13 +55,37 @@ struct HistoryView: View {
             if coordinator.entries.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        ForEach(groupedEntries, id: \.0) { section, entries in
-                            sectionView(title: section, count: entries.count, entries: entries)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            ForEach(groupedEntries, id: \.0) { section, entries in
+                                sectionView(title: section, count: entries.count, entries: entries)
+                            }
                         }
+                        .padding(16)
+                        .background(GeometryReader { geo in
+                            Color.clear.onAppear { updateColumns(geo.size.width) }
+                                .onChange(of: geo.size.width) { _, width in updateColumns(width) }
+                        })
                     }
-                    .padding(16)
+                    .focusable()
+                    .focused($isGridFocused)
+                    .focusEffectDisabled()
+                    .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
+                        moveSelection(press.key, extending: press.modifiers.contains(.shift))
+                        if let anchorID { proxy.scrollTo(anchorID) }
+                        return .handled
+                    }
+                    .onKeyPress(.space) {
+                        onQuickLook(selectedEntries.compactMap { coordinator.fullImageURL(for: $0) })
+                        return .handled
+                    }
+                    // The Mac backspace key sends U+007F, not `.delete` (U+0008).
+                    .onKeyPress(keys: [.delete, .deleteForward, KeyEquivalent("\u{7F}")]) { _ in
+                        guard !selection.isEmpty else { return .ignored }
+                        confirmDelete(selectedEntries)
+                        return .handled
+                    }
                 }
             }
 
@@ -140,8 +170,98 @@ struct HistoryView: View {
                 spacing: 12
             ) {
                 ForEach(entries) { entry in
-                    HistoryItemView(entry: entry, coordinator: coordinator)
+                    HistoryItemView(entry: entry, coordinator: coordinator, isSelected: selection.contains(entry.id))
+                        .id(entry.id)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            select(entry.id, modifiers: NSEvent.modifierFlags)
+                        })
                 }
+            }
+        }
+    }
+
+    // MARK: - Selection
+
+    private var selectedEntries: [HistoryEntry] {
+        coordinator.entries.filter { selection.contains($0.id) }
+    }
+
+    private func updateColumns(_ width: CGFloat) {
+        // Matches the adaptive grid: 165pt minimum items with 12pt spacing.
+        columns = max(1, Int((width - 32 + 12) / (165 + 12)))
+    }
+
+    private func select(_ id: UUID, modifiers: NSEvent.ModifierFlags) {
+        isGridFocused = true
+        let ids = coordinator.entries.map(\.id)
+        if modifiers.contains(.command) {
+            if selection.remove(id) == nil { selection.insert(id) }
+            anchorID = id
+        } else if modifiers.contains(.shift), let anchorID,
+                  let from = ids.firstIndex(of: anchorID), let to = ids.firstIndex(of: id) {
+            selection = Set(ids[min(from, to)...max(from, to)])
+        } else {
+            selection = [id]
+            anchorID = id
+        }
+    }
+
+    // ponytail: up/down step through the flat list by one row's worth of items, so
+    // a row that ends a date section may land a few items off. Track per-section
+    // positions if that turns out to matter.
+    private func moveSelection(_ key: KeyEquivalent, extending: Bool) {
+        let ids = coordinator.entries.map(\.id)
+        guard !ids.isEmpty else { return }
+        guard let current = anchorID.flatMap(ids.firstIndex(of:)) else {
+            selection = [ids[0]]
+            anchorID = ids[0]
+            return
+        }
+        let step: Int
+        switch key {
+        case .leftArrow: step = -1
+        case .rightArrow: step = 1
+        case .upArrow: step = -columns
+        default: step = columns
+        }
+        let next = ids[min(max(current + step, 0), ids.count - 1)]
+        if extending {
+            selection.insert(next)
+        } else {
+            selection = [next]
+        }
+        anchorID = next
+    }
+
+    private func confirmDelete(_ entries: [HistoryEntry]) {
+        guard !entries.isEmpty else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = entries.count == 1
+            ? String(localized: "Delete capture?")
+            : String(localized: "Delete \(entries.count) captures?")
+        alert.informativeText = String(localized: "This will remove the capture from this Mac.")
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        let cloudBox = entries.contains { $0.cloudURL != nil }
+            ? NSButton(checkboxWithTitle: String(localized: "Also delete from cloud"), target: nil, action: nil)
+            : nil
+        cloudBox?.state = .on
+        alert.accessoryView = cloudBox
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let alsoDeleteCloud = cloudBox?.state == .on
+        let ids = coordinator.entries.map(\.id)
+        let nextID = ids.firstIndex { selection.contains($0) }
+            .flatMap { first in ids.dropFirst(first).first { !selection.contains($0) } }
+        selection = nextID.map { [$0] } ?? []
+        anchorID = nextID
+        Task {
+            for entry in entries {
+                if alsoDeleteCloud, entry.cloudURL != nil {
+                    await coordinator.deleteCloudCopy(for: entry)
+                }
+                coordinator.deleteEntry(entry)
             }
         }
     }

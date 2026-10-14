@@ -1,5 +1,6 @@
 // App/Sources/History/HistoryWindow.swift
 import AppKit
+import Quartz
 import SwiftUI
 
 @MainActor
@@ -21,7 +22,7 @@ final class HistoryWindow {
             return
         }
 
-        let window = NSWindow(
+        let window = HistoryNSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 560),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
@@ -38,7 +39,9 @@ final class HistoryWindow {
         visualEffect.state = .active
         window.contentView = visualEffect
 
-        let hostingView = NSHostingView(rootView: HistoryView(coordinator: coordinator))
+        let hostingView = NSHostingView(rootView: HistoryView(coordinator: coordinator) { [weak window] urls in
+            window?.toggleQuickLook(for: urls)
+        })
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         visualEffect.addSubview(hostingView)
         NSLayoutConstraint.activate([
@@ -71,4 +74,40 @@ final class HistoryWindow {
         window?.isVisible == true && window?.isMiniaturized == false
     }
 #endif
+}
+
+/// Hosts Quick Look for the history grid: Space previews the selected captures.
+private final class HistoryNSWindow: NSWindow, QLPreviewPanelDataSource {
+    private var previewURLs: [URL] = []
+
+    func toggleQuickLook(for urls: [URL]) {
+        guard let panel = QLPreviewPanel.shared() else { return }
+        if QLPreviewPanel.sharedPreviewPanelExists(), panel.isVisible {
+            panel.orderOut(nil)
+            return
+        }
+        guard !urls.isEmpty else { return }
+        previewURLs = urls
+        panel.makeKeyAndOrderFront(nil)
+        panel.reloadData()
+    }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        // Older SDKs don't mark these callbacks main-actor, though AppKit calls them there.
+        MainActor.assumeIsolated { panel.dataSource = self }
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated { panel.dataSource = nil }
+    }
+
+    nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+        MainActor.assumeIsolated { previewURLs.count }
+    }
+
+    nonisolated func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
+        MainActor.assumeIsolated { previewURLs[index] as NSURL }
+    }
 }

@@ -515,6 +515,18 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         return view
     }
 
+    func testSpaceLetsTheSelectionBodyBeGrabbedWhileAnnotating() {
+        let (view, _) = makeAllInOneOverlayView(activePreset: .freeform)
+        view.passesThroughSelectionBody = true
+        let body = CGPoint(x: 350, y: 260)
+
+        XCTAssertFalse(view.wantsMouseEvents(at: body))
+        view.isSpaceHeld = true
+        XCTAssertTrue(view.wantsMouseEvents(at: body))
+        view.isSpaceHeld = false
+        XCTAssertFalse(view.wantsMouseEvents(at: body))
+    }
+
     /// Hosts the all-in-one selection overlay and records every live preview it
     /// publishes, which is how the window observes selection changes.
     private func makeAllInOneOverlayView(

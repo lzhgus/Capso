@@ -18,6 +18,7 @@ extension KeyboardShortcuts.Name {
     static let captureAreaToClipboard = Self("captureAreaToClipboard", default: .init(.seven, modifiers: [.option, .shift]))
     static let captureAreaAndShare = Self("captureAreaAndShare", default: .init(.zero, modifiers: [.option, .shift]))
     static let captureAreaAndAnnotate = Self("captureAreaAndAnnotate", default: .init(.eight, modifiers: [.option, .shift]))
+    static let captureAreaAndPin = Self("captureAreaAndPin")
     static let pinFromClipboard = Self("pinFromClipboard")
     static let editClipboardImage = Self("editClipboardImage")
     static let screenshotHistory = Self("screenshotHistory", default: .init(.nine, modifiers: [.option, .shift]))
@@ -37,7 +38,7 @@ extension KeyboardShortcuts.Name {
     static let allCapso: [Self] = [
         .captureAllInOne, .captureArea, .captureFullscreen, .captureWindow, .captureText, .recordScreen,
         .recordFullscreen, .captureScrolling, .captureAreaToClipboard, .captureAreaAndShare,
-        .captureAreaAndAnnotate, .pinFromClipboard, .editClipboardImage, .screenshotHistory,
+        .captureAreaAndAnnotate, .captureAreaAndPin, .pinFromClipboard, .editClipboardImage, .screenshotHistory,
         .captureAndTranslate, .translateSelectedText, .translateTypedText, .selfTimerCapture, .captureLastArea, .togglePins,
     ]
 }
@@ -103,6 +104,7 @@ struct ShortcutSettingsView: View {
                     shortcutRow("Capture Area to Clipboard", name: .captureAreaToClipboard, showDivider: true)
                     shortcutRow("Capture and Share to Cloud", name: .captureAreaAndShare, showDivider: true)
                     shortcutRow("Capture Area & Annotate", name: .captureAreaAndAnnotate, showDivider: true)
+                    shortcutRow("Capture Area & Pin", name: .captureAreaAndPin, showDivider: true)
                     shortcutRow(
                         "Pin from Clipboard",
                         name: .pinFromClipboard,
