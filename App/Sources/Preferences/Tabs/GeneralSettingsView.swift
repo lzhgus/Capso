@@ -196,7 +196,7 @@ struct GeneralSettingsView: View {
 }
 
 private struct ExternalLinkButton: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     let action: () -> Void
     @State private var isHovered = false
