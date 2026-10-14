@@ -251,6 +251,10 @@ Thanks to everyone who has contributed to Capso.
 </p>
 
 <p align="center">
+  <sub>Also credited as co-author: <a href="https://github.com/thanhthai3010">@thanhthai3010</a></sub>
+</p>
+
+<p align="center">
   <sub><a href="./CONTRIBUTING.md">Join them</a> and help make Capso better.</sub>
 </p>
 
