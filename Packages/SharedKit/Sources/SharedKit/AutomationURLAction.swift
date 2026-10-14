@@ -11,6 +11,7 @@ public enum AutomationURLAction: Equatable, Sendable {
     case captureAreaToClipboard
     case captureAreaAndShare
     case captureAreaAndAnnotate
+    case captureAreaAndPin
     case pinFromClipboard
     case editClipboardImage
     case openImageFile
@@ -49,6 +50,7 @@ public enum AutomationURLAction: Equatable, Sendable {
         case "/clipboard", "/area-to-clipboard": self = .captureAreaToClipboard
         case "/share", "/area-and-share": self = .captureAreaAndShare
         case "/annotate", "/area-and-annotate": self = .captureAreaAndAnnotate
+        case "/area-and-pin": self = .captureAreaAndPin
         case "/pin", "/pin-from-clipboard": self = .pinFromClipboard
         case "/edit-clipboard", "/edit-clipboard-image": self = .editClipboardImage
         case "/open-image", "/open-image-file": self = .openImageFile

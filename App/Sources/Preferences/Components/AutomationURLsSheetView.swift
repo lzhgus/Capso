@@ -33,7 +33,8 @@ struct AutomationURLsSheetView: View {
                 AutomationCommandItem(id: "last-area", name: "Capture Previous Area", urlString: "capso://grab/last-area"),
                 AutomationCommandItem(id: "clipboard", name: "Capture Area to Clipboard", urlString: "capso://grab/clipboard"),
                 AutomationCommandItem(id: "share", name: "Capture and Share to Cloud", urlString: "capso://grab/share"),
-                AutomationCommandItem(id: "annotate", name: "Capture Area & Annotate", urlString: "capso://grab/annotate")
+                AutomationCommandItem(id: "annotate", name: "Capture Area & Annotate", urlString: "capso://grab/annotate"),
+                AutomationCommandItem(id: "area-and-pin", name: "Capture Area & Pin", urlString: "capso://grab/area-and-pin")
             ]
         ),
         AutomationCommandSection(

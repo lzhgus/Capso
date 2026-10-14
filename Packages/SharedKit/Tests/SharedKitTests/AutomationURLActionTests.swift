@@ -20,6 +20,7 @@ struct AutomationURLActionTests {
             ("capso://grab/area-and-share", .captureAreaAndShare),
             ("capso://grab/annotate", .captureAreaAndAnnotate),
             ("capso://grab/area-and-annotate", .captureAreaAndAnnotate),
+            ("capso://grab/area-and-pin", .captureAreaAndPin),
             ("capso://grab/pin", .pinFromClipboard),
             ("capso://grab/pin-from-clipboard", .pinFromClipboard),
             ("capso://grab/edit-clipboard", .editClipboardImage),

@@ -1680,6 +1680,28 @@
         }
       }
     },
+    "Capture Area & Pin" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エリアキャプチャ & ピン留め"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영역 캡처 & 고정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截取区域并悬浮"
+          }
+        }
+      }
+    },
     "Capture Area to Clipboard" : {
       "localizations" : {
         "ja" : {
