@@ -95,11 +95,12 @@ private final class HistoryNSWindow: NSWindow, QLPreviewPanelDataSource {
     override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
 
     override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
-        panel.dataSource = self
+        // Older SDKs don't mark these callbacks main-actor, though AppKit calls them there.
+        MainActor.assumeIsolated { panel.dataSource = self }
     }
 
     override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
-        panel.dataSource = nil
+        MainActor.assumeIsolated { panel.dataSource = nil }
     }
 
     nonisolated func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
