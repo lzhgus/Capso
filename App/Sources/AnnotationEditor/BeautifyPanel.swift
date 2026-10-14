@@ -47,6 +47,37 @@ struct BeautifyPanel: View {
                         }
                     }
 
+                    if settings.backgroundStyle == .gradient {
+                        settingRow("Gradient") {
+                            HStack(spacing: 4) {
+                                ForEach(BeautifyGradientPreset.vivid) { preset in
+                                    gradientSwatch(preset)
+                                }
+                            }
+                        }
+                        settingRow("") {
+                            HStack(spacing: 4) {
+                                ForEach(BeautifyGradientPreset.muted) { preset in
+                                    gradientSwatch(preset)
+                                }
+                            }
+                        }
+                        settingRow("Custom") {
+                            HStack(spacing: 4) {
+                                ColorPicker("", selection: customStartBinding, supportsOpacity: false)
+                                    .labelsHidden()
+                                ColorPicker("", selection: customEndBinding, supportsOpacity: false)
+                                    .labelsHidden()
+                            }
+                            .padding(2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(Color.accentColor, lineWidth: settings.gradientPreset == nil ? 1.5 : 0)
+                            )
+                        }
+                        sliderRow("Angle", value: $settings.gradientAngle, range: 0...360)
+                    }
+
                     Divider()
                         .padding(.vertical, 1)
 
@@ -134,6 +165,48 @@ struct BeautifyPanel: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Editing a custom colour switches the gradient to custom mode.
+    private var customStartBinding: Binding<Color> {
+        Binding(
+            get: { settings.gradientCustomStart },
+            set: { settings.gradientCustomStart = $0; settings.gradientPreset = nil }
+        )
+    }
+
+    private var customEndBinding: Binding<Color> {
+        Binding(
+            get: { settings.gradientCustomEnd },
+            set: { settings.gradientCustomEnd = $0; settings.gradientPreset = nil }
+        )
+    }
+
+    private func gradientSwatch(_ preset: BeautifyGradientPreset) -> some View {
+        let selected = settings.gradientPreset == preset
+        let points = BeautifyGradientGeometry.unitPoints(angle: preset.angle)
+        return Button {
+            settings.selectGradientPreset(preset)
+        } label: {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: preset.stops.map { Color(nsColor: $0) },
+                        startPoint: points.start,
+                        endPoint: points.end
+                    )
+                )
+                .frame(width: 18, height: 18)
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+                .padding(2)
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.accentColor, lineWidth: selected ? 1.5 : 0)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(preset.label)
+        .accessibilityLabel(Text(preset.label))
     }
 
     private func isColorMatch(_ a: Color, _ b: Color) -> Bool {
