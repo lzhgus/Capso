@@ -56,25 +56,20 @@ enum BeautifyRenderer {
             height: CGFloat(image.height)
         )
 
-        if settings.shadowEnabled {
-            ctx.saveGState()
-            ctx.setShadow(offset: CGSize(width: 0, height: -6), blur: shadowRadius, color: NSColor.black.withAlphaComponent(0.25).cgColor)
-            let shadowPath = CGPath(roundedRect: imageRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-            ctx.addPath(shadowPath)
-            ctx.setFillColor(NSColor.white.cgColor)
-            ctx.fillPath()
-            ctx.restoreGState()
-        }
-
+        // The shadow is cast by the clipped image itself, so it follows the
+        // screenshot's own transparent corners instead of a filled shape
+        // that can show through them.
         ctx.saveGState()
-        let clipPath = CGPath(roundedRect: imageRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-        ctx.addPath(clipPath)
+        if settings.shadowEnabled {
+            ctx.setShadow(offset: CGSize(width: 0, height: -6), blur: shadowRadius, color: NSColor.black.withAlphaComponent(0.25).cgColor)
+        }
+        ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+        ctx.addPath(Path(roundedRect: imageRect, cornerRadius: cornerRadius, style: .continuous).cgPath)
         ctx.clip()
         // No y-flip: CGContext.draw(_:in:) already renders CGImages right-side-up
         // in a bottom-left CGBitmapContext. (AnnotationRenderer does the same.)
-        // The previous flip was a long-standing bug that went unnoticed with
-        // solid backgrounds because users mostly inspected the editor preview.
         ctx.draw(image, in: imageRect)
+        ctx.endTransparencyLayer()
         ctx.restoreGState()
 
         return ctx.makeImage()

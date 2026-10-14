@@ -411,7 +411,7 @@ struct AnnotationEditorView: View {
             alignment: .topLeading
         )
         .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: canvasCornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: canvasCornerRadius, style: .continuous))
         .shadow(color: canvasShadowColor, radius: canvasShadowRadius, y: canvasShadowOffsetY)
         .padding(previewOuterInset)
     }
