@@ -6,6 +6,7 @@ import ShareKit
 struct HistoryItemView: View {
     let entry: HistoryEntry
     let coordinator: HistoryCoordinator
+    var isSelected = false
     @State private var isHovered = false
     @State private var thumbnailImage: NSImage?
 
@@ -138,6 +139,10 @@ struct HistoryItemView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(.white.opacity(isHovered ? 0.1 : 0.04), lineWidth: 0.5)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.accentColor, lineWidth: isSelected ? 2 : 0)
         )
         .shadow(color: .black.opacity(isHovered ? 0.2 : 0), radius: 8, y: 2)
         .scaleEffect(isHovered ? 1.02 : 1.0)

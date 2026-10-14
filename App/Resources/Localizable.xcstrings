@@ -6752,6 +6752,13 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制云端链接" } }
       }
     },
+    "Delete %lld captures?" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%lld 件のキャプチャを削除しますか？" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캡처 %lld개를 삭제할까요?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除 %lld 张截图？" } }
+      }
+    },
     "Delete capture?" : {
       "localizations" : {
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャプチャを削除しますか？" } },
