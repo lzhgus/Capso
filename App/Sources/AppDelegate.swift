@@ -58,6 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         captureCoordinator!.shareCoordinator = shareCoordinator
         historyCoordinator!.shareCoordinator = shareCoordinator
         recordingCoordinator!.historyCoordinator = historyCoordinator
+        historyCoordinator!.onEditRecording = { [weak recordingCoordinator] source in
+            recordingCoordinator?.openEditor(for: source)
+        }
         recordingCoordinator!.desktopIconsCover = desktopIconsCover
         recordingCoordinator!.recoverInterruptedRecording()
         preferencesWindow = PreferencesWindow(settings: settings, permissionManager: permissionManager, updateManager: updateManager)

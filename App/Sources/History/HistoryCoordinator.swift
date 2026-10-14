@@ -25,6 +25,8 @@ final class HistoryCoordinator {
     /// Cloud sharing coordinator — set by AppDelegate after creation.
     /// Non-nil only when cloud sharing is configured.
     var shareCoordinator: ShareCoordinator?
+    /// Opens a recording from history in the video editor.
+    var onEditRecording: ((HistoryRecordingSource) -> Void)?
 
     private var historyWindow: HistoryWindow?
     private var annotationWindow: AnnotationEditorWindow?
@@ -284,7 +286,13 @@ final class HistoryCoordinator {
     // MARK: - Save Recording to History
 
     @discardableResult
-    func saveRecording(url: URL, mode: HistoryCaptureMode, entryID: UUID = UUID()) -> UUID {
+    func saveRecording(
+        url: URL,
+        mode: HistoryCaptureMode,
+        entryID: UUID = UUID(),
+        cursorTelemetryURL: URL? = nil,
+        info: HistoryRecordingInfo? = nil
+    ) -> UUID {
         guard settings.historyEnabled, let store else { return entryID }
 
         pendingCloudURLs.begin(id: entryID)
@@ -300,6 +308,12 @@ final class HistoryCoordinator {
                 try fm.copyItem(at: url, to: destURL)
 
                 let fileSize = (try? fm.attributesOfItem(atPath: destURL.path)[.size] as? Int64) ?? 0
+                if let cursorTelemetryURL {
+                    try? fm.copyItem(at: cursorTelemetryURL, to: entryDir.appendingPathComponent(HistoryRecordingSource.cursorFileName))
+                }
+                if let info, let data = try? JSONEncoder().encode(info) {
+                    try? data.write(to: entryDir.appendingPathComponent(HistoryRecordingSource.infoFileName))
+                }
 
                 let thumbName = "thumbnail.jpg"
                 let thumbURL = entryDir.appendingPathComponent(thumbName)
@@ -498,8 +512,13 @@ final class HistoryCoordinator {
     }
 
     func editEntry(_ entry: HistoryEntry) {
-        guard isScreenshot(entry),
-              let image = loadFullImage(for: entry) else { return }
+        if !isScreenshot(entry) {
+            if let videoURL = fullImageURL(for: entry) {
+                onEditRecording?(HistoryRecordingSource(entry: entry, videoURL: videoURL))
+            }
+            return
+        }
+        guard let image = loadFullImage(for: entry) else { return }
 
         let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
             ?? NSScreen.main
@@ -866,3 +885,32 @@ final class HistoryCoordinator {
         return (try? store.count(filter: filter)) ?? 0
     }
 }
+
+/// How a recording was made, kept next to it in history so it can be edited again later.
+struct HistoryRecordingInfo: Codable, Equatable {
+    var showsCursor: Bool
+    var recordingAreaWidth: Double
+    var recordingAreaHeight: Double
+}
+
+/// A recording in history, with whatever the editor needs that was saved alongside it.
+struct HistoryRecordingSource {
+    static let cursorFileName = "cursor.json"
+    static let infoFileName = "recording.json"
+
+    let videoURL: URL
+    let mode: HistoryCaptureMode
+    let cursorTelemetryURL: URL?
+    let info: HistoryRecordingInfo?
+
+    init(entry: HistoryEntry, videoURL: URL) {
+        let dir = videoURL.deletingLastPathComponent()
+        let cursorURL = dir.appendingPathComponent(Self.cursorFileName)
+        self.videoURL = videoURL
+        self.mode = entry.captureMode
+        self.cursorTelemetryURL = FileManager.default.fileExists(atPath: cursorURL.path) ? cursorURL : nil
+        self.info = (try? Data(contentsOf: dir.appendingPathComponent(Self.infoFileName)))
+            .flatMap { try? JSONDecoder().decode(HistoryRecordingInfo.self, from: $0) }
+    }
+}
+

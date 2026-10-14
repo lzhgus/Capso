@@ -721,7 +721,17 @@ final class RecordingCoordinator {
                 // Save to history immediately (before user decides to Save/discard)
                 let format = result.format as RecordingKit.RecordingFormat
                 let entryID = UUID()
-                saveRecordingToHistory(url: tempURL, format: format, entryID: entryID)
+                saveRecordingToHistory(
+                    url: tempURL,
+                    format: format,
+                    entryID: entryID,
+                    cursorTelemetryURL: cursorTelemetryURL,
+                    info: HistoryRecordingInfo(
+                        showsCursor: settings.showCursor,
+                        recordingAreaWidth: result.size.width,
+                        recordingAreaHeight: result.size.height
+                    )
+                )
                 startAutomaticClipboardCopyIfNeeded(url: tempURL, format: format)
                 startAutomaticUploadIfNeeded(url: tempURL, format: format, entryID: entryID)
 
@@ -987,7 +997,7 @@ final class RecordingCoordinator {
                 showsCursor: showsCursor,
                 videoDuration: duration,
                 videoSize: naturalSize,
-                recordingAreaSize: recordingAreaSize
+                recordingAreaSize: recordingAreaSize == .zero ? naturalSize : recordingAreaSize
             )
 
             let coordinator = EditorCoordinator(project: project, outputFormat: outputFormat)
@@ -1454,11 +1464,30 @@ final class RecordingCoordinator {
     private func saveRecordingToHistory(
         url: URL,
         format: RecordingKit.RecordingFormat,
-        entryID: UUID
+        entryID: UUID,
+        cursorTelemetryURL: URL? = nil,
+        info: HistoryRecordingInfo? = nil
     ) {
         guard let historyCoordinator else { return }
         let mode: HistoryCaptureMode = format == .gif ? .gif : .recording
-        historyCoordinator.saveRecording(url: url, mode: mode, entryID: entryID)
+        historyCoordinator.saveRecording(
+            url: url,
+            mode: mode,
+            entryID: entryID,
+            cursorTelemetryURL: cursorTelemetryURL,
+            info: info
+        )
+    }
+
+    /// Reopens a recording saved in history in the editor.
+    func openEditor(for source: HistoryRecordingSource) {
+        openEditor(
+            tempURL: source.videoURL,
+            cursorTelemetryURL: source.cursorTelemetryURL,
+            showsCursor: source.info?.showsCursor ?? true,
+            recordingAreaSize: source.info.map { CGSize(width: $0.recordingAreaWidth, height: $0.recordingAreaHeight) } ?? .zero,
+            outputFormat: source.mode == .gif ? .gif : .mp4
+        )
     }
 
     private func startAutomaticUploadIfNeeded(

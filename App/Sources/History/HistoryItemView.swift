@@ -179,10 +179,8 @@ struct HistoryItemView: View {
             actionButton("square.and.arrow.down") { coordinator.saveToFile(entry) }
                 .help(String(localized: "Save to..."))
 
-            if isScreenshot {
-                actionButton("pencil.tip.crop.circle") { coordinator.editEntry(entry) }
-                    .help(String(localized: "Edit"))
-            }
+            actionButton("pencil.tip.crop.circle") { coordinator.editEntry(entry) }
+                .help(String(localized: "Edit"))
 
             cloudActionButton
         }
@@ -337,9 +335,7 @@ struct HistoryItemView: View {
     private var contextMenu: some View {
         Button("Copy to Clipboard") { coordinator.copyToClipboard(entry) }
         Button("Save to...") { coordinator.saveToFile(entry) }
-        if isScreenshot {
-            Button("Edit") { coordinator.editEntry(entry) }
-        }
+        Button("Edit") { coordinator.editEntry(entry) }
 
         if let cloudURL = entry.cloudURL {
             Button(String(localized: "Copy Cloud Link")) {
