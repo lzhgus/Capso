@@ -5,9 +5,51 @@
       "comment" : "Bundle display name",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "Capso"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "Capso"
           }
         }
@@ -17,9 +59,51 @@
       "comment" : "Bundle name",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "Capso"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "Capso"
           }
         }
@@ -29,10 +113,34 @@
       "comment" : "Privacy - Camera Usage Description",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso benötigt Zugriff auf die Kamera, um deine Webcam während Bildschirmaufnahmen anzuzeigen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Capso needs camera access to show your webcam during screen recordings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso necesita acceso a la cámara para mostrar tu webcam durante las grabaciones de pantalla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso a besoin d'accéder à la caméra pour afficher votre webcam pendant les enregistrements de l'écran."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso ha bisogno dell'accesso alla fotocamera per mostrare la tua webcam durante le registrazioni dello schermo."
           }
         },
         "ja" : {
@@ -47,10 +155,28 @@
             "value" : "Capso가 화면 녹화 중 웹캠을 표시하려면 카메라 접근 권한이 필요합니다."
           }
         },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Capso precisa de acesso à câmera para mostrar sua webcam durante as gravações de tela."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso нужен доступ к камере, чтобы показывать изображение с веб-камеры во время записи экрана."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Capso 需要摄像头权限以在录屏时显示摄像头画面。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso 需要取用相機，才能在螢幕錄製期間顯示你的網路攝影機畫面。"
           }
         }
       }
@@ -59,10 +185,34 @@
       "comment" : "Privacy - Microphone Usage Description",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso benötigt Zugriff auf das Mikrofon, um während Bildschirmaufnahmen Audio aufzuzeichnen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Capso needs microphone access to record audio during screen recordings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso necesita acceso al micrófono para grabar audio durante las grabaciones de pantalla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso a besoin d'accéder au micro pour enregistrer l'audio pendant les enregistrements de l'écran."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso ha bisogno dell'accesso al microfono per registrare l'audio durante le registrazioni dello schermo."
           }
         },
         "ja" : {
@@ -77,10 +227,28 @@
             "value" : "Capso가 화면 녹화 중 오디오를 녹음하려면 마이크 접근 권한이 필요합니다."
           }
         },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Capso precisa de acesso ao microfone para gravar áudio durante as gravações de tela."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso нужен доступ к микрофону, чтобы записывать звук во время записи экрана."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "Capso 需要麦克风权限以在录屏时录制音频。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso 需要取用麥克風，才能在螢幕錄製期間錄製音訊。"
           }
         }
       }
@@ -88,6 +256,30 @@
     "NSScreenCaptureUsageDescription" : {
       "extractionState" : "stale",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso benötigt die Berechtigung zur Bildschirmaufnahme, um Bildschirmfotos zu erstellen und den Bildschirm aufzuzeichnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso necesita acceso a la grabación de pantalla para hacer capturas y grabar la pantalla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso a besoin de l'autorisation d'enregistrement de l'écran pour prendre des captures d'écran et enregistrer l'écran."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso ha bisogno dell'autorizzazione di registrazione dello schermo per catturare istantanee e registrare lo schermo."
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -100,10 +292,28 @@
             "value" : "Capso가 스크린샷을 캡처하고 화면을 녹화하려면 화면 녹화 권한이 필요합니다."
           }
         },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Capso precisa de permissão de Gravação de Tela para fazer capturas de tela e gravar a tela."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso нужно разрешение на запись экрана, чтобы делать снимки экрана и записывать экран."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Capso 需要屏幕录制权限来截取屏幕截图和录制屏幕。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capso 需要螢幕錄製權限，才能擷取截圖和錄製螢幕。"
           }
         }
       }
