@@ -500,6 +500,15 @@ final class CaptureAllInOneToolbarWindow {
         if selectionOverlayView?.handleCenterLockKeyEvent(event) == true {
             return nil
         }
+        if event.keyCode == 49, let selectionOverlayView {
+            let held = event.type == .keyDown
+                && annotationOverlay?.isEditingText != true
+                && event.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty
+            guard held || selectionOverlayView.isSpaceHeld else { return event }
+            selectionOverlayView.isSpaceHeld = held
+            updateSelectionMouseHandling()
+            return nil
+        }
         guard event.type == .keyDown else { return event }
         if event.keyCode == 53 {
             onCancel?()
@@ -1217,6 +1226,16 @@ final class AllInOneSelectionOverlayView: NSView {
     private let annotationInnerHitSlop: CGFloat = 4
     private let annotationOuterHitSlop: CGFloat = 12
     private var dragOperation: DragOperation = .none
+    /// Holding Space lets a drag inside the selection move it, even while annotating.
+    var isSpaceHeld = false {
+        didSet {
+            guard isSpaceHeld != oldValue else { return }
+            window?.invalidateCursorRects(for: self)
+            if let window {
+                updateCursor(for: convert(window.mouseLocationOutsideOfEventStream, from: nil))
+            }
+        }
+    }
     private var trackingArea: NSTrackingArea?
     /// Whether Shift is currently held, locking the drag to a 1:1 square.
     private var squareLock = false
@@ -1353,7 +1372,7 @@ final class AllInOneSelectionOverlayView: NSView {
             )
         }
 
-        if !passesThroughSelectionBody {
+        if !passesThroughSelectionBody || isSpaceHeld {
             let bodyRect = rect.insetBy(dx: innerSlop, dy: innerSlop)
             if bodyRect.width > 0, bodyRect.height > 0 {
                 addCursorRect(bodyRect, cursor: .openHand)
@@ -1636,7 +1655,7 @@ final class AllInOneSelectionOverlayView: NSView {
         case .resize:
             return true
         case .move:
-            return false
+            return isSpaceHeld
         case nil:
             return true
         }
