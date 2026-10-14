@@ -783,6 +783,17 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "screenshotShowsCursor") }
     }
 
+    public var autoBeautifyScreenshots: Bool {
+        get { defaults.object(forKey: "autoBeautifyScreenshots") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "autoBeautifyScreenshots") }
+    }
+
+    /// The editor's last Beautify style, applied by `autoBeautifyScreenshots`.
+    public var beautifyStyle: Data? {
+        get { defaults.data(forKey: "beautifyStyle") }
+        set { defaults.set(newValue, forKey: "beautifyStyle") }
+    }
+
     public var screenshotTimestampEnabled: Bool {
         get { defaults.object(forKey: "screenshotTimestampEnabled") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "screenshotTimestampEnabled") }

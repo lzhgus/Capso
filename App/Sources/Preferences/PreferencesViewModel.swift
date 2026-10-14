@@ -192,6 +192,17 @@ final class PreferencesViewModel {
             }
         }
     }
+    var autoBeautifyScreenshots: Bool {
+        get {
+            access(keyPath: \.autoBeautifyScreenshots)
+            return settings.autoBeautifyScreenshots
+        }
+        set {
+            withMutation(keyPath: \.autoBeautifyScreenshots) {
+                settings.autoBeautifyScreenshots = newValue
+            }
+        }
+    }
     var screenshotTimestampEnabled: Bool {
         get {
             access(keyPath: \.screenshotTimestampEnabled)

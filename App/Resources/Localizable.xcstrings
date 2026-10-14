@@ -46,6 +46,28 @@
         }
       }
     },
+    "Beautify Every Screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのスクリーンショットを美化"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 스크린샷 꾸미기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "美化每张截图"
+          }
+        }
+      }
+    },
     "Black" : {
       "localizations" : {
         "ja" : {
@@ -812,6 +834,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "智能缩放"
+          }
+        }
+      }
+    },
+    "Uses the background, padding, corners and shadow last set in the editor's Beautify panel" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エディタの美化パネルで最後に設定した背景、余白、角丸、影を使用します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "편집기의 꾸미기 패널에서 마지막으로 설정한 배경, 여백, 모서리, 그림자를 사용합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用编辑器美化面板中最近设置的背景、边距、圆角和阴影"
           }
         }
       }

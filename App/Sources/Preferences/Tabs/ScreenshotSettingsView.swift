@@ -136,6 +136,19 @@ struct ScreenshotSettingsView: View {
                 }
             }
 
+            SettingGroup(title: "Beautify") {
+                SettingCard {
+                    SettingRow(
+                        label: "Beautify Every Screenshot",
+                        sublabel: "Uses the background, padding, corners and shadow last set in the editor's Beautify panel"
+                    ) {
+                        Toggle("", isOn: $viewModel.autoBeautifyScreenshots)
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                    }
+                }
+            }
+
             SettingGroup(title: "Self-Timer") {
                 SettingCard {
                     SettingRow(

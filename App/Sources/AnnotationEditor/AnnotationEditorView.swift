@@ -88,7 +88,7 @@ struct AnnotationEditorView: View {
     /// the font-size slider even when the tool is `.select` (happens when
     /// re-editing via double-click).
     @State private var isEditingText = false
-    @State private var beautifySettings = BeautifySettings()
+    @State private var beautifySettings = BeautifySettings.saved()
     @State private var showBeautifyPanel = false
     @State private var refreshTrigger = 0
     @State private var zoomScale: CGFloat = 1.0
@@ -467,6 +467,7 @@ struct AnnotationEditorView: View {
             get: { beautifySettings },
             set: { newValue in
                 beautifySettings = newValue
+                newValue.saveStyle()
                 invalidateDragCache()
             }
         )

@@ -1,3 +1,5 @@
+import AppKit
+import SharedKit
 import SwiftUI
 
 /// Background style for the Beautify background surrounding the screenshot.
@@ -33,4 +35,45 @@ struct BeautifySettings {
     var clampedShadowRadius: CGFloat { shadowEnabled ? max(0, shadowRadius) : 0 }
     var shadowInset: CGFloat { shadowEnabled ? clampedShadowRadius + 6 : 0 }
     var outerInset: CGFloat { clampedPadding + shadowInset }
+}
+
+extension BeautifySettings {
+    private struct Style: Codable {
+        var backgroundStyle: String
+        var backgroundColor: [CGFloat]
+        var padding: CGFloat
+        var cornerRadius: CGFloat
+        var shadowEnabled: Bool
+        var shadowRadius: CGFloat
+    }
+
+    /// The last style set in the editor, with Beautify itself left off.
+    static func saved(settings: AppSettings = AppSettings()) -> BeautifySettings {
+        var result = BeautifySettings()
+        guard let data = settings.beautifyStyle,
+              let style = try? JSONDecoder().decode(Style.self, from: data) else { return result }
+        result.backgroundStyle = BeautifyBackgroundStyle(rawValue: style.backgroundStyle) ?? .solid
+        if style.backgroundColor.count == 4 {
+            let c = style.backgroundColor
+            result.backgroundColor = Color(nsColor: NSColor(srgbRed: c[0], green: c[1], blue: c[2], alpha: c[3]))
+        }
+        result.padding = style.padding
+        result.cornerRadius = style.cornerRadius
+        result.shadowEnabled = style.shadowEnabled
+        result.shadowRadius = style.shadowRadius
+        return result
+    }
+
+    func saveStyle(settings: AppSettings = AppSettings()) {
+        let color = NSColor(backgroundColor).usingColorSpace(.sRGB) ?? .white
+        let style = Style(
+            backgroundStyle: backgroundStyle.rawValue,
+            backgroundColor: [color.redComponent, color.greenComponent, color.blueComponent, color.alphaComponent],
+            padding: padding,
+            cornerRadius: cornerRadius,
+            shadowEnabled: shadowEnabled,
+            shadowRadius: shadowRadius
+        )
+        settings.beautifyStyle = try? JSONEncoder().encode(style)
+    }
 }

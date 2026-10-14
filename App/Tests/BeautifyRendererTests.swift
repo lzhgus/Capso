@@ -1,4 +1,5 @@
 import AppKit
+import SharedKit
 import SwiftUI
 import XCTest
 @testable import Capso
@@ -31,6 +32,33 @@ final class BeautifyRendererTests: XCTestCase {
 
         let center = try XCTUnwrap(rep.colorAt(x: inset + size / 2, y: inset + size / 2)?.usingColorSpace(.deviceRGB))
         XCTAssertGreaterThan(center.redComponent, 0.9)
+    }
+
+    func testSavedStyleRoundTripsWithBeautifyOff() throws {
+        let suite = "BeautifyStyleTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = AppSettings(defaults: defaults)
+
+        var style = BeautifySettings()
+        style.isEnabled = true
+        style.backgroundStyle = .liquidGlass
+        style.backgroundColor = Color(nsColor: NSColor(srgbRed: 0.2, green: 0.4, blue: 0.6, alpha: 1))
+        style.padding = 24
+        style.cornerRadius = 18
+        style.shadowEnabled = false
+        style.shadowRadius = 10
+        style.saveStyle(settings: settings)
+
+        let loaded = BeautifySettings.saved(settings: settings)
+        XCTAssertFalse(loaded.isEnabled)
+        XCTAssertEqual(loaded.backgroundStyle, .liquidGlass)
+        XCTAssertEqual(loaded.padding, 24)
+        XCTAssertEqual(loaded.cornerRadius, 18)
+        XCTAssertFalse(loaded.shadowEnabled)
+        XCTAssertEqual(loaded.shadowRadius, 10)
+        let color = try XCTUnwrap(NSColor(loaded.backgroundColor).usingColorSpace(.sRGB))
+        XCTAssertEqual(color.blueComponent, 0.6, accuracy: 0.01)
     }
 
     private static func context(width: Int, height: Int) -> CGContext? {

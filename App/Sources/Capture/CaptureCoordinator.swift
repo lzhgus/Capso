@@ -162,6 +162,26 @@ final class CaptureCoordinator {
         )
     }
 
+    private func beautifiedResultIfNeeded(_ result: CaptureResult, action: PostCaptureAction) -> CaptureResult {
+        // Editors start from the plain capture so Beautify stays adjustable there.
+        guard settings.autoBeautifyScreenshots,
+              ![.pin, .ocr, .annotate, .inlineAnnotate].contains(action) else { return result }
+        var style = BeautifySettings.saved(settings: settings)
+        style.isEnabled = true
+        guard let image = BeautifyRenderer.render(image: result.image, settings: style) else { return result }
+
+        return CaptureResult(
+            image: image,
+            mode: result.mode,
+            captureRect: result.captureRect,
+            windowName: result.windowName,
+            appName: result.appName,
+            appBundleIdentifier: result.appBundleIdentifier,
+            timestamp: result.timestamp,
+            displayID: result.displayID
+        )
+    }
+
     func captureArea() {
         startAreaCapture(action: .default)
     }
@@ -1589,11 +1609,10 @@ final class CaptureCoordinator {
         automatedCaptureDeadline = nil
 
         let result = captureResultWithPendingSource(capturedResult)
-        let outputResult = timestampedResultIfNeeded(result)
-        lastCaptureResult = result
-
         let action = pendingAction
         pendingAction = .default
+        let outputResult = beautifiedResultIfNeeded(timestampedResultIfNeeded(result), action: action)
+        lastCaptureResult = result
 
         if settings.playShutterSound, action.playsShutterSound {
             Self.shutterSound?.stop()
