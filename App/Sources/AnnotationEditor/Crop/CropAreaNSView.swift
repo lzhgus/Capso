@@ -202,15 +202,18 @@ final class CropAreaNSView: NSView {
             && abs(cropRect.height - imageSize.height) < 0.5
     }
 
-    /// Normalised rect between two image points, optionally forced to
-    /// `aspectRatio` (width / height) with the start point as the anchor.
-    static func creationRect(from start: CGPoint, to end: CGPoint, aspectRatio: CGFloat?) -> CGRect {
-        let width = end.x - start.x
-        var height = end.y - start.y
+    /// Normalised rect between two image points, kept inside `bounds` and
+    /// optionally forced to `aspectRatio` (width / height) with the start point as the anchor.
+    static func creationRect(from start: CGPoint, to end: CGPoint, aspectRatio: CGFloat?, in bounds: CGSize) -> CGRect {
+        let start = CGPoint(x: min(max(start.x, 0), bounds.width), y: min(max(start.y, 0), bounds.height))
+        var width = min(max(end.x, 0), bounds.width) - start.x
+        var height = min(max(end.y, 0), bounds.height) - start.y
         if let aspectRatio, aspectRatio > 0 {
-            // Width is the user's intent; derive height and keep the drag direction.
-            let derived = abs(width) / aspectRatio
-            height = height < 0 ? -derived : derived
+            // Width is the user's intent; shrink it if the derived height would leave the image.
+            let roomY = end.y < start.y ? start.y : bounds.height - start.y
+            let w = min(abs(width), roomY * aspectRatio)
+            width = width < 0 ? -w : w
+            height = end.y < start.y ? -w / aspectRatio : w / aspectRatio
         }
         return CGRect(
             x: min(start.x, start.x + width),
@@ -225,7 +228,7 @@ final class CropAreaNSView: NSView {
         let viewPoint = convert(event.locationInWindow, from: nil)
         let hit = handle(at: viewPoint)
         // Outside the crop, or anywhere while the crop is still the whole
-        // image: drag out a new rect instead of moving/resizing (Shottr-style).
+        // image: drag out a new rect instead of moving/resizing.
         if hit == nil || (hit == .move && isIdentityCrop) {
             activeHandle = .create
         } else {
@@ -260,19 +263,24 @@ final class CropAreaNSView: NSView {
         let newRect: CGRect
         switch handle {
         case .create:
-            newRect = Self.creationRect(from: startPoint, to: currentPoint, aspectRatio: aspectRatio)
+            newRect = Self.creationRect(from: startPoint, to: currentPoint, aspectRatio: aspectRatio, in: imageSize)
         case .move:
             newRect = moveRect(startRect, by: CGSize(width: dx, height: dy))
         case .topLeft, .top, .topRight, .left, .right, .bottomLeft, .bottom, .bottomRight:
             newRect = resizeRect(startRect, handle: handle, dx: dx, dy: dy)
         }
 
-        let snapped = softSnap
+        // Snapping moves edges independently, which would break a fixed ratio.
+        let keepsRatio = handle == .create && aspectRatio != nil
+        let snapped = softSnap && !keepsRatio
             ? CropSnap.snapRect(newRect, to: imageSize, threshold: 6 / zoomScale)
             : newRect
+        // Whole pixels, so the size shown is the size exported.
         let clamped = clampToImage(snapped)
-        cropRect = clamped
-        onCropRectChanged?(clamped)
+        let minX = clamped.minX.rounded(), minY = clamped.minY.rounded()
+        let pixelRect = CGRect(x: minX, y: minY, width: clamped.maxX.rounded() - minX, height: clamped.maxY.rounded() - minY)
+        cropRect = pixelRect
+        onCropRectChanged?(pixelRect)
     }
 
     override func mouseUp(with event: NSEvent) {

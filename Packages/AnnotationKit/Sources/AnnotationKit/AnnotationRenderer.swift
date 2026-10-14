@@ -66,7 +66,13 @@ public enum AnnotationRenderer {
         guard var outputImage = ctx.makeImage() else { return nil }
 
         if let crop = cropRect {
-            let clipped = crop.intersection(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
+            // Round to the nearest pixel; `cropping(to:)` would otherwise round outward.
+            let rounded = CGRect(
+                x: crop.minX.rounded(), y: crop.minY.rounded(),
+                width: crop.maxX.rounded() - crop.minX.rounded(),
+                height: crop.maxY.rounded() - crop.minY.rounded()
+            )
+            let clipped = rounded.intersection(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
             if !clipped.isEmpty, let cropped = outputImage.cropping(to: clipped) {
                 outputImage = cropped
             }

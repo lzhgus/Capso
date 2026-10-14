@@ -71,4 +71,15 @@ struct AnnotationRendererCropTests {
         #expect(output.width == 4)
         #expect(output.height == 4)
     }
+
+    @Test("Fractional crop rects round to the nearest pixel")
+    func fractionalCropRounds() throws {
+        let output = try #require(AnnotationRenderer.render(
+            sourceImage: try makeSplitImage(),
+            objects: [],
+            cropRect: CGRect(x: 1.4, y: 0.6, width: 5.2, height: 3.8)
+        ))
+        #expect(output.width == 6)
+        #expect(output.height == 3)
+    }
 }
