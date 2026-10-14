@@ -326,6 +326,7 @@ final class AllInOneAnnotationSession: ObservableObject {
     @Published var textOutlineEnabled: Bool
     @Published var textStrokeEnabled: Bool
     @Published var lineWidth: CGFloat
+    @Published var textFontSize: CGFloat
     @Published var strokePattern: StrokePattern
     @Published var redactionMode: RedactionMode
     @Published var isEditingText = false
@@ -355,6 +356,7 @@ final class AllInOneAnnotationSession: ObservableObject {
         self.textOutlineEnabled = UserDefaults.standard.bool(forKey: "annotationTextOutlineEnabled")
         self.textStrokeEnabled = Self.storedTextStrokeEnabled()
         self.lineWidth = Self.storedWidth(for: Self.storedTool())
+        self.textFontSize = Self.storedTextFontSize()
         self.strokePattern = Self.storedStrokePattern()
         self.redactionMode = Self.storedRedactionMode()
 
@@ -381,8 +383,24 @@ final class AllInOneAnnotationSession: ObservableObject {
         )
     }
 
-    var effectiveTextFontSize: CGFloat {
-        (currentTool == .text || isEditingText) ? lineWidth : Self.storedTextFontSize()
+    var isFontSizeMode: Bool {
+        currentTool == .text || isEditingText
+    }
+
+    /// The toolbar slider edits the font size while text is in play, and the tool's width otherwise.
+    var sliderValue: CGFloat {
+        isFontSizeMode ? textFontSize : lineWidth
+    }
+
+    func setSliderValue(_ value: CGFloat) {
+        if isFontSizeMode {
+            textFontSize = value
+            persistWidth(value, for: .text)
+        } else {
+            lineWidth = value
+            persistWidth(value, for: currentTool)
+            updateSelectedStyle()
+        }
     }
 
     var textFillColor: AnnotationColor? {
@@ -421,7 +439,9 @@ final class AllInOneAnnotationSession: ObservableObject {
 
     func switchTool(_ newTool: AnnotationTool) {
         document.clearSelection()
-        persistWidth(lineWidth, for: currentTool)
+        if currentTool != .text {
+            persistWidth(lineWidth, for: currentTool)
+        }
         currentTool = newTool
         lineWidth = Self.storedWidth(for: newTool)
         UserDefaults.standard.set(newTool.rawValue, forKey: "annotationLastTool")
@@ -552,7 +572,7 @@ private struct AllInOneAnnotationCanvasView: View {
             currentTool: session.currentTool,
             currentStyle: session.currentStyle,
             redactionMode: session.redactionMode,
-            textFontSize: session.effectiveTextFontSize,
+            textFontSize: session.textFontSize,
             textFillColor: session.textFillColor,
             textOutlineColor: session.textOutlineColor,
             textGlyphStrokeColor: session.textGlyphStrokeColor,
@@ -570,13 +590,13 @@ private struct AllInOneAnnotationCanvasView: View {
                 session.textFillEnabled = hasFill
                 session.textOutlineEnabled = hasOutline
                 session.textStrokeEnabled = hasStroke
-                if session.lineWidth != fontSize {
-                    session.lineWidth = fontSize
+                if session.textFontSize != fontSize {
+                    session.textFontSize = fontSize
                 }
             },
             onTextEditingEnded: {
                 session.isEditingText = false
-                session.persistWidth(session.lineWidth, for: .text)
+                session.persistWidth(session.textFontSize, for: .text)
             }
         )
         .background(Color.clear)
@@ -594,7 +614,7 @@ private struct AllInOneAnnotationToolbarView: View {
     @State private var showsTextStylePopover = false
 
     private var isFontSizeMode: Bool {
-        session.currentTool == .text || session.isEditingText
+        session.isFontSizeMode
     }
 
     private var hasActiveTextEffect: Bool {
@@ -776,12 +796,8 @@ private struct AllInOneAnnotationToolbarView: View {
         HStack(spacing: 7) {
             if !(session.currentTool == .pixelate && session.redactionMode == .solid) {
                 Slider(value: Binding(
-                    get: { session.lineWidth },
-                    set: {
-                        session.lineWidth = $0
-                        session.persistWidth($0, for: session.currentTool)
-                        session.updateSelectedStyle()
-                    }
+                    get: { session.sliderValue },
+                    set: { session.setSliderValue($0) }
                 ), in: sliderRange, step: sliderStep)
                 .frame(width: 92)
                 .help(sliderHelp)
@@ -1067,7 +1083,7 @@ private struct AllInOneAnnotationToolbarView: View {
             return "\(Int(session.lineWidth))px"
         }
         if isFontSizeMode {
-            return "\(Int(session.lineWidth))pt"
+            return "\(Int(session.textFontSize))pt"
         }
         return "\(Int(session.lineWidth))px"
     }
@@ -1096,7 +1112,7 @@ private struct AllInOneAnnotationToolbarView: View {
     }
 
     private var sliderHelp: String {
-        if isFontSizeMode { return "\(String(localized: "Font Size")): \(Int(session.lineWidth))" }
+        if isFontSizeMode { return "\(String(localized: "Font Size")): \(Int(session.textFontSize))" }
         switch session.currentTool {
         case .pixelate: return "\(String(localized: "Block Size")): \(Int(session.lineWidth))"
         case .counter: return "\(String(localized: "Counter Size")): \(Int(session.lineWidth))"
