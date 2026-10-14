@@ -381,7 +381,8 @@ struct TranslationResultView: View {
 
         let sourceLanguage = detected.map { Locale.Language(identifier: $0) }
         let targetLanguage = Locale.Language(identifier: target)
-#if compiler(>=6.2)
+// `preferredStrategy:` needs the macOS 26.4 SDK, which first shipped with Swift 6.3.
+#if compiler(>=6.3)
         if #available(macOS 26.4, *) {
             runConfig = TranslationSession.Configuration(
                 source: sourceLanguage,
