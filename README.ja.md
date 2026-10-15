@@ -37,7 +37,6 @@ Swift 6.0 と SwiftUI で構築された、無料・ネイティブな CleanShot
 Homebrew でもインストールできます。
 
 ```bash
-brew tap lzhgus/tap
 brew install --cask capso
 ```
 

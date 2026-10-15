@@ -37,7 +37,6 @@
 或通过 Homebrew 安装：
 
 ```bash
-brew tap lzhgus/tap
 brew install --cask capso
 ```
 

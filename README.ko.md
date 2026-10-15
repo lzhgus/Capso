@@ -37,7 +37,6 @@ Swift 6.0과 SwiftUI로 만든 무료 네이티브 CleanShot X 대안입니다. 
 또는 Homebrew로 설치할 수 있습니다.
 
 ```bash
-brew tap lzhgus/tap
 brew install --cask capso
 ```
 

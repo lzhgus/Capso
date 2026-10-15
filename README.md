@@ -37,7 +37,6 @@ Grab the latest signed, notarized DMG from [**GitHub Releases →**](https://git
 Or install via Homebrew:
 
 ```bash
-brew tap lzhgus/tap
 brew install --cask capso
 ```
 
