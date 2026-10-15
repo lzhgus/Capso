@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static private(set) var shared: AppDelegate?
 
     private var menuBarController: MenuBarController?
+    var statusMenu: NSMenu? {
+        menuBarController?.statusMenu
+    }
     let settings = AppSettings()
     let permissionManager = PermissionManager()
     private(set) var captureCoordinator: CaptureCoordinator?
@@ -119,7 +122,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// One-time migration: clear stale KeyboardShortcuts UserDefaults so new defaults apply.
     private func migrateShortcutsIfNeeded() {
         let migrationKey = "shortcutsMigratedToOptionShift"
         if !UserDefaults.standard.bool(forKey: migrationKey) {
@@ -136,63 +138,92 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(true, forKey: translationMigrationKey)
     }
 
+    private(set) var isRecordingShortcut = false
+
     private func registerGlobalShortcuts() {
+        // Track when a shortcut is being recorded in Preferences
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("KeyboardShortcuts_recorderActiveStatusDidChange"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.isRecordingShortcut = (notification.userInfo?["isActive"] as? Bool) ?? false
+        }
+
         KeyboardShortcuts.onKeyDown(for: .captureArea) { [weak self] in
-            self?.captureCoordinator?.captureArea()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureArea()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAllInOne) { [weak self] in
-            self?.captureCoordinator?.captureAllInOne()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureAllInOne()
         }
         KeyboardShortcuts.onKeyDown(for: .captureFullscreen) { [weak self] in
-            self?.captureCoordinator?.captureFullscreen()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureFullscreen()
         }
         KeyboardShortcuts.onKeyDown(for: .captureWindow) { [weak self] in
-            self?.captureCoordinator?.captureWindow()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureWindow()
         }
         KeyboardShortcuts.onKeyDown(for: .captureText) { [weak self] in
-            self?.ocrCoordinator?.startInstantOCR()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.ocrCoordinator?.startInstantOCR()
         }
         KeyboardShortcuts.onKeyDown(for: .recordScreen) { [weak self] in
-            self?.recordingCoordinator?.startRecordingFlow()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.recordingCoordinator?.startRecordingFlow()
         }
         KeyboardShortcuts.onKeyDown(for: .recordFullscreen) { [weak self] in
-            self?.recordingCoordinator?.startFullScreenRecordingFlow()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.recordingCoordinator?.startFullScreenRecordingFlow()
         }
         KeyboardShortcuts.onKeyDown(for: .captureScrolling) { [weak self] in
-            self?.captureCoordinator?.captureScrolling()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureScrolling()
         }
         KeyboardShortcuts.onKeyDown(for: .selfTimerCapture) { [weak self] in
-            self?.captureCoordinator?.captureAreaWithSelfTimer()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureAreaWithSelfTimer()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAreaToClipboard) { [weak self] in
-            self?.captureCoordinator?.captureAreaToClipboard()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureAreaToClipboard()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAreaAndShare) { [weak self] in
-            self?.captureCoordinator?.captureAreaAndShare()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureAreaAndShare()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAreaAndAnnotate) { [weak self] in
-            self?.captureCoordinator?.captureAreaAndAnnotate()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureAreaAndAnnotate()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAreaAndPin) { [weak self] in
-            self?.captureCoordinator?.captureAreaAndPin()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.captureAreaAndPin()
         }
         KeyboardShortcuts.onKeyDown(for: .pinFromClipboard) { [weak self] in
-            self?.captureCoordinator?.pinFromClipboard()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.pinFromClipboard()
         }
         KeyboardShortcuts.onKeyDown(for: .togglePins) { [weak self] in
-            self?.captureCoordinator?.togglePinsVisibility()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.togglePinsVisibility()
         }
         KeyboardShortcuts.onKeyDown(for: .editClipboardImage) { [weak self] in
-            self?.captureCoordinator?.editClipboardImage()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.editClipboardImage()
         }
         KeyboardShortcuts.onKeyDown(for: .captureLastArea) { [weak self] in
-            self?.captureCoordinator?.replayLastCapture()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.captureCoordinator?.replayLastCapture()
         }
         KeyboardShortcuts.onKeyDown(for: .screenshotHistory) { [weak self] in
-            self?.historyCoordinator?.toggleWindow()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.historyCoordinator?.toggleWindow()
         }
         KeyboardShortcuts.onKeyDown(for: .captureAndTranslate) { [weak self] in
-            guard let self else { return }
+            guard let self, !self.isRecordingShortcut else { return }
             // If the user pressed the global Translate shortcut while a Quick
             // Access panel has focus
             // (hovered / clicked), translate THAT capture rather than
@@ -204,10 +235,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.translationCoordinator?.startCaptureAndTranslate()
         }
         KeyboardShortcuts.onKeyDown(for: .translateSelectedText) { [weak self] in
-            self?.translationCoordinator?.translateSelectedText()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.translationCoordinator?.translateSelectedText()
         }
         KeyboardShortcuts.onKeyDown(for: .translateTypedText) { [weak self] in
-            self?.translationCoordinator?.translateTypedText()
+            guard let self, !self.isRecordingShortcut else { return }
+            self.translationCoordinator?.translateTypedText()
         }
     }
 
