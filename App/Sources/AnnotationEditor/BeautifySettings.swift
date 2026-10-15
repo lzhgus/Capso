@@ -10,6 +10,8 @@ enum BeautifyBackgroundStyle: String, CaseIterable, Identifiable, Hashable {
     /// used as the backdrop — extends the image's own colours into the
     /// padding area for a "liquid glass" look.
     case liquidGlass
+    /// Transparent, for rounded corners and shadow alone.
+    case none
 
     var id: String { rawValue }
 
@@ -17,6 +19,7 @@ enum BeautifyBackgroundStyle: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .solid: "Solid"
         case .liquidGlass: "Liquid Glass"
+        case .none: "None"
         }
     }
 }
