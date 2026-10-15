@@ -5,18 +5,15 @@ struct PermissionSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("Permissions")
-                    .font(.system(size: 20, weight: .bold))
-                Spacer()
+        VStack(alignment: .leading, spacing: 16) {
+            SettingGroup(title: "Privacy & Security", trailing: {
                 Button(action: refresh) {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .controlSize(.small)
-            }
-
-            SettingGroup(title: "Privacy & Security") {
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            }) {
                 SettingCard {
                     permissionRow(
                         kind: .screenRecording,
@@ -24,6 +21,7 @@ struct PermissionSettingsView: View {
                         subtitle: "Required for screenshots and recording",
                         isGranted: viewModel.screenRecordingGranted
                     )
+                    .searchHighlightTarget("permissions-screen-recording")
                     permissionRow(
                         kind: .accessibility,
                         title: "Accessibility",
@@ -31,6 +29,7 @@ struct PermissionSettingsView: View {
                         isGranted: viewModel.accessibilityGranted,
                         showDivider: true
                     )
+                    .searchHighlightTarget("permissions-accessibility")
                     permissionRow(
                         kind: .inputMonitoring,
                         title: "Input Monitoring",
@@ -38,6 +37,7 @@ struct PermissionSettingsView: View {
                         isGranted: viewModel.inputMonitoringGranted,
                         showDivider: true
                     )
+                    .searchHighlightTarget("permissions-input-monitoring")
                     permissionRow(
                         kind: .camera,
                         title: "Camera",
@@ -45,6 +45,7 @@ struct PermissionSettingsView: View {
                         isGranted: viewModel.cameraGranted,
                         showDivider: true
                     )
+                    .searchHighlightTarget("permissions-camera")
                     permissionRow(
                         kind: .microphone,
                         title: "Microphone",
@@ -52,9 +53,11 @@ struct PermissionSettingsView: View {
                         isGranted: viewModel.microphoneGranted,
                         showDivider: true
                     )
+                    .searchHighlightTarget("permissions-microphone")
                 }
             }
         }
+        .searchHighlightTarget("permissions-tab")
         .task {
             await viewModel.refreshPermissions()
         }

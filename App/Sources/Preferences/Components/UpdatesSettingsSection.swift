@@ -22,6 +22,7 @@ struct UpdatesSettingsSection: View {
                         .toggleStyle(.switch)
                         .controlSize(.small)
                 }
+                .searchHighlightTarget("general-check-updates")
                 SettingRow(label: "Check Frequency", showDivider: true) {
                     Picker("", selection: $updateManager.updateCheckFrequency) {
                         Text("Daily").tag(UpdateCheckFrequency.daily)
@@ -31,6 +32,7 @@ struct UpdatesSettingsSection: View {
                     .frame(width: 130)
                     .disabled(!updateManager.automaticallyChecksForUpdates)
                 }
+                .searchHighlightTarget("general-check-frequency")
                 SettingRow(
                     label: "Automatically Install Updates",
                     sublabel: "Install updates in the background when available",
@@ -41,9 +43,11 @@ struct UpdatesSettingsSection: View {
                         .controlSize(.small)
                         .disabled(!updateManager.automaticallyChecksForUpdates)
                 }
+                .searchHighlightTarget("general-auto-install-updates")
                 SettingRow(label: "Check for Updates", sublabel: "Look for a new version now", showDivider: true) {
                     CheckForUpdatesView(updateManager: updateManager)
                 }
+                .searchHighlightTarget("general-check-now")
             }
         }
     }

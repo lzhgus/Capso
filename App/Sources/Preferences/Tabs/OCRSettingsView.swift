@@ -14,9 +14,6 @@ struct TextAndTranslationSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Text & Translation")
-                .font(.system(size: 20, weight: .bold))
-
             SettingGroup(title: "Text Recognition") {
                 SettingCard {
                     SettingRow(label: "Keep Line Breaks", sublabel: "Preserve original line structure") {
@@ -24,11 +21,13 @@ struct TextAndTranslationSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("ocr-line-breaks")
                     SettingRow(label: "Detect Links", sublabel: "Auto-detect and linkify URLs", showDivider: true) {
                         Toggle("", isOn: $viewModel.ocrDetectLinks)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("ocr-detect-links")
                 }
             }
 
@@ -42,6 +41,7 @@ struct TextAndTranslationSettingsView: View {
                         }
                         .frame(width: 180)
                     }
+                    .searchHighlightTarget("ocr-target-language")
                     SettingRow(
                         label: "Provider",
                         sublabel: LocalizedStringKey(viewModel.translationProvider.connectionSummary),
@@ -57,6 +57,7 @@ struct TextAndTranslationSettingsView: View {
                             loadProviderAPIKey()
                         }
                     }
+                    .searchHighlightTarget("ocr-provider")
                     if viewModel.translationProvider.requiresAPIKey {
                         SettingRow(label: "API Key", sublabel: "Stored in Keychain", showDivider: true) {
                             HStack(spacing: 8) {
@@ -71,12 +72,14 @@ struct TextAndTranslationSettingsView: View {
                                 .help("Save API key")
                             }
                         }
+                        .searchHighlightTarget("ocr-api-key")
                         if viewModel.translationProvider.supportsEndpoint {
                             SettingRow(label: "Endpoint", sublabel: "Leave empty to use the provider default", showDivider: true) {
                                 TextField("", text: $viewModel.translationProviderEndpoint)
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: 260)
                             }
+                            .searchHighlightTarget("ocr-endpoint-model")
                         }
                         if viewModel.translationProvider.supportsModel {
                             SettingRow(label: "Model", sublabel: "Leave empty to use the provider default", showDivider: true) {
@@ -84,6 +87,7 @@ struct TextAndTranslationSettingsView: View {
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: 180)
                             }
+                            .searchHighlightTarget("ocr-endpoint-model")
                         }
                         SettingRow(label: "Connection", sublabel: "Verify the current provider settings", showDivider: true) {
                             HStack(spacing: 8) {
@@ -148,6 +152,7 @@ struct TextAndTranslationSettingsView: View {
             //     }
             // }
         }
+        .searchHighlightTarget("ocr-tab")
         .task {
             let codes = await LanguagePreference.loadSupportedLanguageCodes()
             translationLanguages = LanguagePreference.sortedLanguages(from: codes)

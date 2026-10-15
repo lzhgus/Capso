@@ -30,37 +30,57 @@ final class PreferencesWindow {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 480),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 560),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = String(localized: "Capso Settings")
+        window.title = String(localized: "Settings")
         window.minSize = NSSize(width: 680, height: 480)
-        window.maxSize = NSSize(width: 680, height: 480)
         window.isReleasedWhenClosed = false
         window.center()
-
-        // Liquid Glass-inspired background
-        let visualEffect = NSVisualEffectView()
-        visualEffect.blendingMode = .behindWindow
-        visualEffect.material = .sidebar
-        visualEffect.state = .active
-        window.contentView = visualEffect
-
         let viewModel = PreferencesViewModel(settings: settings, permissionManager: permissionManager)
-        let hostingView = NSHostingView(rootView: PreferencesView(viewModel: viewModel, updateManager: updateManager, initialTab: tab))
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        visualEffect.addSubview(hostingView)
-        NSLayoutConstraint.activate([
-            hostingView.topAnchor.constraint(equalTo: visualEffect.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
-            hostingView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
-        ])
+        let hostingController = PreferencesHostingController(
+            rootView: PreferencesView(viewModel: viewModel, updateManager: updateManager, initialTab: tab)
+        )
+        window.contentViewController = hostingController
 
         self.window = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+private final class PreferencesHostingController<Content: View>: NSHostingController<Content> {
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        configureSplitView()
+    }
+
+    private func configureSplitView() {
+        func scanVC(_ vc: NSViewController) -> NSSplitViewController? {
+            if let svc = vc as? NSSplitViewController { return svc }
+            for child in vc.children {
+                if let found = scanVC(child) { return found }
+            }
+            return nil
+        }
+
+        func scanForSplitViewController(in view: NSView) -> NSSplitViewController? {
+            if let sv = view as? NSSplitView, let svc = sv.delegate as? NSSplitViewController {
+                return svc
+            }
+            for subview in view.subviews {
+                if let found = scanForSplitViewController(in: subview) { return found }
+            }
+            return nil
+        }
+
+        let svc = scanVC(self) ?? scanForSplitViewController(in: view)
+        if let svc, let sidebarItem = svc.splitViewItems.first {
+            sidebarItem.canCollapse = false
+            sidebarItem.minimumThickness = 190
+            sidebarItem.maximumThickness = 190
+        }
     }
 }

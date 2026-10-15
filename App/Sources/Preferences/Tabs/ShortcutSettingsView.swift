@@ -91,6 +91,7 @@ struct ShortcutSettingsView: View {
             )
 
             SystemScreenshotShortcutsCard()
+                .searchHighlightTarget("shortcuts-macos-system-takeover")
 
             SettingGroup(title: "Customizable Shortcuts") {
                 SettingCard {
@@ -153,6 +154,7 @@ struct ShortcutSettingsView: View {
                 SquareCenterLockKeyRecorder(shortcut: $viewModel.squareCenterLockShortcut)
             }
         }
+        .searchHighlightTarget("shortcuts-center-lock")
         .help("Hold Shift for 1:1, then this extra key to grow from the click as the center. Shift cannot be changed.")
     }
 
@@ -167,6 +169,7 @@ struct ShortcutSettingsView: View {
             KeyboardShortcuts.Recorder(for: name)
                 .controlSize(.small)
         }
+        .searchHighlightTarget("shortcuts-\(name.rawValue)")
 
         if let help {
             row.help(help)
@@ -183,6 +186,7 @@ struct ShortcutSettingsView: View {
                 }
             }
         }
+        .searchHighlightTarget("shortcuts-\(item.id)")
     }
 }
 

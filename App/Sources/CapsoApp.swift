@@ -21,5 +21,13 @@ struct CapsoApp: App {
         Settings {
             EmptyView()
         }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button(String(localized: "Settings…")) {
+                    appDelegate.showPreferences()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }

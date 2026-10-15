@@ -10,7 +10,7 @@ struct SettingRow<Control: View>: View {
         VStack(spacing: 0) {
             if showDivider {
                 Divider()
-                    .background(Color.white.opacity(0.06))
+                    .padding(.leading, 14)
             }
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
