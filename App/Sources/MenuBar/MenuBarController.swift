@@ -47,6 +47,10 @@ final class MenuBarController: NSObject {
         applyVisibility()
     }
 
+    var statusMenu: NSMenu? {
+        statusItem?.menu
+    }
+
     /// Installs or removes the status item based on `settings.showMenuBarIcon`.
     private func applyVisibility() {
         if settings.showMenuBarIcon {
