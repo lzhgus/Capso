@@ -34,6 +34,27 @@ final class BeautifyRendererTests: XCTestCase {
         XCTAssertGreaterThan(center.redComponent, 0.9)
     }
 
+    func testNoBackgroundLeavesOnlyRoundedCorners() throws {
+        let size = 100
+        let ctx = try XCTUnwrap(Self.context(width: size, height: size))
+        ctx.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        let image = try XCTUnwrap(ctx.makeImage())
+
+        var settings = BeautifySettings()
+        settings.isEnabled = true
+        settings.backgroundStyle = .none
+        settings.padding = 0
+        settings.cornerRadius = 20
+        settings.shadowEnabled = false
+        let output = try XCTUnwrap(BeautifyRenderer.render(image: image, settings: settings))
+
+        XCTAssertEqual(output.width, size)
+        let rep = NSBitmapImageRep(cgImage: output)
+        XCTAssertEqual(try XCTUnwrap(rep.colorAt(x: 1, y: 1)).alphaComponent, 0)
+        XCTAssertEqual(try XCTUnwrap(rep.colorAt(x: size / 2, y: size / 2)).alphaComponent, 1)
+    }
+
     func testSavedStyleRoundTripsWithBeautifyOff() throws {
         let suite = "BeautifyStyleTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

@@ -149,7 +149,7 @@ struct EditorTimelineView: View {
                 $0.startTime > 0.01 && $0.endTime < coordinator.duration - 0.01
             }
             if !segmentTrims.isEmpty {
-                Text("\(segmentTrims.count) trimmed segment\(segmentTrims.count == 1 ? "" : "s")")
+                Text("Trimmed segments: \(segmentTrims.count)")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }

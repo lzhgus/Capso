@@ -47,6 +47,9 @@ enum BeautifyRenderer {
             // Subtle white sheen so the glass feels slightly brightened.
             ctx.setFillColor(NSColor.white.withAlphaComponent(0.03).cgColor)
             ctx.fill(canvasRect)
+
+        case .none:
+            break
         }
 
         let imageRect = CGRect(

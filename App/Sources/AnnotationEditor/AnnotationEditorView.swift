@@ -230,6 +230,8 @@ struct AnnotationEditorView: View {
                 .blur(radius: max(8, 120 * zoomScale), opaque: true)
                 .overlay(Color.white.opacity(0.03))
                 .clipped()
+        case .none:
+            Color.clear
         }
     }
 

@@ -51,7 +51,7 @@ struct BeautifyPanel: View {
                         .padding(.vertical, 1)
 
                     // -- Dimensions --
-                    sliderRow("Padding", value: $settings.padding, range: 16...80)
+                    sliderRow("Padding", value: $settings.padding, range: 0...80)
                     sliderRow("Corners", value: $settings.cornerRadius, range: 0...24)
 
                     Divider()
