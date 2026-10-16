@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 @testable import OCRKit
 
 final class OCRKitTests: XCTestCase {
@@ -13,8 +14,31 @@ final class OCRKitTests: XCTestCase {
         XCTAssertEqual(value, "first")
     }
 
-    /// Prewarm must complete without throwing or crashing, even though it
-    /// recognizes a blank image with no text in it.
+    func testPrewarmProvidesVisibleTextInsteadOfABlankImage() async {
+        await TextRecognizer.prewarm { image in
+            XCTAssertEqual(image.width, 640)
+            XCTAssertEqual(image.height, 100)
+            let context = try XCTUnwrap(CGContext(
+                data: nil, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width,
+                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+            ))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            let pixels = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+            let darkPixels = (0..<(image.width * image.height)).filter { pixels[$0] < 128 }.count
+            XCTAssertGreaterThan(darkPixels, 500, "The recognition model needs real glyphs to warm up")
+            XCTAssertLessThan(darkPixels, image.width * image.height / 2)
+            return []
+        }
+    }
+
+    func testPrewarmIgnoresRecognitionFailure() async {
+        await TextRecognizer.prewarm { _ in
+            throw NSError(domain: "PrewarmFailure", code: 1)
+        }
+    }
+
+    /// Best-effort model initialization must complete without throwing.
     func testPrewarmCompletes() async {
         await TextRecognizer.prewarm()
     }

@@ -5,6 +5,62 @@ import SharedKit
 
 @MainActor
 final class CaptureOverlayInteractionTests: XCTestCase {
+    func testAbsolutePointerEventsKeepNativeCrosshairAndCompleteAreaSelection() throws {
+        let (settings, suiteName) = makeSettings()
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            NSCursor.arrow.set()
+        }
+        settings.capturePresetsEnabled = true
+        settings.capturePreset = .freeform
+        let view = makeAreaOverlayView(settings: settings)
+        var capturedRect: CGRect?
+        view.onSelectionComplete = { capturedRect = $0 }
+
+        // Inject absolute locations without moving the physical pointer or
+        // supplying relative deltas, as remote input can do.
+        view.mouseMoved(with: try makeMouseEvent(.mouseMoved, at: NSPoint(x: 100, y: 100)))
+        XCTAssertEqual(NSCursor.current, NSCursor.crosshair)
+        view.mouseDown(with: try makeMouseEvent(.leftMouseDown, at: NSPoint(x: 100, y: 100)))
+        view.mouseDragged(with: try makeMouseEvent(.leftMouseDragged, at: NSPoint(x: 300, y: 250)))
+        XCTAssertEqual(NSCursor.current, NSCursor.crosshair)
+        XCTAssertEqual(view.selectionRect, CGRect(x: 100, y: 100, width: 200, height: 150))
+        view.mouseUp(with: try makeMouseEvent(.leftMouseUp, at: NSPoint(x: 300, y: 250)))
+        XCTAssertEqual(capturedRect, CGRect(x: 100, y: 100, width: 200, height: 150))
+        XCTAssertEqual(NSCursor.current, NSCursor.arrow)
+    }
+
+    func testPresetAndWindowModeChangesUseVisibleNativeCursors() throws {
+        let (settings, suiteName) = makeSettings()
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            NSCursor.arrow.set()
+        }
+        settings.capturePresetsEnabled = true
+        settings.capturePreset = .freeform
+        let view = makeAreaOverlayView(settings: settings)
+        let movement = try makeMouseEvent(.mouseMoved, at: NSPoint(x: 200, y: 200))
+        view.mouseMoved(with: movement)
+        XCTAssertEqual(NSCursor.current, NSCursor.crosshair)
+
+        settings.capturePreset = .fixedSize(width: 200, height: 100, name: nil)
+        NotificationCenter.default.post(name: .capturePresetChanged, object: self)
+        view.mouseMoved(with: movement)
+        XCTAssertEqual(NSCursor.current, NSCursor.arrow)
+
+        settings.capturePreset = .freeform
+        NotificationCenter.default.post(name: .capturePresetChanged, object: self)
+        view.mouseMoved(with: movement)
+        XCTAssertEqual(NSCursor.current, NSCursor.crosshair)
+
+        view.setMode(.windowSelection([]))
+        view.mouseMoved(with: movement)
+        XCTAssertEqual(NSCursor.current, NSCursor.arrow)
+        view.restoreCursor()
+        view.restoreCursor()
+        XCTAssertEqual(NSCursor.current, NSCursor.arrow)
+    }
+
     func testEscapeEventClearsMultiSelectionWithoutCancellingOtherDisplayOverlay() throws {
         let (settings, defaultsSuiteName) = makeSettings()
         defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }

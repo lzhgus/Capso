@@ -1702,12 +1702,12 @@ final class CaptureCoordinator {
         animationSourceFrame: NSRect? = nil
     ) -> QuickAccessWindow {
         // If the stack is full, evict the oldest (the one anchored at the
-        // bottom slot) with a slide-off-left animation. The remaining
+        // bottom slot) with the position-aware close animation. The remaining
         // previews will slide down one slot as part of the restack below.
         while quickAccessWindows.count >= maxQuickAccessStackSize {
             let oldest = quickAccessWindows.removeFirst()
             oldest.onDismissedUnused?()
-            oldest.slideOffLeftAndClose()
+            oldest.close()
         }
 
         let captureScreen = NSScreen.screens.first { $0.displayID == result.displayID }
@@ -1738,10 +1738,17 @@ final class CaptureCoordinator {
         }
         window.onSave = { [weak self, weak window] in
             guard let self, let window else { return }
-            let savedFileURL = self.saveImageToFile(result)
+            guard let savedFileURL = self.saveImageToFile(result) else {
+                self.showToast(
+                    String(localized: "Failed to save screenshot"),
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .systemOrange,
+                    screen: window.targetScreen
+                )
+                return
+            }
             if self.settings.screenshotAutoCopy,
-               self.settings.screenshotClipboardContent == .filePath,
-               let savedFileURL {
+               self.settings.screenshotClipboardContent == .filePath {
                 self.copyScreenshotToClipboard(
                     result,
                     entryID: entryID,

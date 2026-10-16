@@ -112,10 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Load Vision's OCR models off the critical path so the first
         // "Capture Text" of a session doesn't stall on one-time model setup.
-        if !OCRProcessFallback.shouldSkipPrewarm {
-            Task.detached(priority: .utility) {
-                await TextRecognizer.prewarm()
-            }
+        Task.detached(priority: .utility) {
+            await OCRProcessFallback.prewarm()
         }
     }
 
