@@ -154,6 +154,11 @@ final class RecordingSelectionModeTests: XCTestCase {
         let screen = try XCTUnwrap(NSScreen.main)
         let rect = CGRect(x: 80, y: 90, width: 640, height: 360)
         let coordinator = RecordingCoordinator(settings: settings)
+        defer {
+            // Cancel while the coordinator is alive so app-wide Escape
+            // monitors and event taps cannot leak into subsequent tests.
+            withExtendedLifetime(coordinator) { closeRecordingSelectionWindows() }
+        }
 
         coordinator.startRecordingFlow(withSelectedArea: rect, screen: screen)
 
@@ -177,6 +182,11 @@ final class RecordingSelectionModeTests: XCTestCase {
             screenID: screen.displayID
         )
         let coordinator = RecordingCoordinator(settings: settings)
+        defer {
+            // Cancel while the coordinator is alive so app-wide Escape
+            // monitors and event taps cannot leak into subsequent tests.
+            withExtendedLifetime(coordinator) { closeRecordingSelectionWindows() }
+        }
 
         coordinator.startRecordingFlow()
         try await Task.sleep(for: .milliseconds(250))
@@ -198,6 +208,11 @@ final class RecordingSelectionModeTests: XCTestCase {
         }
         let settings = AppSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
         let coordinator = RecordingCoordinator(settings: settings)
+        defer {
+            // Cancel while the coordinator is alive so app-wide Escape
+            // monitors and event taps cannot leak into subsequent tests.
+            withExtendedLifetime(coordinator) { closeRecordingSelectionWindows() }
+        }
 
         coordinator.startRecordingFlow()
         try await Task.sleep(for: .milliseconds(250))
@@ -218,6 +233,11 @@ final class RecordingSelectionModeTests: XCTestCase {
         }
         let settings = AppSettings(defaults: try XCTUnwrap(UserDefaults(suiteName: suiteName)))
         let coordinator = RecordingCoordinator(settings: settings)
+        defer {
+            // Cancel while the coordinator is alive so app-wide Escape
+            // monitors and event taps cannot leak into subsequent tests.
+            withExtendedLifetime(coordinator) { closeRecordingSelectionWindows() }
+        }
 
         coordinator.startFullScreenRecordingFlow()
         try await Task.sleep(for: .milliseconds(250))
@@ -246,6 +266,11 @@ final class RecordingSelectionModeTests: XCTestCase {
         for window in NSApp.windows where window is CaptureOverlayWindow
             || window is RecordingSelectionModeWindow
             || window is RecordingToolbarWindow {
+            if window is RecordingToolbarWindow || window is RecordingSelectionModeWindow,
+               let escape = try? makeKeyEvent("\u{1B}", keyCode: 53, windowNumber: window.windowNumber) {
+                window.keyDown(with: escape)
+            }
+            (window as? CaptureOverlayWindow)?.deactivate()
             window.close()
         }
     }
