@@ -2345,7 +2345,10 @@ final class CaptureCoordinator {
     /// Deprecated in macOS 14+ but still functional — loaded via dlsym
     /// to bypass the compile-time unavailability annotation.
     /// Required for freeze-screen: must capture before any window appears.
-    private typealias CGDisplayCreateImageFunc = @convention(c) (CGDirectDisplayID) -> CGImage?
+    // Create rule: the image comes back +1, and a function pointer carries no
+    // ownership annotation, so it must be taken as retained or it leaks along
+    // with its display-sized IOSurface.
+    private typealias CGDisplayCreateImageFunc = @convention(c) (CGDirectDisplayID) -> Unmanaged<CGImage>?
 
     private static let cgDisplayCreateImage: CGDisplayCreateImageFunc? = {
         guard let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY),
@@ -2356,7 +2359,7 @@ final class CaptureCoordinator {
     }()
 
     private static func syncCaptureDisplay(_ displayID: CGDirectDisplayID) -> CGImage? {
-        cgDisplayCreateImage?(displayID)
+        cgDisplayCreateImage?(displayID)?.takeRetainedValue()
     }
 }
 
