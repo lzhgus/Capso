@@ -13,9 +13,6 @@ struct ScreenshotSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Screenshots")
-                .font(.system(size: 20, weight: .bold))
-
             SettingGroup(title: "After Capture") {
                 SettingCard {
                     SettingRow(label: "Show Preview", sublabel: "Display thumbnail with quick actions") {
@@ -23,11 +20,13 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-show-preview")
                     SettingRow(label: "Copy to Clipboard", sublabel: "Copy screenshot immediately", showDivider: true) {
                         Toggle("", isOn: $viewModel.screenshotAutoCopy)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-copy-clipboard")
                     SettingRow(
                         label: "Clipboard Content",
                         sublabel: clipboardContentDescription,
@@ -41,6 +40,7 @@ struct ScreenshotSettingsView: View {
                         .pickerStyle(.menu)
                         .fixedSize(horizontal: true, vertical: false)
                     }
+                    .searchHighlightTarget("screenshots-clipboard-content")
                     if viewModel.screenshotClipboardContent == .image {
                         SettingRow(
                             label: "Clipboard Format",
@@ -56,12 +56,14 @@ struct ScreenshotSettingsView: View {
                             .pickerStyle(.menu)
                             .fixedSize(horizontal: true, vertical: false)
                         }
+                        .searchHighlightTarget("screenshots-clipboard-format")
                     }
                     SettingRow(label: "Auto Save", sublabel: "Save to file automatically", showDivider: true) {
                         Toggle("", isOn: $viewModel.screenshotAutoSave)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-auto-save")
                 }
             }
 
@@ -72,11 +74,13 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-show-cursor")
                     SettingRow(label: "Capture Window Shadow", sublabel: "Include shadow in window captures", showDivider: true) {
                         Toggle("", isOn: $viewModel.captureWindowShadow)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-window-shadow")
                     // TODO: Re-enable the rows below once underlying
                     // behaviors are implemented (showMagnifier,
                     // rememberLastCaptureArea).
@@ -90,6 +94,7 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-add-timestamp")
 
                     if viewModel.screenshotTimestampEnabled {
                         SettingRow(label: "Position", showDivider: true) {
@@ -134,6 +139,7 @@ struct ScreenshotSettingsView: View {
                         }
                     }
                 }
+                .searchHighlightTarget("screenshots-timestamp-customization")
             }
 
             SettingGroup(title: "Beautify") {
@@ -146,6 +152,7 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-beautify")
                 }
             }
 
@@ -167,6 +174,7 @@ struct ScreenshotSettingsView: View {
                             .labelsHidden()
                         }
                     }
+                    .searchHighlightTarget("screenshots-self-timer-duration")
                     SettingRow(
                         label: "Tick Sound",
                         sublabel: "Play a sound on each second of the countdown",
@@ -176,6 +184,7 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-self-timer-tick")
                 }
 
                 Text("Useful for capturing menus, hover states, and other UI that disappears the moment you move the mouse.")
@@ -194,6 +203,7 @@ struct ScreenshotSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("screenshots-capture-presets")
                 }
 
                 if viewModel.capturePresetsEnabled {
@@ -284,6 +294,7 @@ struct ScreenshotSettingsView: View {
             }
 
         }
+        .searchHighlightTarget("screenshots-tab")
         .sheet(isPresented: $showingAddPreset) {
             addPresetSheet
         }

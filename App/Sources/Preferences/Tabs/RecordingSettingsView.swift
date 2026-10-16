@@ -7,9 +7,6 @@ struct RecordingSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Recording")
-                .font(.system(size: 20, weight: .bold))
-
             SettingGroup(title: "Cursor") {
                 SettingCard {
                     SettingRow(label: "Show Cursor") {
@@ -17,11 +14,13 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-show-cursor")
                     SettingRow(label: "Highlight Clicks", sublabel: "Radial pulse on mouse click", showDivider: true) {
                         Toggle("", isOn: $viewModel.highlightClicks)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-highlight-clicks")
                     SettingRow(
                         label: "Show Key Presses",
                         sublabel: "KeyCastr-style overlay of keys while recording. Requires Input Monitoring. Off by default.",
@@ -31,6 +30,7 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-show-key-presses")
                     // TODO: Re-enable "Cursor Smoothing" once Bézier interpolation
                     // of the cursor path is actually implemented in the recording
                     // pipeline. AppSettings.cursorSmoothing is stored but never
@@ -50,16 +50,19 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-show-countdown")
                     SettingRow(label: "Hide Desktop Icons", sublabel: "Cover desktop icons with the wallpaper while recording", showDivider: true) {
                         Toggle("", isOn: $viewModel.hideDesktopIconsWhileRecording)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-hide-desktop-icons")
                     SettingRow(label: "Open Editor After Recording", sublabel: "Edit, trim, and add effects before exporting", showDivider: true) {
                         Toggle("", isOn: $viewModel.openEditorAfterRecording)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-open-editor")
                     SettingRow(
                         label: "Copy to Clipboard",
                         sublabel: "Copy the finished recording as an MP4 or GIF file",
@@ -69,6 +72,7 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-copy-clipboard")
                     // TODO: Re-enable the row below once its behavior is
                     // implemented. It is stored in AppSettings but never
                     // consumed by RecordingCoordinator:
@@ -83,6 +87,7 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-remember-area")
                 }
             }
 
@@ -96,6 +101,7 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-camera-fade")
                     SettingRow(
                         label: "Click Through PiP",
                         sublabel: "While the pointer is over the small camera view, clicks pass through to whatever is behind it. Independent of Fade on Hover. Never applies in fullscreen.",
@@ -105,6 +111,7 @@ struct RecordingSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("recording-camera-click-through")
                 }
             }
 
@@ -126,6 +133,7 @@ struct RecordingSettingsView: View {
             //     }
             // }
         }
+        .searchHighlightTarget("recording-tab")
     }
 
 

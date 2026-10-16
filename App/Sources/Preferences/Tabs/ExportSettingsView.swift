@@ -18,9 +18,6 @@ struct ExportSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Export")
-                .font(.system(size: 20, weight: .bold))
-
             SettingGroup(title: "Quality") {
                 SettingCard {
                     SettingRow(label: "Export Quality", sublabel: "Applies to video and GIF exports") {
@@ -32,6 +29,7 @@ struct ExportSettingsView: View {
                         .pickerStyle(.segmented)
                         .frame(width: 220)
                     }
+                    .searchHighlightTarget("export-quality")
                     SettingRow(
                         label: "Screenshot Format",
                         sublabel: "HEIC produces the smallest files; PNG is lossless",
@@ -49,6 +47,7 @@ struct ExportSettingsView: View {
                         .pickerStyle(.menu)
                         .frame(width: 120)
                     }
+                    .searchHighlightTarget("export-screenshot-format")
                     if viewModel.screenshotOutputFormat.isLossy {
                         SettingRow(label: "Screenshot Quality", showDivider: true) {
                             HStack(spacing: 8) {
@@ -64,6 +63,7 @@ struct ExportSettingsView: View {
                                 .labelsHidden()
                             }
                         }
+                        .searchHighlightTarget("export-screenshot-quality")
                     }
                 }
             }
@@ -84,12 +84,15 @@ struct ExportSettingsView: View {
                             .controlSize(.small)
                         }
                     }
+                    .searchHighlightTarget("export-location")
                     SettingRow(label: "Monthly Screenshot Folders", sublabel: "Save screenshots into yyyy-MM subfolders", showDivider: true) {
                         Toggle("", isOn: $viewModel.screenshotMonthlyFolders)
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("export-monthly-folders")
                     filenameTemplateEditor
+                        .searchHighlightTarget("export-filename-template")
                 }
             }
 
@@ -107,9 +110,11 @@ struct ExportSettingsView: View {
                         .pickerStyle(.menu)
                         .frame(width: 180)
                     }
+                    .searchHighlightTarget("export-opened-images")
                 }
             }
         }
+        .searchHighlightTarget("export-tab")
         .onAppear {
             filenameTemplateDraft = viewModel.screenshotFilenameTemplate
         }

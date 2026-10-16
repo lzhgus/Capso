@@ -12,15 +12,13 @@ struct CloudShareSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Cloud Share")
-                .font(.system(size: 20, weight: .bold))
-
             if viewModel.isCloudShareConfigured {
                 configuredView
             } else {
                 notConfiguredView
             }
         }
+        .searchHighlightTarget("cloudshare-tab")
         .sheet(isPresented: $showWizard) {
             CloudShareWizardView(viewModel: viewModel, onComplete: {
                 showWizard = false
@@ -81,6 +79,7 @@ struct CloudShareSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .searchHighlightTarget("cloudshare-provider")
                     SettingRow(label: "Public URL Prefix", showDivider: true) {
                         Text(viewModel.cloudShareURLPrefix ?? "—")
                             .font(.system(size: 12))
@@ -122,6 +121,7 @@ struct CloudShareSettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                     }
+                    .searchHighlightTarget("cloudshare-auto-upload")
                     SettingRow(
                         label: "Copy Link When Upload Starts",
                         sublabel: "Paste the link right away; it works once the upload finishes",
