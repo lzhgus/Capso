@@ -110,7 +110,11 @@ final class RecordingCoordinator {
             if self.showRememberedRecordingArea() {
                 return
             }
+            let selectsWindow = self.settings.recordingSelectsWindow
             self.showAreaSelectionOverlay()
+            if selectsWindow {
+                self.requestWindowSelectionOverlay()
+            }
         }
     }
 
@@ -174,6 +178,7 @@ final class RecordingCoordinator {
     ) {
         dismissOverlay()
         activeSelectionMode = selectedMode
+        settings.recordingSelectsWindow = selectedMode == .window
 
         for screen in NSScreen.screens {
             let overlay = CaptureOverlayWindow(

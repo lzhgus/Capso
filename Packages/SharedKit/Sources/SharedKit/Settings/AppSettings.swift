@@ -602,6 +602,12 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "showCountdown") }
     }
 
+    /// Whether Record Area last showed window selection, so it opens there again.
+    public var recordingSelectsWindow: Bool {
+        get { defaults.bool(forKey: "recordingSelectsWindow") }
+        set { defaults.set(newValue, forKey: "recordingSelectsWindow") }
+    }
+
     public var rememberLastRecordingArea: Bool {
         get { defaults.object(forKey: "rememberLastRecordingArea") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "rememberLastRecordingArea") }
