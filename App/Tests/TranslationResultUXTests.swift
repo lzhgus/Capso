@@ -129,3 +129,114 @@ final class TranslationResultUXTests: XCTestCase {
         )
     }
 }
+
+final class OCRFallbackRoutingTests: XCTestCase {
+    private static let visionFailure = NSError(
+        domain: "TextRecognition.CRImageReaderError", code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "TextRecognition.CRImageReaderError"]
+    )
+
+    func testConfirmedFailureSkipsPrimaryOnSubsequentCaptures() async throws {
+        let router = OCRFallbackRouter()
+        let calls = OCRRoutingCalls()
+        for _ in 0..<3 {
+            _ = try await router.recognize(automaticLanguages: true) {
+                await calls.recordPrimary()
+                throw Self.visionFailure
+            } fallback: {
+                await calls.recordFallback()
+                return []
+            }
+        }
+        let counts = await calls.counts
+        XCTAssertEqual(counts.primary, 1)
+        XCTAssertEqual(counts.fallback, 3)
+    }
+
+    func testFailedHelperDoesNotLatchFallback() async throws {
+        let router = OCRFallbackRouter()
+        do {
+            _ = try await router.recognize(automaticLanguages: true) {
+                throw Self.visionFailure
+            } fallback: {
+                throw URLError(.cannotDecodeContentData)
+            }
+            XCTFail("Expected helper error")
+        } catch {}
+        let calls = OCRRoutingCalls()
+        _ = try await router.recognize(automaticLanguages: true) {
+            await calls.recordPrimary()
+            return []
+        } fallback: {
+            await calls.recordFallback()
+            return []
+        }
+        let counts = await calls.counts
+        XCTAssertEqual(counts.primary, 1)
+        XCTAssertEqual(counts.fallback, 0)
+    }
+
+    func testExplicitLanguagesStillUsePrimaryAfterConfirmedFailure() async throws {
+        let router = OCRFallbackRouter()
+        _ = try await router.recognize(automaticLanguages: true) {
+            throw Self.visionFailure
+        } fallback: { [] }
+        let calls = OCRRoutingCalls()
+        _ = try await router.recognize(automaticLanguages: false) {
+            await calls.recordPrimary()
+            return []
+        } fallback: {
+            await calls.recordFallback()
+            return []
+        }
+        let counts = await calls.counts
+        XCTAssertEqual(counts.primary, 1)
+        XCTAssertEqual(counts.fallback, 0)
+    }
+
+    func testUnrelatedErrorsDoNotInvokeHelper() async {
+        let router = OCRFallbackRouter()
+        let calls = OCRRoutingCalls()
+        do {
+            _ = try await router.recognize(automaticLanguages: true) {
+                throw URLError(.unknown)
+            } fallback: {
+                await calls.recordFallback()
+                return []
+            }
+            XCTFail("Expected original error")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .unknown)
+        }
+        let counts = await calls.counts
+        XCTAssertEqual(counts.fallback, 0)
+    }
+
+    func testCancellationDuringPrimaryDoesNotLaunchHelper() async {
+        let router = OCRFallbackRouter()
+        let calls = OCRRoutingCalls()
+        let task = Task {
+            try await router.recognize(automaticLanguages: true) {
+                withUnsafeCurrentTask { $0?.cancel() }
+                throw Self.visionFailure
+            } fallback: {
+                await calls.recordFallback()
+                return []
+            }
+        }
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        let counts = await calls.counts
+        XCTAssertEqual(counts.fallback, 0)
+    }
+}
+
+private actor OCRRoutingCalls {
+    private(set) var counts = (primary: 0, fallback: 0)
+    func recordPrimary() { counts.primary += 1 }
+    func recordFallback() { counts.fallback += 1 }
+}

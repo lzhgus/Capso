@@ -67,12 +67,14 @@ public enum ImageUtilities {
     }
 
     public static func scaled(_ cgImage: CGImage, maxWidth: Int, maxHeight: Int) -> CGImage? {
+        guard maxWidth > 0, maxHeight > 0 else { return nil }
         let widthRatio = Double(maxWidth) / Double(cgImage.width)
         let heightRatio = Double(maxHeight) / Double(cgImage.height)
         let scale = min(widthRatio, heightRatio, 1.0)
+        guard scale < 1 else { return cgImage }
 
-        let newWidth = Int(Double(cgImage.width) * scale)
-        let newHeight = Int(Double(cgImage.height) * scale)
+        let newWidth = max(1, Int(Double(cgImage.width) * scale))
+        let newHeight = max(1, Int(Double(cgImage.height) * scale))
 
         guard let context = CGContext(
             data: nil,

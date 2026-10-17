@@ -43,6 +43,42 @@ extension KeyboardShortcuts.Name {
     ]
 }
 
+/// The settings list and duplicate detection share the same global shortcut catalog.
+/// Panel-specific shortcuts are intentionally outside this catalog.
+enum ShortcutCatalog {
+    struct Entry {
+        let name: KeyboardShortcuts.Name
+        let title: String
+        var help: LocalizedStringKey? = nil
+    }
+
+    static var entries: [Entry] {
+        [
+            .init(name: .captureAllInOne, title: String(localized: "All-in-One")),
+            .init(name: .captureArea, title: String(localized: "Capture Area")),
+            .init(name: .captureFullscreen, title: String(localized: "Capture Fullscreen")),
+            .init(name: .captureWindow, title: String(localized: "Capture Window")),
+            .init(name: .captureText, title: String(localized: "Capture Text (OCR)")),
+            .init(name: .captureScrolling, title: String(localized: "Scrolling Capture")),
+            .init(name: .selfTimerCapture, title: String(localized: "Self-Timer")),
+            .init(name: .captureAreaToClipboard, title: String(localized: "Capture Area to Clipboard")),
+            .init(name: .captureAreaAndShare, title: String(localized: "Capture and Share to Cloud")),
+            .init(name: .captureAreaAndAnnotate, title: String(localized: "Capture Area & Annotate")),
+            .init(name: .captureAreaAndPin, title: String(localized: "Capture Area & Pin")),
+            .init(name: .pinFromClipboard, title: String(localized: "Pin from Clipboard"), help: "Float copied images, text, colors, or files above other windows"),
+            .init(name: .editClipboardImage, title: String(localized: "Edit Clipboard Image"), help: "Open the image currently copied to the clipboard in Annotate"),
+            .init(name: .togglePins, title: String(localized: "Hide / Show All Pins")),
+            .init(name: .captureAndTranslate, title: String(localized: "Capture & Translate")),
+            .init(name: .translateSelectedText, title: String(localized: "Translate Selected Text")),
+            .init(name: .translateTypedText, title: String(localized: "Translate Typed Text")),
+            .init(name: .captureLastArea, title: String(localized: "Capture Previous Area")),
+            .init(name: .recordScreen, title: String(localized: "Record Area")),
+            .init(name: .recordFullscreen, title: String(localized: "Record Full Screen")),
+            .init(name: .screenshotHistory, title: String(localized: "Screenshot History"))
+        ]
+    }
+}
+
 struct ShortcutSettingsView: View {
     @Bindable var viewModel: PreferencesViewModel
     private struct ContextualShortcut: Identifiable {
@@ -94,37 +130,12 @@ struct ShortcutSettingsView: View {
 
             SettingGroup(title: "Customizable Shortcuts") {
                 SettingCard {
-                    shortcutRow("All-in-One", name: .captureAllInOne)
-                    shortcutRow("Capture Area", name: .captureArea, showDivider: true)
-                    shortcutRow("Capture Fullscreen", name: .captureFullscreen, showDivider: true)
-                    shortcutRow("Capture Window", name: .captureWindow, showDivider: true)
-                    shortcutRow("Capture Text (OCR)", name: .captureText, showDivider: true)
-                    shortcutRow("Scrolling Capture", name: .captureScrolling, showDivider: true)
-                    shortcutRow("Self-Timer", name: .selfTimerCapture, showDivider: true)
-                    shortcutRow("Capture Area to Clipboard", name: .captureAreaToClipboard, showDivider: true)
-                    shortcutRow("Capture and Share to Cloud", name: .captureAreaAndShare, showDivider: true)
-                    shortcutRow("Capture Area & Annotate", name: .captureAreaAndAnnotate, showDivider: true)
-                    shortcutRow("Capture Area & Pin", name: .captureAreaAndPin, showDivider: true)
-                    shortcutRow(
-                        "Pin from Clipboard",
-                        name: .pinFromClipboard,
-                        showDivider: true,
-                        help: "Float copied images, text, colors, or files above other windows"
-                    )
-                    shortcutRow(
-                        "Edit Clipboard Image",
-                        name: .editClipboardImage,
-                        showDivider: true,
-                        help: "Open the image currently copied to the clipboard in Annotate"
-                    )
-                    shortcutRow("Hide / Show All Pins", name: .togglePins, showDivider: true)
-                    shortcutRow("Capture & Translate", name: .captureAndTranslate, showDivider: true)
-                    shortcutRow("Translate Selected Text", name: .translateSelectedText, showDivider: true)
-                    shortcutRow("Translate Typed Text", name: .translateTypedText, showDivider: true)
-                    shortcutRow("Capture Previous Area", name: .captureLastArea, showDivider: true)
-                    shortcutRow("Record Area", name: .recordScreen, showDivider: true)
-                    shortcutRow("Record Full Screen", name: .recordFullscreen, showDivider: true)
-                    shortcutRow("Screenshot History", name: .screenshotHistory, showDivider: true)
+                    ForEach(Array(ShortcutCatalog.entries.enumerated()), id: \.element.name) { index, entry in
+                        shortcutRow(
+                            LocalizedStringKey(entry.title), name: entry.name,
+                            showDivider: index > 0, help: entry.help
+                        )
+                    }
                 }
             }
 
@@ -164,8 +175,8 @@ struct ShortcutSettingsView: View {
         help: LocalizedStringKey? = nil
     ) -> some View {
         let row = SettingRow(label: label, showDivider: showDivider) {
-            KeyboardShortcuts.Recorder(for: name)
-                .controlSize(.small)
+            ShortcutRecorderControl(name: name)
+                .frame(width: 170, height: 32)
         }
 
         if let help {

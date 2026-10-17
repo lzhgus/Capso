@@ -14,9 +14,22 @@ import UniformTypeIdentifiers
 /// rather than Capso's normal OCR path.
 enum OCRProcessFallback {
     private static let helperArgument = "--capso-ocr-helper"
+    private static let router = OCRFallbackRouter()
 
-    static var shouldSkipPrewarm: Bool {
-        ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 27
+    static func prewarm() async {
+        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 27 {
+            // Warm the system model cache without consuming this process's
+            // first request on OS builds whose later requests can fail.
+            await TextRecognizer.prewarm { image in
+                try await Task.detached(priority: .utility) {
+                    try recognizeInFreshProcess(
+                        image: image, languages: nil, level: .accurate, detectURLs: false
+                    )
+                }.value
+            }
+        } else {
+            await TextRecognizer.prewarm()
+        }
     }
 
     static func recognize(
@@ -31,27 +44,30 @@ enum OCRProcessFallback {
             level: level,
             detectURLs: detectURLs,
             run: TextRecognizer.recognize,
-            retry: recognizeInFreshProcess
+            retry: recognizeInFreshProcess,
+            router: router
         )
     }
 
-    /// Keep the fresh-process policy testable without depending on an OS fault.
+    /// Injectable runners use an isolated router unless one is explicitly shared.
     static func recognize(
         image: CGImage,
         languages: [String]?,
         level: RecognitionLevel,
         detectURLs: Bool,
         run: @Sendable (CGImage, [String]?, RecognitionLevel, Bool) async throws -> [TextRegion],
-        retry: @escaping @Sendable (CGImage, [String]?, RecognitionLevel, Bool) throws -> [TextRegion] = recognizeInFreshProcess
+        retry: @escaping @Sendable (CGImage, [String]?, RecognitionLevel, Bool) throws -> [TextRegion] = recognizeInFreshProcess,
+        router: OCRFallbackRouter = OCRFallbackRouter()
     ) async throws -> [TextRegion] {
-        do {
-            return try await run(image, languages, level, detectURLs)
-        } catch {
-            guard shouldRetryInFreshProcess(error) else { throw error }
-            return try await Task.detached(priority: .userInitiated) {
-                try retry(image, languages, level, detectURLs)
-            }.value
-        }
+        try await router.recognize(
+            automaticLanguages: languages == nil,
+            primary: { try await run(image, languages, level, detectURLs) },
+            fallback: {
+                try await Task.detached(priority: .userInitiated) {
+                    try retry(image, languages, level, detectURLs)
+                }.value
+            }
+        )
     }
 
     /// Runs before normal Capso startup when this executable was launched by
@@ -89,12 +105,6 @@ enum OCRProcessFallback {
         }
         semaphore.wait()
         exit(exitCode.value)
-    }
-
-    private static func shouldRetryInFreshProcess(_ error: Error) -> Bool {
-        let description = error.localizedDescription
-        return description.contains("TextRecognition.CRImageReaderError")
-            || String(describing: error).contains("CRImageReaderError")
     }
 
     private static func recognizeInFreshProcess(
@@ -249,6 +259,38 @@ private final class ExitCodeBox: @unchecked Sendable {
             lock.lock()
             defer { lock.unlock() }
             storedValue = newValue
+        }
+    }
+}
+
+/// Remembers a confirmed process-local Vision failure for this app lifetime.
+/// Explicit language requests still try Vision because the helper cannot honor them.
+actor OCRFallbackRouter {
+    private var prefersFreshProcess = false
+
+    func recognize(
+        automaticLanguages: Bool,
+        primary: @Sendable () async throws -> [TextRegion],
+        fallback: @Sendable () async throws -> [TextRegion]
+    ) async throws -> [TextRegion] {
+        try Task.checkCancellation()
+        if prefersFreshProcess && automaticLanguages {
+            return try await fallback()
+        }
+        do {
+            return try await primary()
+        } catch {
+            try Task.checkCancellation()
+            guard error.localizedDescription.contains("TextRecognition.CRImageReaderError")
+                    || String(describing: error).contains("CRImageReaderError") else {
+                throw error
+            }
+            let regions = try await fallback()
+            try Task.checkCancellation()
+            if automaticLanguages {
+                prefersFreshProcess = true
+            }
+            return regions
         }
     }
 }
