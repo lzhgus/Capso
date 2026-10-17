@@ -38,6 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         Self.shared = self
+        NSAppleEventManager.shared().setEventHandler(
+            self, andSelector: #selector(handleReopen(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kCoreEventClass), andEventID: AEEventID(kAEReopenApplication)
+        )
         DiagnosticLogger.installUncaughtExceptionHandler()
 
         // Show tooltips faster (default is ~2s, reduce to 0.3s)
@@ -338,13 +342,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Called when the user reopens the app while it's already running
     /// (Spotlight, Launchpad, Finder). Launch — including Launch at Login —
-    /// stays silent. When the menu bar icon is hidden, reopen is the way back
-    /// into Preferences.
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !settings.showMenuBarIcon {
-            showPreferences()
-        }
-        return true
+    /// stays silent. Reopen always shows Preferences, since the menu bar icon
+    /// may be hidden by the user or crowded out behind the notch. Handled as a
+    /// raw Apple Event because SwiftUI never forwards
+    /// `applicationShouldHandleReopen` to the adaptor delegate.
+    @objc private func handleReopen(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
+        showPreferences()
     }
 
     func showPreferences() {
