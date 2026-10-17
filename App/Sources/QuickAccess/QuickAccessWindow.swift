@@ -13,6 +13,7 @@ final class QuickAccessWindow: NSPanel {
 
     var onCopy: (() -> Void)?
     var onSave: (() -> Void)?
+    var onSaveAs: (() -> Void)?
     var onAnnotate: (() -> Void)?
     var onOCR: (() -> Void)?
     var onTranslate: (() -> Void)?
@@ -95,6 +96,7 @@ final class QuickAccessWindow: NSPanel {
             onUploadSucceeded: { [weak self] url in self?.onUploadSucceeded?(url) },
             onCopy:      { [weak self] in self?.onCopy?() },
             onSave:      { [weak self] in self?.onSave?() },
+            onSaveAs:    { [weak self] in self?.onSaveAs?() },
             onAnnotate:  { [weak self] in self?.onAnnotate?() },
             onOCR:       { [weak self] in self?.onOCR?() },
             onTranslate: { [weak self] in self?.onTranslate?() },

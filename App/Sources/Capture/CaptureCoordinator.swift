@@ -1751,6 +1751,27 @@ final class CaptureCoordinator {
             }
             self.dismissQuickAccessWindow(window)
         }
+        window.onSaveAs = { [weak self, weak window] in
+            guard let self, let window,
+                  let savedFileURL = ScreenshotSavePanel.save(
+                      result.image,
+                      output: self.settings.screenshotOutputOptions,
+                      date: result.timestamp,
+                      sourceAppName: result.appName,
+                      sourceWindowTitle: result.windowName,
+                      template: self.settings.screenshotFilenameTemplate
+                  ) else { return }
+            if self.settings.screenshotAutoCopy,
+               self.settings.screenshotClipboardContent == .filePath {
+                self.copyScreenshotToClipboard(
+                    result,
+                    entryID: entryID,
+                    preferredFileURL: savedFileURL,
+                    pasteboard: pasteboard
+                )
+            }
+            self.dismissQuickAccessWindow(window)
+        }
         window.onAnnotate = { [weak self, weak window] in
             guard let self, let window else { return }
             let anchor = window.targetScreen
