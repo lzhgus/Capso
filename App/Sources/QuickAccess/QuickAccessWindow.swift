@@ -29,7 +29,6 @@ final class QuickAccessWindow: NSPanel {
     private var transitionWindow: QuickAccessTransitionWindow?
     private var closeAnimationID = UUID()
     private var isClosing = false
-    private var anchoredPosition: QuickAccessPosition
     private let settings: AppSettings
     private let transitionImage: NSImage
     /// The screen this preview is anchored to (where the capture originated).
@@ -43,30 +42,10 @@ final class QuickAccessWindow: NSPanel {
         autoUpload: Bool
     ) {
         self.settings = settings
-        self.anchoredPosition = settings.quickAccessPosition
         self.targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
-        // Keep a Retina-sized display texture; actions still receive the original capture.
-        let displayScale = max(2, targetScreen.backingScaleFactor)
-        // Match the view's centered aspect-fill crop before downsampling, so
-        // panoramic and portrait captures do not get enlarged from a thin strip.
-        let imageWidth = CGFloat(result.image.width)
-        let imageHeight = CGFloat(result.image.height)
-        let cropWidth = min(imageWidth, imageHeight * 268 / 142)
-        let cropHeight = min(imageHeight, imageWidth * 142 / 268)
-        let cropped = result.image.cropping(to: CGRect(
-            x: (imageWidth - cropWidth) / 2,
-            y: (imageHeight - cropHeight) / 2,
-            width: cropWidth,
-            height: cropHeight
-        )) ?? result.image
-        let thumbnail = ImageUtilities.scaled(
-            cropped,
-            maxWidth: Int(268 * displayScale),
-            maxHeight: Int(142 * displayScale)
-        ) ?? result.image
-        self.transitionImage = NSImage(cgImage: thumbnail, size: NSSize(
-            width: thumbnail.width,
-            height: thumbnail.height
+        self.transitionImage = NSImage(cgImage: result.image, size: NSSize(
+            width: result.image.width,
+            height: result.image.height
         ))
 
         let windowWidth: CGFloat = 288
@@ -94,7 +73,7 @@ final class QuickAccessWindow: NSPanel {
         self.hasShadow = false
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         self.isMovableByWindowBackground = true
-        self.animationBehavior = .none
+        self.animationBehavior = .utilityWindow
         self.hidesOnDeactivate = false
 
         let nsImage = transitionImage
@@ -147,7 +126,7 @@ final class QuickAccessWindow: NSPanel {
     }
 
     private func hideDuringExternalDrag() {
-        guard !isClosing, alphaValueBeforeDrag == nil else { return }
+        guard alphaValueBeforeDrag == nil else { return }
         stopAutoDismissTimer()
         alphaValueBeforeDrag = alphaValue
         alphaValue = 0
@@ -155,7 +134,6 @@ final class QuickAccessWindow: NSPanel {
     }
 
     private func finishExternalDrag(dropped: Bool) {
-        guard !isClosing else { return }
         if dropped && settings.quickAccessCloseAfterDrag {
             onClose?()
         } else {
@@ -174,7 +152,6 @@ final class QuickAccessWindow: NSPanel {
     }
 
     private func showAfterExternalDrag() {
-        guard !isClosing else { return }
         alphaValue = alphaValueBeforeDrag ?? 1
         alphaValueBeforeDrag = nil
         ignoresMouseEvents = false
@@ -185,13 +162,10 @@ final class QuickAccessWindow: NSPanel {
         let finalFrame = frame
         isClosing = false
         closeAnimationID = UUID()
-        ignoresMouseEvents = false
-        alphaValueBeforeDrag = nil
 
         guard let sourceFrame, !sourceFrame.isEmpty,
               let cardImage = panelSnapshot() else {
-            // Translate at a fixed size instead of relaying out SwiftUI each frame.
-            showPanel(from: finalFrame.offsetBy(dx: 0, dy: -20))
+            showPanel(from: finalFrame.insetBy(dx: min(120, finalFrame.width * 0.42), dy: min(80, finalFrame.height * 0.42)))
             return
         }
 
@@ -231,7 +205,7 @@ final class QuickAccessWindow: NSPanel {
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.42
             ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 0.8, 0.2, 1)
-            self.animator().setFrame(finalFrame, display: false)
+            self.animator().setFrame(finalFrame, display: true)
             self.animator().alphaValue = 1
         }
 
@@ -279,32 +253,18 @@ final class QuickAccessWindow: NSPanel {
 
         cancelEntranceTransition()
 
-        // Keep the card at its full size and slide toward its anchored edge.
-        // Use the current display's coordinates, including on secondary screens.
-        let screenFrame = (screen ?? targetScreen).frame
-        var endFrame = frame
-        switch anchoredPosition {
-        case .bottomLeft:
-            endFrame.origin.x = screenFrame.minX - endFrame.width - 16
-        case .bottomRight:
-            endFrame.origin.x = screenFrame.maxX + 16
-        case .centerScreen:
-            endFrame.origin.y = screenFrame.minY - endFrame.height - 16
-        }
-        ignoresMouseEvents = true
-        alphaValueBeforeDrag = nil
-        guard isVisible, alphaValue > 0 else {
-            finishCloseAnimation()
-            return
-        }
+        let currentFrame = frame
+        let endFrame = currentFrame.insetBy(
+            dx: min(120, currentFrame.width * 0.42),
+            dy: min(80, currentFrame.height * 0.42)
+        )
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.3
+            ctx.duration = 0.24
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            // Only the window position changes; reuse the existing backing store.
-            self.animator().setFrame(endFrame, display: false)
+            self.animator().setFrame(endFrame, display: true)
             self.animator().alphaValue = 0
-        }, completionHandler: { [self] in
-            guard self.closeAnimationID == animationID else { return }
+        }, completionHandler: { [weak self] in
+            guard let self, self.closeAnimationID == animationID else { return }
             self.finishCloseAnimation()
         })
     }
@@ -319,42 +279,59 @@ final class QuickAccessWindow: NSPanel {
         transitionWindow?.orderOut(nil)
     }
 
+    /// Evict this preview off-screen to the left with a slide animation.
+    func slideOffLeftAndClose() {
+        guard !isClosing else { return }
+        isClosing = true
+        let animationID = UUID()
+        closeAnimationID = animationID
+        stopAutoDismissTimer()
+        cancelEntranceTransition()
+        var target = frame
+        target.origin.x = -(target.width + 40)
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.38
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            self.animator().setFrame(target, display: true)
+            self.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, self.closeAnimationID == animationID else { return }
+            self.orderOut(nil)
+        })
+    }
+
     /// Reposition this window within a stack, centering the group when requested.
     func repositionForStack(index: Int, count: Int, animated: Bool = true) {
-        guard !isClosing else { return }
-        anchoredPosition = settings.quickAccessPosition
         let newFrame = QuickAccessStackGeometry.frame(
-            position: anchoredPosition,
+            position: settings.quickAccessPosition,
             screenFrame: targetScreen.frame,
             visibleFrame: targetScreen.visibleFrame,
             windowSize: frame.size,
             stackIndex: index,
             stackCount: count
         )
-        guard newFrame != frame else { return }
 
         if animated {
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.25
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                self.animator().setFrame(newFrame, display: false)
+                self.animator().setFrame(newFrame, display: true)
             }
         } else {
-            setFrame(newFrame, display: false)
+            setFrame(newFrame, display: true)
         }
     }
 
     private func scheduleAutoDismissTimerIfNeeded() {
         stopAutoDismissTimer()
-        guard !isClosing, alphaValueBeforeDrag == nil, settings.quickAccessAutoClose else { return }
+        guard settings.quickAccessAutoClose else { return }
 
         autoDismissTimer = Timer.scheduledTimer(
             withTimeInterval: TimeInterval(settings.quickAccessAutoCloseInterval),
             repeats: false
         ) { [weak self] _ in
             Task { @MainActor in
-                guard let self, !self.isClosing, self.alphaValueBeforeDrag == nil else { return }
-                self.onClose?()
+                self?.onClose?()
             }
         }
     }

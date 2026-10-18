@@ -138,18 +138,6 @@ struct ProviderResponseDataAccumulator {
 public enum ProviderTranslationService {
     private static let maximumResponseBytes = 4 * 1024 * 1024
 
-    // Keep connections warm across captures, without persisting responses,
-    // cookies, or credentials between provider requests.
-    private static let networkSession: URLSession = {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 60
-        configuration.timeoutIntervalForResource = 90
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
-        configuration.urlCredentialStorage = nil
-        return URLSession(configuration: configuration)
-    }()
-
     public static func translationUpdates(
         text: String,
         target: String,
@@ -231,8 +219,13 @@ public enum ProviderTranslationService {
     }
 
     private static func loadBoundedResponse(for request: URLRequest) async throws -> (Data, URLResponse) {
-        let (bytes, response) = try await networkSession.bytes(for: request)
-        defer { bytes.task.cancel() }
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.timeoutIntervalForRequest = 60
+        sessionConfiguration.timeoutIntervalForResource = 90
+        let session = URLSession(configuration: sessionConfiguration)
+        defer { session.invalidateAndCancel() }
+
+        let (bytes, response) = try await session.bytes(for: request)
         if response.expectedContentLength > maximumResponseBytes {
             throw ProviderTranslationError.responseTooLarge
         }
@@ -273,10 +266,13 @@ public enum ProviderTranslationService {
                         config: config,
                         stream: true
                     )
-                    let (bytes, response) = try await networkSession.bytes(for: request)
-                    // End only this response (including early SSE completion),
-                    // keeping other translations and reusable connections alive.
-                    defer { bytes.task.cancel() }
+                    let sessionConfiguration = URLSessionConfiguration.ephemeral
+                    sessionConfiguration.timeoutIntervalForRequest = 60
+                    sessionConfiguration.timeoutIntervalForResource = 90
+                    let session = URLSession(configuration: sessionConfiguration)
+                    defer { session.invalidateAndCancel() }
+
+                    let (bytes, response) = try await session.bytes(for: request)
                     guard let http = response as? HTTPURLResponse else {
                         throw ProviderTranslationError.badResponse
                     }

@@ -2,7 +2,6 @@
 import Foundation
 import CoreGraphics
 import os
-import CoreText
 import Vision
 
 private let logger = Logger(subsystem: "com.awesomemacapps.capso", category: "OCRKit")
@@ -169,45 +168,28 @@ public enum TextRecognizer {
         }
     }
 
-    /// Load the detection and recognition models before the first user request.
-    /// A blank image only exercises detection; real glyphs also warm the text
-    /// recognizer. The injectable operation lets the app isolate buggy OS models.
-    public static func prewarm(
-        using recognize: @Sendable (CGImage) async throws -> [TextRegion] = {
-            try await TextRecognizer.recognize(image: $0, detectURLs: false)
-        }
-    ) async {
-        guard let image = makePrewarmImage() else { return }
-        _ = try? await recognize(image)
+    /// Prewarm Vision's text-recognition models so the first real OCR request
+    /// doesn't pay the one-time model-loading cost. Runs a throwaway request
+    /// (with the same configuration as a real call) on a blank image.
+    /// Safe to call from a background task at app launch; errors are ignored.
+    public static func prewarm() async {
+        guard let image = makeBlankImage() else { return }
+        _ = try? await recognize(image: image, level: .accurate, detectURLs: false)
     }
 
-    private static func makePrewarmImage() -> CGImage? {
-        let width = 640
-        let height = 100
+    private static func makeBlankImage() -> CGImage? {
+        let size = 64
         guard let context = CGContext(
             data: nil,
-            width: width,
-            height: height,
+            width: size,
+            height: size,
             bitsPerComponent: 8,
             bytesPerRow: 0,
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
-        context.setFillColor(CGColor(gray: 1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        let attributes: [NSAttributedString.Key: Any] = [
-            NSAttributedString.Key(kCTFontAttributeName as String):
-                CTFontCreateWithName("Helvetica" as CFString, 24, nil),
-            NSAttributedString.Key(kCTForegroundColorAttributeName as String):
-                CGColor(gray: 0, alpha: 1)
-        ]
-        for (index, text) in ["Capso text recognition 1234567890", "截图文字识别 中文测试"].enumerated() {
-            let line = CTLineCreateWithAttributedString(
-                NSAttributedString(string: text, attributes: attributes)
-            )
-            context.textPosition = CGPoint(x: 16, y: 16 + index * 40)
-            CTLineDraw(line, context)
-        }
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
         return context.makeImage()
     }
 

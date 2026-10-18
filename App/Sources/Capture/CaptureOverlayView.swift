@@ -69,6 +69,8 @@ final class CaptureOverlayView: NSView {
     private var selectedWindowIDs: [CGWindowID] = []
     private var isShiftHeld = false
 
+    private var cursorHidden = false
+
     /// Pre-captured frozen screenshot. When set, drawn as the background
     /// instead of being transparent, preserving dropdown menus/popups.
     var frozenBackground: CGImage?
@@ -147,7 +149,12 @@ final class CaptureOverlayView: NSView {
                 guard newPreset != self.activePreset else { return }
                 self.activePreset = newPreset
 
-                self.updateCaptureCursor()
+                if self.activePreset.isFixedSize {
+                    self.restoreCursorIfNeeded()
+                } else if !self.cursorHidden, case .area = self.mode {
+                    NSCursor.hide()
+                    self.cursorHidden = true
+                }
 
                 self.setNeedsDisplay(self.bounds)
                 self.display()
@@ -185,37 +192,36 @@ final class CaptureOverlayView: NSView {
     func prepareForPresentation() {
         syncCurrentMouseLocation()
 
-        updateCaptureCursor()
+        // Only hide cursor in area mode — we draw our own crosshair reticle.
+        // In window selection mode, keep the normal cursor visible so
+        // the user can see where they're pointing.
+        if case .area = mode {
+            if activePreset.isFixedSize {
+                // Fixed-size mode: keep system cursor visible (the rectangle replaces the reticle)
+                restoreCursorIfNeeded()
+            } else if !cursorHidden {
+                NSCursor.hide()
+                cursorHidden = true
+            }
+        } else {
+            restoreCursorIfNeeded()
+        }
+
+        window?.invalidateCursorRects(for: self)
         needsDisplay = true
         displayIfNeeded()
     }
 
-    /// Keep the native pointer visible so remote clients can track its position
-    /// without depending on redraws of our frozen-screen overlay.
-    private var captureCursor: NSCursor {
-        if case .area = mode, !activePreset.isFixedSize {
-            return .crosshair
+    /// Restore cursor if hidden — safe to call multiple times
+    func restoreCursorIfNeeded() {
+        if cursorHidden {
+            NSCursor.unhide()
+            cursorHidden = false
         }
-        return .arrow
     }
 
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        addCursorRect(visibleRect, cursor: captureCursor)
-    }
-
-    private func updateCaptureCursor() {
-        window?.invalidateCursorRects(for: self)
-        // A preset change is broadcast to every display. Only the overlay
-        // under the pointer should change the current system cursor.
-        guard let window, window.isVisible else { return }
-        let point = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
-        guard bounds.contains(point) else { return }
-        captureCursor.set()
-    }
-
-    func restoreCursor() {
-        NSCursor.arrow.set()
+    private func restoreCursor() {
+        restoreCursorIfNeeded()
     }
 
     /// Seed the reticle from the current pointer location so area capture
@@ -246,7 +252,6 @@ final class CaptureOverlayView: NSView {
         case .area:
             self.availableWindows = []
         }
-        updateCaptureCursor()
         needsDisplay = true
     }
 
@@ -266,7 +271,13 @@ final class CaptureOverlayView: NSView {
         activePreset = presets[newIndex]
         settings.capturePreset = activePreset
 
-        updateCaptureCursor()
+        // Update cursor visibility: fixed-size shows system cursor, others hide it
+        if activePreset.isFixedSize {
+            restoreCursorIfNeeded()
+        } else if !cursorHidden {
+            NSCursor.hide()
+            cursorHidden = true
+        }
 
         // Force synchronous redraw — needsDisplay alone may not flush
         // at .screenSaver window level without a mouse event to drive the run loop
@@ -318,9 +329,7 @@ final class CaptureOverlayView: NSView {
             context.restoreGState()
 
             drawDimensionLabel(for: selectionRect, in: context)
-            // With ratio/center constraints the selected corner can differ
-            // from the native pointer. Mark that corner without hiding it.
-            if let currentMouseLocation, currentMouseLocation != lastRawEnd {
+            if let currentMouseLocation {
                 drawReticle(at: currentMouseLocation, in: context)
             }
         } else {
@@ -363,6 +372,7 @@ final class CaptureOverlayView: NSView {
                 drawDimmedBackdrop(clearing: nil, in: context)
                 // Freeform or aspect-ratio mode: standard crosshair
                 if let currentMouseLocation {
+                    drawReticle(at: currentMouseLocation, in: context)
                     drawCoordinateLabel(at: currentMouseLocation, in: context)
                 }
                 drawPresetBadge(in: context)
@@ -827,7 +837,7 @@ final class CaptureOverlayView: NSView {
                     width: CGFloat(fixedSize.width),
                     height: CGFloat(fixedSize.height)
                 )
-                restoreCursor()
+                restoreCursorIfNeeded()
                 onSelectionComplete?(fixedRect)
                 return
             }
@@ -926,7 +936,11 @@ final class CaptureOverlayView: NSView {
         // Reticle tracks the constrained corner so it stays on the selection edge
         currentMouseLocation = reticlePoint
 
-        captureCursor.set()
+        // Ensure cursor stays hidden during drag (it can reappear on screen edges)
+        if !cursorHidden {
+            NSCursor.hide()
+            cursorHidden = true
+        }
 
         needsDisplay = true
     }
@@ -942,14 +956,13 @@ final class CaptureOverlayView: NSView {
 
         let rect = selectionRect
         if rect.width > 5 && rect.height > 5 {
-            restoreCursor()
+            restoreCursorIfNeeded()
             onSelectionComplete?(rect)
         }
         needsDisplay = true
     }
 
     override func mouseMoved(with event: NSEvent) {
-        captureCursor.set()
         currentMouseLocation = convert(event.locationInWindow, from: nil)
 
         switch mode {
@@ -1175,7 +1188,7 @@ final class CaptureOverlayView: NSView {
     }
 
     private func cancelOverlay() {
-        restoreCursor()
+        restoreCursorIfNeeded()
         onCancel?()
     }
 
@@ -1274,7 +1287,13 @@ final class CaptureOverlayView: NSView {
         activePreset = preset
         settings.capturePreset = preset
 
-        updateCaptureCursor()
+        // Update cursor visibility after preset change
+        if activePreset.isFixedSize {
+            restoreCursorIfNeeded()
+        } else if !cursorHidden {
+            NSCursor.hide()
+            cursorHidden = true
+        }
 
         setNeedsDisplay(bounds)
         display()

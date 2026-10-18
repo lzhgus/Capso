@@ -16,20 +16,8 @@ enum OCRProcessFallback {
     private static let helperArgument = "--capso-ocr-helper"
     private static let router = OCRFallbackRouter()
 
-    static func prewarm() async {
-        if ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 27 {
-            // Warm the system model cache without consuming this process's
-            // first request on OS builds whose later requests can fail.
-            await TextRecognizer.prewarm { image in
-                try await Task.detached(priority: .utility) {
-                    try recognizeInFreshProcess(
-                        image: image, languages: nil, level: .accurate, detectURLs: false
-                    )
-                }.value
-            }
-        } else {
-            await TextRecognizer.prewarm()
-        }
+    static var shouldSkipPrewarm: Bool {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 27
     }
 
     static func recognize(
@@ -275,7 +263,9 @@ actor OCRFallbackRouter {
     ) async throws -> [TextRegion] {
         try Task.checkCancellation()
         if prefersFreshProcess && automaticLanguages {
-            return try await fallback()
+            let regions = try await fallback()
+            try Task.checkCancellation()
+            return regions
         }
         do {
             return try await primary()

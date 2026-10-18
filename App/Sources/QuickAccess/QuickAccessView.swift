@@ -323,7 +323,6 @@ struct QuickAccessView: View {
                 thumbnail: thumbnail,
                 dragImageSize: Self.thumbnailSize,
                 fileURLProvider: dragFileURL,
-                dragImageProvider: { ImageUtilities.nsImage(from: captureImage) },
                 onDragStarted: onDragStarted,
                 onDragEnded: onDragEnded
             )

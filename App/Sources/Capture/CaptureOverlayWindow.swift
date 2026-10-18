@@ -140,7 +140,7 @@ final class CaptureOverlayWindow: NSPanel {
     }
 
     func deactivate() {
-        overlayView.restoreCursor()
+        overlayView.restoreCursorIfNeeded()
         removeKeyMonitor()
         orderOut(nil)
     }
