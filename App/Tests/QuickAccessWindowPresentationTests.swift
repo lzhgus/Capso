@@ -1,11 +1,39 @@
 import AppKit
 import CaptureKit
 import SharedKit
+import SwiftUI
 import XCTest
 @testable import Capso
 
 @MainActor
 final class QuickAccessWindowPresentationTests: XCTestCase {
+    func testLargeCaptureUsesBoundedThumbnailAndPreservesOriginalImage() throws {
+        let original = try makeImage(width: 4096, height: 2048)
+        let (window, suiteName) = try makeWindow(autoClose: false, image: original)
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        let view = try XCTUnwrap(window.contentView as? NSHostingView<QuickAccessView>).rootView
+        let thumbnail = try XCTUnwrap(view.thumbnail.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let scale = max(2, window.targetScreen.backingScaleFactor)
+        XCTAssertLessThanOrEqual(thumbnail.width, Int(268 * scale))
+        XCTAssertLessThanOrEqual(thumbnail.height, Int(142 * scale))
+        XCTAssertEqual(view.captureImage.width, 4096)
+        XCTAssertEqual(view.captureImage.height, 2048)
+    }
+
+    func testPanoramicAndPortraitThumbnailsCropBeforeDownsampling() throws {
+        for (width, height) in [(4096, 64), (64, 4096)] {
+            let original = try makeImage(width: width, height: height)
+            let (window, suiteName) = try makeWindow(autoClose: false, image: original)
+            defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+            let view = try XCTUnwrap(window.contentView as? NSHostingView<QuickAccessView>).rootView
+            // The display texture must match the card, rather than stretching
+            // a downsampled panorama's few remaining rows to fill its height.
+            XCTAssertEqual(view.thumbnail.size.width / view.thumbnail.size.height, 268.0 / 142.0, accuracy: 0.04)
+            XCTAssertEqual(view.captureImage.width, width)
+            XCTAssertEqual(view.captureImage.height, height)
+        }
+    }
+
     func testWindowUsesNonactivatingCrossSpaceOverlayConfiguration() throws {
         let (window, defaultsSuiteName) = try makeWindow(autoClose: false)
         defer {
@@ -165,9 +193,40 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertFalse(window.isVisible, "The cancelled entrance must not restore the old card")
     }
 
+    func testDragEndingAfterCloseDoesNotRestorePanelOrRestartAutoDismiss() throws {
+        let (window, suiteName) = try makeWindow(autoClose: true, interval: 1)
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        window.show()
+        settleRunLoop(for: 0.6)
+        var closeCount = 0
+        window.onClose = { closeCount += 1 }
+        let hostingView = try XCTUnwrap(window.contentView as? NSHostingView<QuickAccessView>)
+        hostingView.rootView.onDragStarted()
+        window.close()
+        hostingView.rootView.onDragEnded(false)
+        hostingView.rootView.onDragEnded(true)
+        settleRunLoop(for: 1.2)
+
+        XCTAssertFalse(window.isVisible)
+        XCTAssertEqual(window.alphaValue, 0)
+        XCTAssertTrue(window.ignoresMouseEvents)
+        XCTAssertEqual(closeCount, 0)
+    }
+
+    func testClosingDuringEntranceDoesNotReappearAtAnimationCompletion() throws {
+        let (window, suiteName) = try makeWindow(autoClose: false)
+        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+        window.show(from: NSRect(x: 100, y: 100, width: 800, height: 600))
+        window.close()
+        settleRunLoop(for: 0.7)
+        XCTAssertFalse(window.isVisible)
+    }
+
     private func makeWindow(
         autoClose: Bool,
-        interval: Int = 5
+        interval: Int = 5,
+        position: QuickAccessPosition = .bottomRight,
+        image: CGImage? = nil
     ) throws -> (QuickAccessWindow, String) {
         let suiteName = "QuickAccessWindowPresentationTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -175,10 +234,11 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         let settings = AppSettings(defaults: defaults)
         settings.quickAccessAutoClose = autoClose
         settings.quickAccessAutoCloseInterval = interval
+        settings.quickAccessPosition = position
 
         return (QuickAccessWindow(
             result: CaptureResult(
-                image: try makeImage(),
+                image: try image ?? makeImage(),
                 mode: .area,
                 captureRect: CGRect(x: 0, y: 0, width: 8, height: 6)
             ),
@@ -189,18 +249,18 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         ), suiteName)
     }
 
-    private func makeImage() throws -> CGImage {
+    private func makeImage(width: Int = 8, height: Int = 6) throws -> CGImage {
         let context = try XCTUnwrap(CGContext(
             data: nil,
-            width: 8,
-            height: 6,
+            width: width,
+            height: height,
             bitsPerComponent: 8,
-            bytesPerRow: 32,
+            bytesPerRow: width * 4,
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ))
         context.setFillColor(CGColor(gray: 0.5, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: 8, height: 6))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return try XCTUnwrap(context.makeImage())
     }
 

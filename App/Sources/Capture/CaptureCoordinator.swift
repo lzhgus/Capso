@@ -1738,10 +1738,17 @@ final class CaptureCoordinator {
         }
         window.onSave = { [weak self, weak window] in
             guard let self, let window else { return }
-            let savedFileURL = self.saveImageToFile(result)
+            guard let savedFileURL = self.saveImageToFile(result) else {
+                self.showToast(
+                    String(localized: "Failed to save screenshot"),
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .systemOrange,
+                    screen: window.targetScreen
+                )
+                return
+            }
             if self.settings.screenshotAutoCopy,
-               self.settings.screenshotClipboardContent == .filePath,
-               let savedFileURL {
+               self.settings.screenshotClipboardContent == .filePath {
                 self.copyScreenshotToClipboard(
                     result,
                     entryID: entryID,

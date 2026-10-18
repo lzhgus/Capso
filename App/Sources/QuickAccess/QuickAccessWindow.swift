@@ -43,9 +43,28 @@ final class QuickAccessWindow: NSPanel {
     ) {
         self.settings = settings
         self.targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
-        self.transitionImage = NSImage(cgImage: result.image, size: NSSize(
-            width: result.image.width,
-            height: result.image.height
+        // Keep a Retina-sized display texture; actions still receive the original capture.
+        let displayScale = max(2, targetScreen.backingScaleFactor)
+        // Match the view's centered aspect-fill crop before downsampling, so
+        // panoramic and portrait captures do not get enlarged from a thin strip.
+        let imageWidth = CGFloat(result.image.width)
+        let imageHeight = CGFloat(result.image.height)
+        let cropWidth = min(imageWidth, imageHeight * 268 / 142)
+        let cropHeight = min(imageHeight, imageWidth * 142 / 268)
+        let cropped = result.image.cropping(to: CGRect(
+            x: (imageWidth - cropWidth) / 2,
+            y: (imageHeight - cropHeight) / 2,
+            width: cropWidth,
+            height: cropHeight
+        )) ?? result.image
+        let thumbnail = ImageUtilities.scaled(
+            cropped,
+            maxWidth: Int(268 * displayScale),
+            maxHeight: Int(142 * displayScale)
+        ) ?? result.image
+        self.transitionImage = NSImage(cgImage: thumbnail, size: NSSize(
+            width: thumbnail.width,
+            height: thumbnail.height
         ))
 
         let windowWidth: CGFloat = 288
@@ -126,7 +145,7 @@ final class QuickAccessWindow: NSPanel {
     }
 
     private func hideDuringExternalDrag() {
-        guard alphaValueBeforeDrag == nil else { return }
+        guard !isClosing, alphaValueBeforeDrag == nil else { return }
         stopAutoDismissTimer()
         alphaValueBeforeDrag = alphaValue
         alphaValue = 0
@@ -134,6 +153,7 @@ final class QuickAccessWindow: NSPanel {
     }
 
     private func finishExternalDrag(dropped: Bool) {
+        guard !isClosing else { return }
         if dropped && settings.quickAccessCloseAfterDrag {
             onClose?()
         } else {
@@ -143,7 +163,7 @@ final class QuickAccessWindow: NSPanel {
 
     /// Auto-close waits while the pointer is over the preview, then starts over.
     private func hoverChanged(_ hovering: Bool) {
-        guard alphaValueBeforeDrag == nil else { return }
+        guard !isClosing, alphaValueBeforeDrag == nil else { return }
         if hovering {
             stopAutoDismissTimer()
         } else {
@@ -152,6 +172,7 @@ final class QuickAccessWindow: NSPanel {
     }
 
     private func showAfterExternalDrag() {
+        guard !isClosing else { return }
         alphaValue = alphaValueBeforeDrag ?? 1
         alphaValueBeforeDrag = nil
         ignoresMouseEvents = false
@@ -162,6 +183,8 @@ final class QuickAccessWindow: NSPanel {
         let finalFrame = frame
         isClosing = false
         closeAnimationID = UUID()
+        ignoresMouseEvents = false
+        alphaValueBeforeDrag = nil
 
         guard let sourceFrame, !sourceFrame.isEmpty,
               let cardImage = panelSnapshot() else {
@@ -247,6 +270,8 @@ final class QuickAccessWindow: NSPanel {
     override func close() {
         guard !isClosing else { return }
         isClosing = true
+        ignoresMouseEvents = true
+        alphaValueBeforeDrag = nil
         let animationID = UUID()
         closeAnimationID = animationID
         stopAutoDismissTimer()
@@ -283,6 +308,8 @@ final class QuickAccessWindow: NSPanel {
     func slideOffLeftAndClose() {
         guard !isClosing else { return }
         isClosing = true
+        ignoresMouseEvents = true
+        alphaValueBeforeDrag = nil
         let animationID = UUID()
         closeAnimationID = animationID
         stopAutoDismissTimer()
@@ -302,6 +329,7 @@ final class QuickAccessWindow: NSPanel {
 
     /// Reposition this window within a stack, centering the group when requested.
     func repositionForStack(index: Int, count: Int, animated: Bool = true) {
+        guard !isClosing else { return }
         let newFrame = QuickAccessStackGeometry.frame(
             position: settings.quickAccessPosition,
             screenFrame: targetScreen.frame,
@@ -324,14 +352,15 @@ final class QuickAccessWindow: NSPanel {
 
     private func scheduleAutoDismissTimerIfNeeded() {
         stopAutoDismissTimer()
-        guard settings.quickAccessAutoClose else { return }
+        guard !isClosing, alphaValueBeforeDrag == nil, settings.quickAccessAutoClose else { return }
 
         autoDismissTimer = Timer.scheduledTimer(
             withTimeInterval: TimeInterval(settings.quickAccessAutoCloseInterval),
             repeats: false
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.onClose?()
+                guard let self, !self.isClosing, self.alphaValueBeforeDrag == nil else { return }
+                self.onClose?()
             }
         }
     }

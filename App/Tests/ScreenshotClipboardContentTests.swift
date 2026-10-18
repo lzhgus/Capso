@@ -6,6 +6,37 @@ import XCTest
 
 @MainActor
 final class ScreenshotClipboardContentTests: XCTestCase {
+    func testQuickAccessSaveFailureKeepsPreviewAvailableForRetry() throws {
+        let settings = makeSettings()
+        settings.quickAccessAutoClose = false
+        let exportRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("capso-save-retry-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: exportRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: exportRoot) }
+        let blockedDirectory = exportRoot.appendingPathComponent("blocked")
+        try Data([1]).write(to: blockedDirectory)
+        settings.setExportLocation(blockedDirectory)
+        let coordinator = CaptureCoordinator(settings: settings)
+        let window = coordinator.showQuickAccess(
+            for: try makeCaptureResult(), entryID: UUID(), autoUpload: false,
+            pasteboard: makePasteboard()
+        )
+        defer { window.orderOut(nil) }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+
+        window.onSave?()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertTrue(window.isVisible)
+        XCTAssertFalse(window.ignoresMouseEvents)
+
+        settings.setExportLocation(exportRoot)
+        window.onSave?()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertFalse(window.isVisible)
+        let files = try FileManager.default.contentsOfDirectory(at: exportRoot, includingPropertiesForKeys: nil)
+        XCTAssertTrue(files.contains { $0.pathExtension == "png" })
+    }
+
     func testFilePathContentCopiesReadableManagedFileWithoutPreview() throws {
         let settings = makeSettings()
         settings.screenshotClipboardContent = .filePath
