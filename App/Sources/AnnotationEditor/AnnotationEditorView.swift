@@ -15,6 +15,7 @@ struct AnnotationEditorView: View {
     let screenshotOutput: ScreenshotOutputOptions
     let screenshotFilenameTemplate: String
     let onSave: (CGImage) -> Void
+    let onSaveAs: (CGImage) -> Void
     let onCopy: (CGImage) -> Void
     let onPin: (CGImage) -> Void
     let onDragStarted: () -> Void
@@ -35,6 +36,7 @@ struct AnnotationEditorView: View {
         screenshotOutput: ScreenshotOutputOptions,
         screenshotFilenameTemplate: String,
         onSave: @escaping (CGImage) -> Void,
+        onSaveAs: @escaping (CGImage) -> Void,
         onCopy: @escaping (CGImage) -> Void,
         onPin: @escaping (CGImage) -> Void,
         onDragStarted: @escaping () -> Void,
@@ -49,6 +51,7 @@ struct AnnotationEditorView: View {
         self.screenshotOutput = screenshotOutput
         self.screenshotFilenameTemplate = screenshotFilenameTemplate
         self.onSave = onSave
+        self.onSaveAs = onSaveAs
         self.onCopy = onCopy
         self.onPin = onPin
         self.onDragStarted = onDragStarted
@@ -244,6 +247,7 @@ struct AnnotationEditorView: View {
             }
         }
         .background(escapeKeyHandler)
+        .background(saveAsKeyHandler)
         .onDisappear { invalidateDragCache() }
     }
 
@@ -258,6 +262,15 @@ struct AnnotationEditorView: View {
             .opacity(0)
             .accessibilityHidden(true)
             .keyboardShortcut(.escape, modifiers: [])
+    }
+
+    private var saveAsKeyHandler: some View {
+        Button(action: saveAs) { EmptyView() }
+            .buttonStyle(.plain)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
+            .keyboardShortcut("s", modifiers: [.command, .shift])
     }
 
     private func handleEscape() {
@@ -721,10 +734,24 @@ struct AnnotationEditorView: View {
     }
 
     private func save() {
+        if NSEvent.modifierFlags.contains(.option) {
+            saveAs()
+            return
+        }
         commitEditingTrigger += 1
         DispatchQueue.main.async {
             if let rendered = renderedOutputImage() {
                 onSave(rendered)
+            }
+        }
+    }
+
+    private func saveAs() {
+        guard !isCropMode else { return }
+        commitEditingTrigger += 1
+        DispatchQueue.main.async {
+            if let rendered = renderedOutputImage() {
+                onSaveAs(rendered)
             }
         }
     }

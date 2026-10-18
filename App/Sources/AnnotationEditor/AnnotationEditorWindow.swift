@@ -107,6 +107,19 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
                     self?.close()
                 }
             },
+            onSaveAs: { [weak self] rendered in
+                MainActor.assumeIsolated {
+                    guard ScreenshotSavePanel.save(
+                        rendered,
+                        output: screenshotOutput,
+                        date: captureDate,
+                        sourceAppName: sourceAppName,
+                        sourceWindowTitle: sourceWindowTitle,
+                        template: screenshotFilenameTemplate
+                    ) != nil else { return }
+                    self?.close()
+                }
+            },
             onCopy: { [weak self] rendered in
                 onCopy(rendered)
                 MainActor.assumeIsolated {

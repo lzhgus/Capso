@@ -22,6 +22,7 @@ struct QuickAccessView: View {
     let onUploadSucceeded: ((String) -> Void)?
     let onCopy: () -> Void
     let onSave: () -> Void
+    let onSaveAs: () -> Void
     let onAnnotate: () -> Void
     let onOCR: () -> Void
     let onTranslate: () -> Void
@@ -235,7 +236,9 @@ struct QuickAccessView: View {
         case .copy:
             toolButton(.copy, icon: "doc.on.doc", action: onCopy)
         case .save:
-            toolButton(.save, icon: "square.and.arrow.down", isPrimary: true, action: onSave)
+            toolButton(.save, icon: "square.and.arrow.down", isPrimary: true) {
+                NSEvent.modifierFlags.contains(.option) ? onSaveAs() : onSave()
+            }
         case .upload:
             if shareCoordinator != nil {
                 uploadButton
@@ -251,6 +254,10 @@ struct QuickAccessView: View {
 
     private var overflowMenu: some View {
         Menu {
+            Button(action: onSaveAs) {
+                Label("Save As…", systemImage: "square.and.arrow.down.on.square")
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
             ForEach(QuickAccessActionLayout.overflowActions, id: \.rawValue) { action in
                 overflowTool(action)
             }

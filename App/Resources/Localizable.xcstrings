@@ -12106,7 +12106,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "關閉快速取用"
+            "value" : "關閉快速存取"
           }
         }
       }
@@ -23968,7 +23968,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "懸浮"
+            "value" : "飄逸"
           }
         }
       }
@@ -25765,7 +25765,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隱藏／顯示所有釘選截圖"
+            "value" : "隱藏／顯示所有釘選項目"
           }
         }
       }
@@ -25893,7 +25893,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隱藏所有釘選截圖"
+            "value" : "隱藏所有釘選項目"
           }
         }
       }
@@ -30379,7 +30379,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "霧"
+            "value" : "霧灰"
           }
         }
       }
@@ -31277,7 +31277,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下次擷取截圖時，按一下「快速取用」中的雲端圖像 — 分享連結就會在剪貼簿中，可直接貼到 Slack 或 Discord。"
+            "value" : "下次擷取截圖時，按一下「快速存取」中的雲端圖像 — 分享連結就會在剪貼簿中，可直接貼到 Slack 或 Discord。"
           }
         }
       }
@@ -36989,7 +36989,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "快速取用"
+            "value" : "快速存取"
           }
         }
       }
@@ -37053,7 +37053,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "快速取用動作"
+            "value" : "快速存取動作"
           }
         }
       }
@@ -40770,7 +40770,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "鼠尾草"
+            "value" : "鼠尾草綠"
           }
         }
       }
@@ -40962,7 +40962,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在快速取用中全部儲存"
+            "value" : "在快速存取中全部儲存"
           }
         }
       }
@@ -41027,6 +41027,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "儲存 API 密鑰"
+          }
+        }
+      }
+    },
+    "Save As…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sichern unter …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar como…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer sous…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva con nome…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別名で保存…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 이름으로 저장…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar como…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить как…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另存为…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存為…"
           }
         }
       }
@@ -44286,7 +44350,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "顯示所有釘選截圖"
+            "value" : "顯示所有釘選項目"
           }
         }
       }
@@ -45438,7 +45502,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "俐落"
+            "value" : "靈敏"
           }
         }
       }
