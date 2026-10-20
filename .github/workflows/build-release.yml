@@ -270,7 +270,13 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --wait
 
-          xcrun stapler staple "$DMG"
+          for i in 1 2 3 4 5; do
+            if xcrun stapler staple "$DMG"; then
+              break
+            fi
+            echo "Staple attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
           xcrun stapler validate "$DMG"
 
       - name: Upload DMG artifact
