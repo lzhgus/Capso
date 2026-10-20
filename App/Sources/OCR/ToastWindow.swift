@@ -8,13 +8,15 @@ final class ToastWindow: NSPanel {
     private var dismissTimer: Timer?
 
     init(message: String, icon: String = "checkmark.circle.fill", iconColor: NSColor = .systemGreen, screen: NSScreen? = nil) {
-        let windowWidth: CGFloat = min(max(CGFloat(message.count) * 8 + 60, 220), 500)
-        let windowHeight: CGFloat = 44
+        // The hosting view sizes the panel to its content, so center on that size.
+        let hostingView = NSHostingView(rootView: ToastView(message: message, icon: icon, iconColor: Color(nsColor: iconColor)))
+        let windowWidth = hostingView.fittingSize.width
+        let windowHeight = hostingView.fittingSize.height
 
         let targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
         let screenFrame = targetScreen.visibleFrame
         let x = screenFrame.midX - windowWidth / 2
-        let y = screenFrame.minY + 60
+        let y = screenFrame.minY + 50
 
         super.init(
             contentRect: NSRect(x: x, y: y, width: windowWidth, height: windowHeight),
@@ -31,8 +33,7 @@ final class ToastWindow: NSPanel {
         self.isMovableByWindowBackground = false
         self.animationBehavior = .utilityWindow
 
-        let view = ToastView(message: message, icon: icon, iconColor: Color(nsColor: iconColor))
-        self.contentView = NSHostingView(rootView: view)
+        self.contentView = hostingView
     }
 
     func show(autoDismissAfter: TimeInterval = 1.5) {
@@ -84,10 +85,12 @@ private struct ToastView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.primary)
         }
+        .fixedSize()
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+        .padding(12)
     }
 }
