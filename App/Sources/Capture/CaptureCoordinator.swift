@@ -1040,7 +1040,7 @@ final class CaptureCoordinator {
         return try operation()
     }
 
-    func withQuickAccessHidden<T>(_ operation: () async throws -> T) async rethrows -> T {
+    func withQuickAccessHidden<T>(_ operation: @MainActor () async throws -> T) async rethrows -> T {
         let visibleWindows = quickAccessWindows.filter(\.isVisible)
         visibleWindows.forEach { $0.orderOut(nil) }
         CATransaction.flush()
