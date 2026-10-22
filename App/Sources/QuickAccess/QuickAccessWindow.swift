@@ -29,6 +29,7 @@ final class QuickAccessWindow: NSPanel {
     private var transitionWindow: QuickAccessTransitionWindow?
     private var closeAnimationID = UUID()
     private var isClosing = false
+    private var anchoredPosition: QuickAccessPosition
     private let settings: AppSettings
     private let transitionImage: NSImage
     /// The screen this preview is anchored to (where the capture originated).
@@ -42,6 +43,7 @@ final class QuickAccessWindow: NSPanel {
         autoUpload: Bool
     ) {
         self.settings = settings
+        self.anchoredPosition = settings.quickAccessPosition
         self.targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
         // Keep a Retina-sized display texture; actions still receive the original capture.
         let displayScale = max(2, targetScreen.backingScaleFactor)
@@ -278,15 +280,25 @@ final class QuickAccessWindow: NSPanel {
 
         cancelEntranceTransition()
 
-        let currentFrame = frame
-        let endFrame = currentFrame.insetBy(
-            dx: min(120, currentFrame.width * 0.42),
-            dy: min(80, currentFrame.height * 0.42)
-        )
+        var endFrame = frame
+        let screenFrame = targetScreen.frame
+        switch anchoredPosition {
+        case .bottomLeft:
+            endFrame.origin.x = screenFrame.minX - endFrame.width - 16
+        case .bottomRight:
+            endFrame.origin.x = screenFrame.maxX + 16
+        case .centerScreen:
+            endFrame.origin.y = screenFrame.minY - endFrame.height - 16
+        }
+        guard isVisible, alphaValue > 0 else {
+            finishCloseAnimation()
+            return
+        }
+
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.24
+            ctx.duration = 0.3
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            self.animator().setFrame(endFrame, display: true)
+            self.animator().setFrame(endFrame, display: false)
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             guard let self, self.closeAnimationID == animationID else { return }
@@ -330,8 +342,9 @@ final class QuickAccessWindow: NSPanel {
     /// Reposition this window within a stack, centering the group when requested.
     func repositionForStack(index: Int, count: Int, animated: Bool = true) {
         guard !isClosing else { return }
+        anchoredPosition = settings.quickAccessPosition
         let newFrame = QuickAccessStackGeometry.frame(
-            position: settings.quickAccessPosition,
+            position: anchoredPosition,
             screenFrame: targetScreen.frame,
             visibleFrame: targetScreen.visibleFrame,
             windowSize: frame.size,

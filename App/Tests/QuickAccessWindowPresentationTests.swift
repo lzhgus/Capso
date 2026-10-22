@@ -222,6 +222,38 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertFalse(window.isVisible)
     }
 
+    func testCloseSlidesPastAnchoredEdgeWithoutResizing() throws {
+        for position in QuickAccessPosition.allCases {
+            let (window, suiteName) = try makeWindow(autoClose: false, position: position)
+            defer {
+                window.orderOut(nil)
+                UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            }
+
+            window.show()
+            settleRunLoop(for: 0.6)
+            let startFrame = window.frame
+            let screenFrame = window.targetScreen.frame
+
+            window.close()
+            settleRunLoop(for: 0.5)
+
+            XCTAssertFalse(window.isVisible)
+            XCTAssertEqual(window.frame.size, startFrame.size)
+            switch position {
+            case .bottomLeft:
+                XCTAssertLessThan(window.frame.maxX, screenFrame.minX)
+                XCTAssertEqual(window.frame.minY, startFrame.minY)
+            case .bottomRight:
+                XCTAssertGreaterThan(window.frame.minX, screenFrame.maxX)
+                XCTAssertEqual(window.frame.minY, startFrame.minY)
+            case .centerScreen:
+                XCTAssertLessThan(window.frame.maxY, screenFrame.minY)
+                XCTAssertEqual(window.frame.minX, startFrame.minX)
+            }
+        }
+    }
+
     private func makeWindow(
         autoClose: Bool,
         interval: Int = 5,
