@@ -453,7 +453,7 @@ final class CaptureCoordinator {
         // dropdowns/popovers/menus are baked into the capture. CGDisplayCreateImage
         // does not include the cursor, so we draw it back onto the frozen frame
         // when the user has opted into cursor-inclusive screenshots.
-        if let image = Self.syncCaptureDisplay(displayID) {
+        if let image = withQuickAccessHidden({ Self.syncCaptureDisplay(displayID) }) {
             let fullScreenRect = CGRect(origin: .zero, size: targetScreen?.frame.size ?? .zero)
             let outputImage = targetScreen.flatMap {
                 cursorCompositedIfNeeded(on: image, selectionRect: fullScreenRect, screen: $0)
@@ -470,10 +470,12 @@ final class CaptureCoordinator {
 
         Task {
             do {
-                let result = try await ScreenCaptureManager.captureFullscreen(
-                    displayID: displayID,
-                    showsCursor: settings.screenshotShowsCursor
-                )
+                let result = try await self.withQuickAccessHidden {
+                    try await ScreenCaptureManager.captureFullscreen(
+                        displayID: displayID,
+                        showsCursor: self.settings.screenshotShowsCursor
+                    )
+                }
                 handleCaptureResult(result)
             } catch {
                 print("Fullscreen capture failed: \(error)")
@@ -523,11 +525,12 @@ final class CaptureCoordinator {
         // and won't disappear when our overlay becomes key.
         Task {
             do {
-                // Exclude only Capso's overlay windows (not all Capso windows
-                // like Settings) so the user can still capture them.
+                // Exclude capture chrome (not all Capso windows like Settings)
+                // so Quick Access cards cannot be selected as screenshot content.
                 let overlayIDs = Set(overlayWindows.map { CGWindowID($0.windowNumber) })
+                let quickAccessIDs = Set(quickAccessWindows.map { CGWindowID($0.windowNumber) })
                 let windows = try await ContentEnumerator.windows()
-                    .filter { !overlayIDs.contains($0.id) }
+                    .filter { !overlayIDs.contains($0.id) && !quickAccessIDs.contains($0.id) }
 
                 guard !windows.isEmpty else {
                     isSelectionFlowStarting = false
@@ -574,10 +577,12 @@ final class CaptureCoordinator {
             pendingAction = .default
             Task {
                 do {
-                    let result = try await ScreenCaptureManager.captureFullscreen(
-                        displayID: screenID,
-                        showsCursor: settings.screenshotShowsCursor
-                    )
+                    let result = try await self.withQuickAccessHidden {
+                        try await ScreenCaptureManager.captureFullscreen(
+                            displayID: screenID,
+                            showsCursor: self.settings.screenshotShowsCursor
+                        )
+                    }
                     handleCaptureResult(result)
                 } catch {
                     print("Fullscreen replay failed: \(error)")
@@ -1013,10 +1018,35 @@ final class CaptureCoordinator {
     }
 
     private func captureFrozenScreens() -> [(NSScreen, CGImage)] {
-        NSScreen.screens.compactMap { screen in
-            guard let image = Self.syncCaptureDisplay(screen.displayID) else { return nil }
-            return (screen, image)
+        withQuickAccessHidden {
+            NSScreen.screens.compactMap { screen in
+                guard let image = Self.syncCaptureDisplay(screen.displayID) else { return nil }
+                return (screen, image)
+            }
         }
+    }
+
+    /// Quick Access previews show the preceding capture and must be absent
+    /// from any new screenshot. Hide only visible cards for the sampling
+    /// interval, then restore them immediately.
+    func withQuickAccessHidden<T>(_ operation: () throws -> T) rethrows -> T {
+        let visibleWindows = quickAccessWindows.filter(\.isVisible)
+        visibleWindows.forEach { $0.orderOut(nil) }
+        CATransaction.flush()
+        // The synchronous display API can otherwise return a stale compositor
+        // frame from before orderOut reached WindowServer.
+        Thread.sleep(forTimeInterval: 1.0 / 60.0)
+        defer { visibleWindows.forEach { $0.orderFrontRegardless() } }
+        return try operation()
+    }
+
+    func withQuickAccessHidden<T>(_ operation: () async throws -> T) async rethrows -> T {
+        let visibleWindows = quickAccessWindows.filter(\.isVisible)
+        visibleWindows.forEach { $0.orderOut(nil) }
+        CATransaction.flush()
+        try? await Task.sleep(for: .milliseconds(20))
+        defer { visibleWindows.forEach { $0.orderFrontRegardless() } }
+        return try await operation()
     }
 
     private func showFreezeWindows(_ frozenScreens: [(NSScreen, CGImage)]) {
@@ -1047,39 +1077,43 @@ final class CaptureCoordinator {
             do {
                 // Always capture without system shadow — we generate our own
                 // uniform padding + frosted glass backdrop when the setting is on.
-                let result = try await ScreenCaptureManager.captureWindow(
-                    windowID: windowID,
-                    includeShadow: false,
-                    showsCursor: settings.screenshotShowsCursor
-                )
-                if settings.captureWindowShadow {
-                    // Capture the real desktop behind the window (excluding the
-                    // window itself) for the frosted glass background.
-                    // Padding = 4% of the shorter side, plus room for shadow blur.
-                    let shorter = min(CGFloat(result.image.width), CGFloat(result.image.height))
-                    let padding = max(30, shorter * 0.04)
-                    let totalPadding = padding + 20 // extra for shadow spread
-                    let desktopBg = try await ScreenCaptureManager.captureDesktopBehindWindow(
+                let (result, desktopBg) = try await self.withQuickAccessHidden {
+                    let result = try await ScreenCaptureManager.captureWindow(
                         windowID: windowID,
-                        padding: totalPadding
+                        includeShadow: false,
+                        showsCursor: self.settings.screenshotShowsCursor
                     )
-                    if let composited = Self.compositeWindowWithFrostedGlass(
-                        windowImage: result.image,
-                        desktopBackground: desktopBg
-                    ) {
-                        let enhanced = CaptureResult(
-                            image: composited,
-                            mode: result.mode,
-                            captureRect: result.captureRect,
-                            windowName: result.windowName,
-                            appName: result.appName,
-                            appBundleIdentifier: result.appBundleIdentifier,
-                            timestamp: result.timestamp,
-                            displayID: result.displayID
+                    var desktopBg: CGImage?
+                    if self.settings.captureWindowShadow {
+                        // Capture the real desktop behind the window (excluding the
+                        // window itself) for the frosted glass background.
+                        // Padding = 4% of the shorter side, plus room for shadow blur.
+                        let shorter = min(CGFloat(result.image.width), CGFloat(result.image.height))
+                        let padding = max(30, shorter * 0.04) + 20
+                        desktopBg = try await ScreenCaptureManager.captureDesktopBehindWindow(
+                            windowID: windowID,
+                            padding: padding
                         )
-                        handleCaptureResult(enhanced)
-                        return
                     }
+                    return (result, desktopBg)
+                }
+                if let desktopBg,
+                   let composited = Self.compositeWindowWithFrostedGlass(
+                       windowImage: result.image,
+                       desktopBackground: desktopBg
+                   ) {
+                    let enhanced = CaptureResult(
+                        image: composited,
+                        mode: result.mode,
+                        captureRect: result.captureRect,
+                        windowName: result.windowName,
+                        appName: result.appName,
+                        appBundleIdentifier: result.appBundleIdentifier,
+                        timestamp: result.timestamp,
+                        displayID: result.displayID
+                    )
+                    handleCaptureResult(enhanced)
+                    return
                 }
                 handleCaptureResult(result)
             } catch {
@@ -1371,11 +1405,13 @@ final class CaptureCoordinator {
                     height: rect.height
                 )
                 let displayID = screen.displayID
-                let result = try await ScreenCaptureManager.captureArea(
-                    rect: screenRect,
-                    displayID: displayID,
-                    showsCursor: settings.screenshotShowsCursor
-                )
+                let result = try await self.withQuickAccessHidden {
+                    try await ScreenCaptureManager.captureArea(
+                        rect: screenRect,
+                        displayID: displayID,
+                        showsCursor: self.settings.screenshotShowsCursor
+                    )
+                }
                 handleCaptureResult(result)
             } catch {
                 print("Area capture failed: \(error)")
