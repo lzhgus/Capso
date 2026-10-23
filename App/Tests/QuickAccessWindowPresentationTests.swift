@@ -253,6 +253,38 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertTrue(preview.isVisible, "The preview should return after capture sampling")
     }
 
+    func testAsyncCaptureDoesNotRestoreQuickAccessCardClosedDuringCapture() async throws {
+        let suiteName = "CaptureQuickAccessVisibilityTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        let settings = AppSettings(defaults: defaults)
+        settings.quickAccessAutoClose = false
+        let coordinator = CaptureCoordinator(settings: settings)
+        let preview = coordinator.showQuickAccess(
+            for: CaptureResult(
+                image: try makeImage(),
+                mode: .area,
+                captureRect: CGRect(x: 0, y: 0, width: 8, height: 6)
+            ),
+            entryID: UUID(),
+            autoUpload: false
+        )
+        defer {
+            coordinator.closeAllQuickAccess()
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        settleRunLoop(for: 0.5)
+        XCTAssertTrue(preview.isVisible)
+
+        try await coordinator.withQuickAccessHidden {
+            await Task.yield()
+            preview.onClose?()
+        }
+
+        XCTAssertFalse(coordinator.hasQuickAccess)
+        XCTAssertFalse(preview.isVisible, "A card closed during async capture must not be restored")
+    }
+
     private func makeWindow(
         autoClose: Bool,
         interval: Int = 5,
