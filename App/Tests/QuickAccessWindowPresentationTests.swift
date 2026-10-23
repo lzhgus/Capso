@@ -222,7 +222,7 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertFalse(window.isVisible)
     }
 
-    func testCloseShrinksTowardAnchoredEdgeWithoutLeavingTargetScreen() throws {
+    func testCloseScalesTowardAnchoredEdgeWithoutLeavingTargetScreen() throws {
         for position in QuickAccessPosition.allCases {
             let (window, suiteName) = try makeWindow(autoClose: false, position: position)
             defer {
@@ -234,6 +234,7 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
             settleRunLoop(for: 0.6)
             let startFrame = window.frame
             let screenFrame = window.targetScreen.frame
+            let contentLayer = try XCTUnwrap(window.contentView?.layer)
 
             window.close()
             settleRunLoop(for: 0.5)
@@ -247,17 +248,17 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
             case .bottomLeft:
                 XCTAssertLessThan(window.frame.minX, startFrame.minX)
                 XCTAssertLessThan(window.frame.maxX, startFrame.maxX)
-                XCTAssertLessThan(window.frame.width, startFrame.width)
+                XCTAssertLessThan(contentLayer.transform.m11, 1)
                 XCTAssertEqual(window.frame.minY, startFrame.minY)
             case .bottomRight:
                 XCTAssertGreaterThan(window.frame.minX, startFrame.minX)
                 XCTAssertGreaterThan(window.frame.maxX, startFrame.maxX)
-                XCTAssertLessThan(window.frame.width, startFrame.width)
+                XCTAssertLessThan(contentLayer.transform.m11, 1)
                 XCTAssertEqual(window.frame.minY, startFrame.minY)
             case .centerScreen:
                 XCTAssertLessThan(window.frame.minY, startFrame.minY)
                 XCTAssertLessThan(window.frame.maxY, startFrame.maxY)
-                XCTAssertLessThan(window.frame.height, startFrame.height)
+                XCTAssertLessThan(contentLayer.transform.m22, 1)
                 XCTAssertEqual(window.frame.minX, startFrame.minX)
             }
         }
