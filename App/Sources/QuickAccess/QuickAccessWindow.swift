@@ -8,6 +8,8 @@ import ShareKit
 @MainActor
 final class QuickAccessWindow: NSPanel {
     private static let cornerRadius: CGFloat = 14
+    private static let dismissalEdgeInset: CGFloat = 8
+    private static let dismissalShrink: CGFloat = 64
 
     override var canBecomeKey: Bool { true }
 
@@ -280,16 +282,29 @@ final class QuickAccessWindow: NSPanel {
 
         cancelEntranceTransition()
 
-        var endFrame = frame
+        let currentFrame = frame
+        var endFrame = currentFrame
         let screenFrame = targetScreen.frame
         switch anchoredPosition {
         case .bottomLeft:
-            endFrame.origin.x = screenFrame.minX - endFrame.width - 16
+            let distance = min(120, currentFrame.width * 0.42)
+            let availableDistance = max(0, currentFrame.minX - screenFrame.minX - Self.dismissalEdgeInset)
+            endFrame.origin.x -= min(distance, availableDistance)
+            endFrame.size.width -= min(Self.dismissalShrink, currentFrame.width * 0.25)
         case .bottomRight:
-            endFrame.origin.x = screenFrame.maxX + 16
+            let distance = min(120, currentFrame.width * 0.42)
+            let availableDistance = max(0, screenFrame.maxX - Self.dismissalEdgeInset - currentFrame.maxX)
+            endFrame.origin.x += min(distance, availableDistance)
+            let shrink = min(Self.dismissalShrink, currentFrame.width * 0.25)
+            endFrame.origin.x += shrink
+            endFrame.size.width -= shrink
         case .centerScreen:
-            endFrame.origin.y = screenFrame.minY - endFrame.height - 16
+            let distance = min(80, currentFrame.height * 0.42)
+            let availableDistance = max(0, currentFrame.minY - screenFrame.minY - Self.dismissalEdgeInset)
+            endFrame.origin.y -= min(distance, availableDistance)
+            endFrame.size.height -= min(Self.dismissalShrink, currentFrame.height * 0.25)
         }
+        endFrame = Self.frameFitted(endFrame, within: screenFrame)
         guard isVisible, alphaValue > 0 else {
             finishCloseAnimation()
             return
@@ -308,6 +323,19 @@ final class QuickAccessWindow: NSPanel {
 
     private func finishCloseAnimation() {
         super.close()
+    }
+
+    private static func frameFitted(_ frame: NSRect, within bounds: NSRect) -> NSRect {
+        let size = NSSize(
+            width: min(frame.width, bounds.width),
+            height: min(frame.height, bounds.height)
+        )
+        return NSRect(
+            x: min(max(frame.minX, bounds.minX), bounds.maxX - size.width),
+            y: min(max(frame.minY, bounds.minY), bounds.maxY - size.height),
+            width: size.width,
+            height: size.height
+        )
     }
 
     private func cancelEntranceTransition() {

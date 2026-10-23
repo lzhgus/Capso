@@ -222,7 +222,7 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertFalse(window.isVisible)
     }
 
-    func testCloseSlidesPastAnchoredEdgeWithoutResizing() throws {
+    func testCloseShrinksTowardAnchoredEdgeWithoutLeavingTargetScreen() throws {
         for position in QuickAccessPosition.allCases {
             let (window, suiteName) = try makeWindow(autoClose: false, position: position)
             defer {
@@ -239,18 +239,56 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
             settleRunLoop(for: 0.5)
 
             XCTAssertFalse(window.isVisible)
-            XCTAssertEqual(window.frame.size, startFrame.size)
+            XCTAssertGreaterThanOrEqual(window.frame.minX, screenFrame.minX)
+            XCTAssertLessThanOrEqual(window.frame.maxX, screenFrame.maxX)
+            XCTAssertGreaterThanOrEqual(window.frame.minY, screenFrame.minY)
+            XCTAssertLessThanOrEqual(window.frame.maxY, screenFrame.maxY)
             switch position {
             case .bottomLeft:
-                XCTAssertLessThan(window.frame.maxX, screenFrame.minX)
+                XCTAssertLessThan(window.frame.minX, startFrame.minX)
+                XCTAssertLessThan(window.frame.maxX, startFrame.maxX)
+                XCTAssertLessThan(window.frame.width, startFrame.width)
                 XCTAssertEqual(window.frame.minY, startFrame.minY)
             case .bottomRight:
-                XCTAssertGreaterThan(window.frame.minX, screenFrame.maxX)
+                XCTAssertGreaterThan(window.frame.minX, startFrame.minX)
+                XCTAssertGreaterThan(window.frame.maxX, startFrame.maxX)
+                XCTAssertLessThan(window.frame.width, startFrame.width)
                 XCTAssertEqual(window.frame.minY, startFrame.minY)
             case .centerScreen:
-                XCTAssertLessThan(window.frame.maxY, screenFrame.minY)
+                XCTAssertLessThan(window.frame.minY, startFrame.minY)
+                XCTAssertLessThan(window.frame.maxY, startFrame.maxY)
+                XCTAssertLessThan(window.frame.height, startFrame.height)
                 XCTAssertEqual(window.frame.minX, startFrame.minX)
             }
+        }
+    }
+
+    func testCloseReturnsDraggedCardEntirelyToTargetScreen() throws {
+        for position in QuickAccessPosition.allCases {
+            let (window, suiteName) = try makeWindow(autoClose: false, position: position)
+            defer {
+                window.orderOut(nil)
+                UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            }
+
+            window.show()
+            settleRunLoop(for: 0.6)
+            let screenFrame = window.targetScreen.frame
+            let draggedFrame = NSRect(
+                x: screenFrame.maxX - window.frame.width / 2,
+                y: screenFrame.maxY - window.frame.height / 2,
+                width: window.frame.width,
+                height: window.frame.height
+            )
+            window.setFrame(draggedFrame, display: false)
+
+            window.close()
+            settleRunLoop(for: 0.5)
+
+            XCTAssertGreaterThanOrEqual(window.frame.minX, screenFrame.minX)
+            XCTAssertLessThanOrEqual(window.frame.maxX, screenFrame.maxX)
+            XCTAssertGreaterThanOrEqual(window.frame.minY, screenFrame.minY)
+            XCTAssertLessThanOrEqual(window.frame.maxY, screenFrame.maxY)
         }
     }
 
