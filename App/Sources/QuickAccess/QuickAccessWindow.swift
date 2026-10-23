@@ -8,6 +8,7 @@ import ShareKit
 @MainActor
 final class QuickAccessWindow: NSPanel {
     private static let cornerRadius: CGFloat = 14
+    private static let dismissalEdgeInset: CGFloat = 8
 
     override var canBecomeKey: Bool { true }
 
@@ -29,6 +30,7 @@ final class QuickAccessWindow: NSPanel {
     private var transitionWindow: QuickAccessTransitionWindow?
     private var closeAnimationID = UUID()
     private var isClosing = false
+    private var anchoredPosition: QuickAccessPosition
     private let settings: AppSettings
     private let transitionImage: NSImage
     /// The screen this preview is anchored to (where the capture originated).
@@ -42,6 +44,7 @@ final class QuickAccessWindow: NSPanel {
         autoUpload: Bool
     ) {
         self.settings = settings
+        self.anchoredPosition = settings.quickAccessPosition
         self.targetScreen = screen ?? NSScreen.main ?? NSScreen.screens.first!
         // Keep a Retina-sized display texture; actions still receive the original capture.
         let displayScale = max(2, targetScreen.backingScaleFactor)
@@ -180,6 +183,7 @@ final class QuickAccessWindow: NSPanel {
     }
 
     func show(from sourceFrame: NSRect? = nil) {
+        resetDismissalContentTransform()
         let finalFrame = frame
         isClosing = false
         closeAnimationID = UUID()
@@ -279,14 +283,33 @@ final class QuickAccessWindow: NSPanel {
         cancelEntranceTransition()
 
         let currentFrame = frame
-        let endFrame = currentFrame.insetBy(
-            dx: min(120, currentFrame.width * 0.42),
-            dy: min(80, currentFrame.height * 0.42)
-        )
+        var endFrame = currentFrame
+        let screenFrame = targetScreen.frame
+        switch anchoredPosition {
+        case .bottomLeft:
+            let distance = min(120, currentFrame.width * 0.42)
+            let availableDistance = max(0, currentFrame.minX - screenFrame.minX - Self.dismissalEdgeInset)
+            endFrame.origin.x -= min(distance, availableDistance)
+        case .bottomRight:
+            let distance = min(120, currentFrame.width * 0.42)
+            let availableDistance = max(0, screenFrame.maxX - Self.dismissalEdgeInset - currentFrame.maxX)
+            endFrame.origin.x += min(distance, availableDistance)
+        case .centerScreen:
+            let distance = min(80, currentFrame.height * 0.42)
+            let availableDistance = max(0, currentFrame.minY - screenFrame.minY - Self.dismissalEdgeInset)
+            endFrame.origin.y -= min(distance, availableDistance)
+        }
+        endFrame = Self.frameFitted(endFrame, within: screenFrame)
+        guard isVisible, alphaValue > 0 else {
+            finishCloseAnimation()
+            return
+        }
+
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.24
+            ctx.duration = 0.3
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            self.animator().setFrame(endFrame, display: true)
+            self.animateDismissalContent(for: self.anchoredPosition, duration: ctx.duration)
+            self.animator().setFrame(endFrame, display: false)
             self.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             guard let self, self.closeAnimationID == animationID else { return }
@@ -296,6 +319,48 @@ final class QuickAccessWindow: NSPanel {
 
     private func finishCloseAnimation() {
         super.close()
+    }
+
+    private static func frameFitted(_ frame: NSRect, within bounds: NSRect) -> NSRect {
+        let size = NSSize(
+            width: min(frame.width, bounds.width),
+            height: min(frame.height, bounds.height)
+        )
+        return NSRect(
+            x: min(max(frame.minX, bounds.minX), bounds.maxX - size.width),
+            y: min(max(frame.minY, bounds.minY), bounds.maxY - size.height),
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    private func animateDismissalContent(for position: QuickAccessPosition, duration: TimeInterval) {
+        guard let layer = contentView?.layer else { return }
+
+        let transform: CGAffineTransform
+        switch position {
+        case .bottomLeft:
+            transform = CGAffineTransform(translationX: -32, y: 0).scaledBy(x: 0.78, y: 1)
+        case .bottomRight:
+            transform = CGAffineTransform(translationX: 32, y: 0).scaledBy(x: 0.78, y: 1)
+        case .centerScreen:
+            transform = CGAffineTransform(translationX: 0, y: -24).scaledBy(x: 1, y: 0.75)
+        }
+
+        let finalTransform = CATransform3DMakeAffineTransform(transform)
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = layer.presentation()?.transform ?? layer.transform
+        animation.toValue = finalTransform
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        layer.transform = finalTransform
+        layer.add(animation, forKey: "quickAccessDismissal")
+    }
+
+    private func resetDismissalContentTransform() {
+        guard let layer = contentView?.layer else { return }
+        layer.removeAnimation(forKey: "quickAccessDismissal")
+        layer.transform = CATransform3DIdentity
     }
 
     private func cancelEntranceTransition() {
@@ -330,8 +395,9 @@ final class QuickAccessWindow: NSPanel {
     /// Reposition this window within a stack, centering the group when requested.
     func repositionForStack(index: Int, count: Int, animated: Bool = true) {
         guard !isClosing else { return }
+        anchoredPosition = settings.quickAccessPosition
         let newFrame = QuickAccessStackGeometry.frame(
-            position: settings.quickAccessPosition,
+            position: anchoredPosition,
             screenFrame: targetScreen.frame,
             visibleFrame: targetScreen.visibleFrame,
             windowSize: frame.size,
