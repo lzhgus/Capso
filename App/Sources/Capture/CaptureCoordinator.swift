@@ -1031,6 +1031,9 @@ final class CaptureCoordinator {
     /// interval, then restore them immediately.
     func withQuickAccessHidden<T>(_ operation: () throws -> T) rethrows -> T {
         let visibleWindows = quickAccessWindows.filter(\.isVisible)
+        guard !visibleWindows.isEmpty else {
+            return try operation()
+        }
         visibleWindows.forEach { $0.orderOut(nil) }
         CATransaction.flush()
         // The synchronous display API can otherwise return a stale compositor
@@ -1042,10 +1045,17 @@ final class CaptureCoordinator {
 
     func withQuickAccessHidden<T>(_ operation: @MainActor () async throws -> T) async rethrows -> T {
         let visibleWindows = quickAccessWindows.filter(\.isVisible)
+        guard !visibleWindows.isEmpty else {
+            return try await operation()
+        }
         visibleWindows.forEach { $0.orderOut(nil) }
         CATransaction.flush()
         try? await Task.sleep(for: .milliseconds(20))
-        defer { visibleWindows.forEach { $0.orderFrontRegardless() } }
+        defer {
+            visibleWindows
+                .filter { window in quickAccessWindows.contains { $0 === window } }
+                .forEach { $0.orderFrontRegardless() }
+        }
         return try await operation()
     }
 
