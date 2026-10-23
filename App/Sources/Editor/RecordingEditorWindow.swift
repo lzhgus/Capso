@@ -16,6 +16,7 @@ final class RecordingEditorWindow: NSPanel {
             defer: false
         )
 
+        identifier = DockPresenceController.windowIdentifier
         title = String(localized: "Recording Editor")
         minSize = NSSize(width: 800, height: 540)
         isReleasedWhenClosed = false

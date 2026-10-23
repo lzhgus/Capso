@@ -68,6 +68,7 @@ final class AnnotationEditorWindow: NSPanel, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
+        identifier = DockPresenceController.windowIdentifier
 
         self.title = "Annotate"
         self.isReleasedWhenClosed = false

@@ -35,6 +35,7 @@ final class PreferencesWindow {
             backing: .buffered,
             defer: false
         )
+        window.identifier = DockPresenceController.windowIdentifier
         window.title = String(localized: "Capso Settings")
         window.minSize = NSSize(width: 680, height: 480)
         window.maxSize = NSSize(width: 680, height: 480)

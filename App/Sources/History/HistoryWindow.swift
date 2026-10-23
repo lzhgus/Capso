@@ -28,6 +28,7 @@ final class HistoryWindow {
             backing: .buffered,
             defer: false
         )
+        window.identifier = DockPresenceController.windowIdentifier
         window.title = String(localized: "Screenshot History")
         window.minSize = NSSize(width: 480, height: 400)
         window.isReleasedWhenClosed = false

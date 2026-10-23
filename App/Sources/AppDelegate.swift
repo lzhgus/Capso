@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var historyCoordinator: HistoryCoordinator?
     private(set) var shareCoordinator: ShareCoordinator?
     private var preferencesWindow: PreferencesWindow?
+    private var dockPresenceController: DockPresenceController?
     private var automationURLRequestBuffer = AutomationURLRequestBuffer()
     private var imageFileOpenBuffer = ImageFileOpenBuffer()
     /// Sparkle update coordinator used by preferences and manual update checks.
@@ -68,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         recordingCoordinator!.desktopIconsCover = desktopIconsCover
         recordingCoordinator!.recoverInterruptedRecording()
         preferencesWindow = PreferencesWindow(settings: settings, permissionManager: permissionManager, updateManager: updateManager)
+        dockPresenceController = DockPresenceController()
         if settings.diagnosticLoggingEnabled {
             DiagnosticLogger.append(
                 "App launched version=\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown") build=\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown")",
