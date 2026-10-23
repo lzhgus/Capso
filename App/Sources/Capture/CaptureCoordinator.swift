@@ -1034,7 +1034,7 @@ final class CaptureCoordinator {
         guard !visibleWindows.isEmpty else {
             return try operation()
         }
-        visibleWindows.forEach { $0.orderOut(nil) }
+        hideQuickAccessWindowsImmediately(visibleWindows)
         CATransaction.flush()
         // The synchronous display API can otherwise return a stale compositor
         // frame from before orderOut reached WindowServer.
@@ -1048,7 +1048,7 @@ final class CaptureCoordinator {
         guard !visibleWindows.isEmpty else {
             return try await operation()
         }
-        visibleWindows.forEach { $0.orderOut(nil) }
+        hideQuickAccessWindowsImmediately(visibleWindows)
         CATransaction.flush()
         try? await Task.sleep(for: .milliseconds(20))
         defer {
@@ -1057,6 +1057,18 @@ final class CaptureCoordinator {
                 .forEach { $0.orderFrontRegardless() }
         }
         return try await operation()
+    }
+
+    /// `QuickAccessWindow` normally uses the utility-window transition. That
+    /// leaves its fade-out pixels on screen long enough to leak into a capture,
+    /// so suppress the animation only while ordering it out for sampling.
+    private func hideQuickAccessWindowsImmediately(_ windows: [QuickAccessWindow]) {
+        windows.forEach { window in
+            let animationBehavior = window.animationBehavior
+            window.animationBehavior = .none
+            window.orderOut(nil)
+            window.animationBehavior = animationBehavior
+        }
     }
 
     private func showFreezeWindows(_ frozenScreens: [(NSScreen, CGImage)]) {
