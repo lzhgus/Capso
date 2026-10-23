@@ -163,6 +163,18 @@ struct HistoryView: View {
                 Text("\(count)")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
+
+                if entries.contains(where: { [.area, .fullscreen, .window].contains($0.captureMode) }) {
+                    Button {
+                        coordinator.exportAsPDF(entries)
+                    } label: {
+                        Image(systemName: "doc.richtext")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Export Screenshots as PDF")
+                }
             }
 
             LazyVGrid(

@@ -4,6 +4,7 @@ import AVFoundation
 import ImageIO
 import UniformTypeIdentifiers
 import Observation
+import PDFKit
 import CaptureKit
 import ExportKit
 import HistoryKit
@@ -786,6 +787,37 @@ final class HistoryCoordinator {
                 }
             }
         }
+    }
+
+    /// Combines the screenshots among `entries` into one PDF, oldest first,
+    /// one capture per page.
+    func exportAsPDF(_ entries: [HistoryEntry]) {
+        let screenshots = entries
+            .filter { preferredCaptureType(for: $0) == .screenshot }
+            .sorted { $0.createdAt < $1.createdAt }
+        let imageURLs = screenshots.compactMap { fullImageURL(for: $0) }
+        guard let first = screenshots.first, !imageURLs.isEmpty else { return }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "Capso \(first.createdAt.formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month().day())).pdf"
+        panel.allowedContentTypes = [.pdf]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destURL = panel.url else { return }
+
+        Task.detached(priority: .utility) {
+            if !Self.writePDF(pages: imageURLs, to: destURL) {
+                print("Failed to export history as PDF")
+            }
+        }
+    }
+
+    nonisolated static func writePDF(pages imageURLs: [URL], to destinationURL: URL) -> Bool {
+        let document = PDFDocument()
+        for url in imageURLs {
+            guard let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else { continue }
+            document.insert(page, at: document.pageCount)
+        }
+        return document.pageCount > 0 && document.write(to: destinationURL)
     }
 
     func showInFinder(_ entry: HistoryEntry) {
