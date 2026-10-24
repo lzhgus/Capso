@@ -110,10 +110,10 @@ final class RecordingCoordinator {
             if self.showRememberedRecordingArea() {
                 return
             }
-            let selectsWindow = self.settings.recordingSelectsWindow
-            self.showAreaSelectionOverlay()
-            if selectsWindow {
+            if self.settings.recordingSelectsWindow {
                 self.requestWindowSelectionOverlay()
+            } else {
+                self.showAreaSelectionOverlay()
             }
         }
     }
@@ -153,15 +153,23 @@ final class RecordingCoordinator {
                     .filter { !overlayIDs.contains($0.id) }
                 guard !Task.isCancelled else { return }
                 guard !windows.isEmpty else {
-                    selectionModeWindow?.setSelectedMode(fallbackMode)
+                    fallBackFromWindowSelection(to: fallbackMode)
                     return
                 }
                 showWindowSelectionOverlay(windows: windows)
             } catch {
                 guard !Task.isCancelled else { return }
-                selectionModeWindow?.setSelectedMode(fallbackMode)
+                fallBackFromWindowSelection(to: fallbackMode)
                 print("Window enumeration failed: \(error)")
             }
+        }
+    }
+
+    private func fallBackFromWindowSelection(to mode: RecordingSelectionMode) {
+        if activeSelectionMode == nil {
+            showAreaSelectionOverlay()
+        } else {
+            selectionModeWindow?.setSelectedMode(mode)
         }
     }
 
