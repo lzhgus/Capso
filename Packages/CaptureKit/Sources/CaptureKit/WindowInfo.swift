@@ -42,7 +42,7 @@ public enum ContentEnumerator {
     public static func windows() async throws -> [WindowInfo] {
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
         let myBundleID = Bundle.main.bundleIdentifier
-        return content.windows
+        let candidates = content.windows
             .filter { window in
                 let trimmedTitle = window.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 let appName = window.owningApplication?.applicationName ?? ""
@@ -59,6 +59,39 @@ public enum ContentEnumerator {
                 )
             }
             .map { WindowInfo(from: $0) }
+        return orderedFrontToBack(candidates, id: \.id, zOrder: currentZOrder())
+    }
+
+    /// `SCShareableContent.windows` is not guaranteed to be in z-order, so
+    /// hit testing against it can pick a window hidden behind the frontmost
+    /// one. `CGWindowListCopyWindowInfo` returns on-screen windows
+    /// front-to-back; use it as the authoritative stacking order.
+    private static func currentZOrder() -> [CGWindowID] {
+        guard let list = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return []
+        }
+        return list.compactMap { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value }
+    }
+
+    /// Sorts windows to match `zOrder` (front-to-back). Windows missing from
+    /// `zOrder` keep their relative order and go after the known ones.
+    static func orderedFrontToBack<Window>(
+        _ windows: [Window],
+        id: (Window) -> CGWindowID,
+        zOrder: [CGWindowID]
+    ) -> [Window] {
+        guard !zOrder.isEmpty else { return windows }
+        let rank = Dictionary(zOrder.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        return windows.enumerated()
+            .sorted { lhs, rhs in
+                let l = rank[id(lhs.element)] ?? Int.max
+                let r = rank[id(rhs.element)] ?? Int.max
+                return l != r ? l < r : lhs.offset < rhs.offset
+            }
+            .map(\.element)
     }
 
     /// System overlays that sit above app windows and steal hit testing.
