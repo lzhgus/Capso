@@ -301,6 +301,9 @@ final class RecordingCoordinator {
             onCancel: { [weak self] in
                 self?.dismissOverlay()
                 self?.selectedTarget = nil
+            },
+            onHover: { [weak self] isOver in
+                self?.overlayWindows.forEach { $0.setPointerOverPanel(isOver) }
             }
         )
         window.show()

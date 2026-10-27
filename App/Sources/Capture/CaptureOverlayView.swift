@@ -55,6 +55,7 @@ final class CaptureOverlayView: NSView {
     /// Shift toggle can recompute the constrained corner.
     private var lastRawEnd: NSPoint = .zero
     private var currentMouseLocation: NSPoint?
+    private var isPointerOverPanel = false
 
     /// The currently active capture preset. Starts from settings and can be
     /// changed at runtime via R-key cycling or the right-click context menu.
@@ -217,6 +218,21 @@ final class CaptureOverlayView: NSView {
         if cursorHidden {
             NSCursor.unhide()
             cursorHidden = false
+        }
+    }
+
+    /// The reticle is drawn underneath panels above the overlay (like the
+    /// recording mode rail), so show the system cursor while over them.
+    func setPointerOverPanel(_ isOver: Bool) {
+        isPointerOverPanel = isOver
+        guard case .area = mode, !isDragging else { return }
+        if isOver {
+            restoreCursorIfNeeded()
+            currentMouseLocation = nil
+            needsDisplay = true
+        } else if !activePreset.isFixedSize, !cursorHidden {
+            NSCursor.hide()
+            cursorHidden = true
         }
     }
 
@@ -963,7 +979,8 @@ final class CaptureOverlayView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        currentMouseLocation = convert(event.locationInWindow, from: nil)
+        // The panel's transparent margin still passes moves through to us.
+        currentMouseLocation = isPointerOverPanel ? nil : convert(event.locationInWindow, from: nil)
 
         switch mode {
         case .area:

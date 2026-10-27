@@ -48,6 +48,7 @@ enum RecordingSelectionMode: CaseIterable, Equatable {
 final class RecordingSelectionModeWindow: NSPanel {
     private let onSelect: (RecordingSelectionMode) -> Void
     private let onCancel: () -> Void
+    private let onHover: (Bool) -> Void
     private let canUseLastArea: Bool
     private var selectedMode: RecordingSelectionMode
 
@@ -56,10 +57,12 @@ final class RecordingSelectionModeWindow: NSPanel {
         selectedMode: RecordingSelectionMode,
         canUseLastArea: Bool,
         onSelect: @escaping (RecordingSelectionMode) -> Void,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        onHover: @escaping (Bool) -> Void = { _ in }
     ) {
         self.onSelect = onSelect
         self.onCancel = onCancel
+        self.onHover = onHover
         self.canUseLastArea = canUseLastArea
         self.selectedMode = selectedMode
 
@@ -87,11 +90,7 @@ final class RecordingSelectionModeWindow: NSPanel {
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
 
-        contentView = NSHostingView(rootView: RecordingSelectionModeRail(
-            selectedMode: selectedMode,
-            canUseLastArea: canUseLastArea,
-            onSelect: { [weak self] mode in self?.selectMode(mode) }
-        ))
+        contentView = makeContentView()
     }
 
     override var canBecomeKey: Bool { true }
@@ -135,12 +134,31 @@ final class RecordingSelectionModeWindow: NSPanel {
         onSelect(mode)
     }
 
-    private func updateContent() {
-        contentView = NSHostingView(rootView: RecordingSelectionModeRail(
+    override func mouseEntered(with event: NSEvent) {
+        onHover(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHover(false)
+    }
+
+    private func makeContentView() -> NSView {
+        let view = NSHostingView(rootView: RecordingSelectionModeRail(
             selectedMode: selectedMode,
             canUseLastArea: canUseLastArea,
             onSelect: { [weak self] mode in self?.selectMode(mode) }
         ))
+        view.addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        ))
+        return view
+    }
+
+    private func updateContent() {
+        contentView = makeContentView()
         makeFirstResponder(contentView)
     }
 }
