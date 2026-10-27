@@ -12,6 +12,12 @@ final class PinnedScreenshotContentView: NSView {
     }
 
     override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    // Receive clicks ourselves so the first click on an inactive pin can drag it.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) == nil ? nil : self
+    }
 
     init(image: CGImage, frame: NSRect) {
         imageView = NSImageView(frame: frame)
