@@ -214,14 +214,16 @@ jobs:
         run: |
           set -euo pipefail
           APP="build/export/${APP_NAME}.app"
+          stapled=0
           for i in 1 2 3 4 5; do
-            if xcrun stapler staple "$APP"; then
+            if xcrun stapler staple "$APP" && xcrun stapler validate "$APP"; then
+              stapled=1
               break
             fi
             echo "Staple attempt $i failed, retrying in 15s..."
             sleep 15
           done
-          xcrun stapler validate "$APP"
+          [ "$stapled" = 1 ]
           spctl -a -t exec -vv "$APP" || true
 
       - name: Create ZIP
@@ -270,14 +272,16 @@ jobs:
             --team-id "$APPLE_TEAM_ID" \
             --wait
 
+          stapled=0
           for i in 1 2 3 4 5; do
-            if xcrun stapler staple "$DMG"; then
+            if xcrun stapler staple "$DMG" && xcrun stapler validate "$DMG"; then
+              stapled=1
               break
             fi
             echo "Staple attempt $i failed, retrying in 15s..."
             sleep 15
           done
-          xcrun stapler validate "$DMG"
+          [ "$stapled" = 1 ]
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
