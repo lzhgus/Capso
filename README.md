@@ -107,7 +107,7 @@ Capso exists to give back to the macOS community and to show what a modern, modu
 - **Pin to Screen** — float screenshots as always-on-top windows with lock/click-through mode
 - **Global keyboard shortcuts** — fully configurable
 - **Preferences** — comprehensive settings with Apple Liquid Glass design
-- **Localization** — English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Spanish, Italian, Brazilian Portuguese, Russian
+- **Localization** — English, Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French, Spanish, Italian, Brazilian Portuguese, Russian, Turkish
 
 ### Cloud Sharing (Optional)
 - **Bring-your-own storage** — point Capso at your own Cloudflare R2 bucket; we never run a hosted service
