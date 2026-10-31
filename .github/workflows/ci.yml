@@ -12,6 +12,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: macos-26
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -65,4 +66,8 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            -only-testing:CapsoTests
+            -only-testing:CapsoTests &
+          pid=$!
+          for i in $(seq 48); do sleep 5; kill -0 $pid 2>/dev/null || { wait $pid; exit $?; }; done
+          for p in $(pgrep -x Capso); do sample $p 5 -file /tmp/s.txt >/dev/null 2>&1; grep -A80 "Thread_.*DispatchQueue_1:" /tmp/s.txt | head -120; done
+          kill $pid; exit 1
