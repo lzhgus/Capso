@@ -96,7 +96,7 @@ public enum TextRecognizer {
 
         return try await withCheckedThrowingContinuation { continuation in
             let oneShot = OneShotContinuation(continuation)
-            let request = VNRecognizeTextRequest { request, error in
+            nonisolated(unsafe) let request = VNRecognizeTextRequest { request, error in
                 if let error {
                     oneShot.resume(throwing: error)
                     return
@@ -159,11 +159,14 @@ public enum TextRecognizer {
             request.automaticallyDetectsLanguage = languages == nil
             request.usesLanguageCorrection = true
 
-            let handler = VNImageRequestHandler(cgImage: image, options: [:])
-            do {
-                try handler.perform([request])
-            } catch {
-                oneShot.resume(throwing: error)
+            nonisolated(unsafe) let handler = VNImageRequestHandler(cgImage: image, options: [:])
+            // perform blocks; keep it off the Swift concurrency thread pool.
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try handler.perform([request])
+                } catch {
+                    oneShot.resume(throwing: error)
+                }
             }
         }
     }
