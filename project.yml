@@ -48,7 +48,8 @@ packages:
   ShareKit:
     path: Packages/ShareKit
   KeyboardShortcuts:
-    path: Packages/KeyboardShortcuts
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    exactVersion: "3.1.0"
   Defaults:
     url: https://github.com/sindresorhus/Defaults
     exactVersion: "9.0.6"

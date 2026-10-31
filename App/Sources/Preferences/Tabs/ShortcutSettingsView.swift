@@ -6,24 +6,24 @@ import SharedKit
 
 extension KeyboardShortcuts.Name {
     static let captureAllInOne = Self("captureAllInOne")
-    static let captureArea = Self("captureArea", default: .init(.one, modifiers: [.option, .shift]))
-    static let captureFullscreen = Self("captureFullscreen", default: .init(.two, modifiers: [.option, .shift]))
-    static let captureWindow = Self("captureWindow", default: .init(.three, modifiers: [.option, .shift]))
-    static let captureText = Self("captureText", default: .init(.four, modifiers: [.option, .shift]))
+    static let captureArea = Self("captureArea", initial: .init(.one, modifiers: [.option, .shift]))
+    static let captureFullscreen = Self("captureFullscreen", initial: .init(.two, modifiers: [.option, .shift]))
+    static let captureWindow = Self("captureWindow", initial: .init(.three, modifiers: [.option, .shift]))
+    static let captureText = Self("captureText", initial: .init(.four, modifiers: [.option, .shift]))
     /// Keep the existing storage key so current users retain their recording shortcut.
-    static let recordScreen = Self("recordScreen", default: .init(.five, modifiers: [.option, .shift]))
+    static let recordScreen = Self("recordScreen", initial: .init(.five, modifiers: [.option, .shift]))
     /// Opt-in to avoid adding another default global shortcut.
     static let recordFullscreen = Self("recordFullscreen")
-    static let captureScrolling = Self("captureScrolling", default: .init(.six, modifiers: [.option, .shift]))
-    static let captureAreaToClipboard = Self("captureAreaToClipboard", default: .init(.seven, modifiers: [.option, .shift]))
-    static let captureAreaAndShare = Self("captureAreaAndShare", default: .init(.zero, modifiers: [.option, .shift]))
-    static let captureAreaAndAnnotate = Self("captureAreaAndAnnotate", default: .init(.eight, modifiers: [.option, .shift]))
+    static let captureScrolling = Self("captureScrolling", initial: .init(.six, modifiers: [.option, .shift]))
+    static let captureAreaToClipboard = Self("captureAreaToClipboard", initial: .init(.seven, modifiers: [.option, .shift]))
+    static let captureAreaAndShare = Self("captureAreaAndShare", initial: .init(.zero, modifiers: [.option, .shift]))
+    static let captureAreaAndAnnotate = Self("captureAreaAndAnnotate", initial: .init(.eight, modifiers: [.option, .shift]))
     static let captureAreaAndPin = Self("captureAreaAndPin")
     static let pinFromClipboard = Self("pinFromClipboard")
     static let editClipboardImage = Self("editClipboardImage")
-    static let screenshotHistory = Self("screenshotHistory", default: .init(.nine, modifiers: [.option, .shift]))
-    static let captureAndTranslate = Self("captureAndTranslate", default: .init(.t, modifiers: [.option, .shift]))
-    static let translateSelectedText = Self("translateSelectedText", default: .init(.y, modifiers: [.option, .shift]))
+    static let screenshotHistory = Self("screenshotHistory", initial: .init(.nine, modifiers: [.option, .shift]))
+    static let captureAndTranslate = Self("captureAndTranslate", initial: .init(.t, modifiers: [.option, .shift]))
+    static let translateSelectedText = Self("translateSelectedText", initial: .init(.y, modifiers: [.option, .shift]))
     static let translateTypedText = Self("translateTypedText")
     /// No default binding — opt-in. Self-Timer is discoverable from the
     /// menu bar; shipping a default risks colliding with whatever the user
