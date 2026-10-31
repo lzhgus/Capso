@@ -6,16 +6,16 @@
     <description>Open-source screenshot and screen recording for macOS</description>
     <language>en</language>
     <item>
-      <title>Version 1.2.6</title>
-      <pubDate>Tue, 27 Oct 2026 07:24:01 +0000</pubDate>
-      <sparkle:version>67</sparkle:version>
-      <sparkle:shortVersionString>1.2.6</sparkle:shortVersionString>
+      <title>Version 1.2.7</title>
+      <pubDate>Sat, 31 Oct 2026 07:21:19 +0000</pubDate>
+      <sparkle:version>68</sparkle:version>
+      <sparkle:shortVersionString>1.2.7</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
       <enclosure
-        url="https://github.com/lzhgus/Capso/releases/download/v1.2.6/Capso-1.2.6.dmg"
+        url="https://github.com/lzhgus/Capso/releases/download/v1.2.7/Capso-1.2.7.dmg"
         type="application/octet-stream"
-        sparkle:edSignature="Dskr/a0TckpvGzAzjx17kvS7asvYr7y/2/RNcs5xogHZXpWmxQCDoGArEvFuYPQGea2SMgXtW5sC9pq977ysCQ=="
-        length="10632992"
+        sparkle:edSignature="sY5VRduwTy788FZQDxTQRnhvPVjTP1l2fKkryQrIQ092ZLLzoARRPNuQMAh4okWlVfA3ccdldxXW98yjqMXYBA=="
+        length="10655446"
       />
     </item>
   </channel>
