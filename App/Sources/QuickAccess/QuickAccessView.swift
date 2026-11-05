@@ -572,7 +572,11 @@ struct QuickAccessView: View {
     }
 
     private var hiddenEscapeButton: some View {
-        Button(action: onClose) { EmptyView() }
+        Button {
+            // Holding Escape would otherwise beep once the card is gone (#356).
+            EscapeKeyPressSwallower.shared.swallowRemainder(of: NSApp.currentEvent)
+            onClose()
+        } label: { EmptyView() }
             .keyboardShortcut(.escape, modifiers: [])
             .opacity(0)
             .frame(width: 0, height: 0)
