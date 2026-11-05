@@ -36,7 +36,10 @@ private struct AnnotationToolShortcutMonitor: NSViewRepresentable {
         func install() {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handle(event) ?? event
+                // Not `self?.handle(event) ?? event`: a nil result means
+                // "consumed", and `??` would turn it back into the event.
+                guard let self else { return event }
+                return self.handle(event)
             }
         }
 

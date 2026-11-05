@@ -98,6 +98,9 @@ final class CaptureOverlayWindow: NSPanel {
             self?.onWindowsSelected?(windowIDs)
         }
         overlayView.onCancel = { [weak self] in
+            // Escape can also reach the view directly when the local
+            // monitor leaves the event alone.
+            EscapeKeyPressSwallower.shared.swallowRemainder(of: NSApp.currentEvent)
             self?.onCancelled?()
         }
         overlayView.onSpaceToggle = { [weak self] in
@@ -168,9 +171,10 @@ final class CaptureOverlayWindow: NSPanel {
             }
         }
         // Local monitor: catches ESC/Space when our window is key.
-        localEscMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
-            self?.handleLocalKeyEvent(event) ?? event
-        }
+        localEscMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.keyDown, .keyUp],
+            handler: makeLocalKeyMonitorHandler()
+        )
         // Ensure Shift-driven behavior still runs when the view is not first
         // responder (e.g. after clicking across screens): multi-window
         // confirmation on release, and the live 1:1 square lock during a drag.
@@ -206,6 +210,18 @@ final class CaptureOverlayWindow: NSPanel {
         }
     }
 
+    /// The handler installed as the local key monitor.
+    func makeLocalKeyMonitorHandler() -> (NSEvent) -> NSEvent? {
+        { [weak self] event in
+            guard let self else { return event }
+            // Not `self?.handleLocalKeyEvent(event) ?? event`: a nil result
+            // means "consumed", and `??` turns it back into the event. Escape
+            // then reached AppKit after the overlay had closed, and with no
+            // key window left it played the error sound (#356).
+            return self.handleLocalKeyEvent(event)
+        }
+    }
+
     /// Local monitors are app-wide. Leave events for other display overlays
     /// untouched so one key press is handled exactly once.
     func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
@@ -219,6 +235,7 @@ final class CaptureOverlayWindow: NSPanel {
             if overlayView.handleEscapeKey() {
                 return nil
             }
+            EscapeKeyPressSwallower.shared.swallowRemainder(of: event)
             onCancelled?()
             return nil
         case 49:

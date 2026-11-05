@@ -45,6 +45,61 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         XCTAssertEqual(cancellationCount, 1)
     }
 
+    func testInstalledKeyMonitorConsumesEscapeThatCancels() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let window = CaptureOverlayWindow(
+            screen: try XCTUnwrap(NSScreen.main),
+            settings: settings,
+            handlesGlobalKeyEvents: true
+        )
+        var cancellationCount = 0
+        window.onCancelled = { cancellationCount += 1 }
+
+        let handler = window.makeLocalKeyMonitorHandler()
+        let escape = try makeEscapeEvent(windowNumber: window.windowNumber)
+
+        // A non-nil result lets AppKit keep dispatching Escape after the
+        // overlay has closed, which plays the error sound (#356).
+        XCTAssertNil(handler(escape))
+        XCTAssertEqual(cancellationCount, 1)
+
+        // The rest of the press is swallowed; its keyUp ends that.
+        let swallower = EscapeKeyPressSwallower.shared
+        XCTAssertTrue(swallower.isSwallowing)
+        XCTAssertNil(swallower.handle(try makeEscapeEvent(windowNumber: 0, type: .keyUp)))
+        XCTAssertFalse(swallower.isSwallowing)
+    }
+
+    func testInstalledKeyMonitorConsumesEscapeThatClearsMultiSelection() throws {
+        let (settings, defaultsSuiteName) = makeSettings()
+        defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let window = CaptureOverlayWindow(
+            screen: try XCTUnwrap(NSScreen.main),
+            settings: settings,
+            handlesGlobalKeyEvents: true
+        )
+        let view = try XCTUnwrap(window.contentView as? CaptureOverlayView)
+        view.setMode(.windowSelection([]))
+        NotificationCenter.default.post(
+            name: .multiWindowSelectionChanged,
+            object: self,
+            userInfo: ["windowIDs": [NSNumber(value: CGWindowID(42))]]
+        )
+        var cancellationCount = 0
+        window.onCancelled = { cancellationCount += 1 }
+
+        // Consumed, so the view does not see the same Escape again and cancel
+        // the whole capture right after clearing the selection.
+        XCTAssertNil(window.makeLocalKeyMonitorHandler()(
+            try makeEscapeEvent(windowNumber: window.windowNumber)
+        ))
+        XCTAssertEqual(cancellationCount, 0)
+        XCTAssertFalse(EscapeKeyPressSwallower.shared.isSwallowing)
+    }
+
     func testGlobalEscapeUsesOneOwnerWhenNoOverlayIsKey() throws {
         let (settings, defaultsSuiteName) = makeSettings()
         defer { UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName) }
@@ -581,9 +636,9 @@ final class CaptureOverlayInteractionTests: XCTestCase {
         return (AppSettings(defaults: UserDefaults(suiteName: suiteName)!), suiteName)
     }
 
-    private func makeEscapeEvent(windowNumber: Int) throws -> NSEvent {
+    private func makeEscapeEvent(windowNumber: Int, type: NSEvent.EventType = .keyDown) throws -> NSEvent {
         try XCTUnwrap(NSEvent.keyEvent(
-            with: .keyDown,
+            with: type,
             location: .zero,
             modifierFlags: [],
             timestamp: 0,
