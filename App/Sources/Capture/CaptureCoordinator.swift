@@ -1289,22 +1289,10 @@ final class CaptureCoordinator {
     }
 
     private func dismissFreezeWindows() {
-        let windows = freezeWindows
+        // Fading a display-sized window blends through black instead of the
+        // windows behind it; the frozen frame matches the live screen, so cut.
+        freezeWindows.forEach { $0.orderOut(nil) }
         freezeWindows.removeAll()
-        if windows.isEmpty { return }
-
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.15
-            for window in windows {
-                window.animator().alphaValue = 0
-            }
-        }
-        // Clean up after animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            for window in windows {
-                window.orderOut(nil)
-            }
-        }
     }
 
     private func dismissAllInOneToolbar() {
