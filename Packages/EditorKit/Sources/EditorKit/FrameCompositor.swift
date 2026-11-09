@@ -457,22 +457,10 @@ public final class FrameCompositor: Sendable {
     }
 
     private func buildGradientCanvas(in rect: CGRect) -> CIImage {
-        // Convert angle (degrees, 0 = top-to-bottom) to a start/end point pair.
-        // Angle 0° → from top centre to bottom centre.
-        let angleRad = CGFloat(backgroundStyle.gradientAngle) * .pi / 180.0
-
-        let cx = rect.midX
-        let cy = rect.midY
-        // Half-diagonal so the gradient covers the full rect at any angle.
-        let halfLen = hypot(rect.width, rect.height) / 2.0
-
-        // `sin` drives X, `-cos` drives Y (angle 0 = straight down in screen space,
-        // which is straight up in CIImage's flipped Y space → use +cos for CIImage Y).
-        let dx = sin(angleRad) * halfLen
-        let dy = cos(angleRad) * halfLen
-
-        let point0 = CIVector(x: cx - dx, y: cy - dy)
-        let point1 = CIVector(x: cx + dx, y: cy + dy)
+        // Unit points are y-down like the SwiftUI preview; Core Image is y-up.
+        let (start, end) = backgroundStyle.gradientUnitPoints
+        let point0 = CIVector(x: rect.minX + start.x * rect.width, y: rect.maxY - start.y * rect.height)
+        let point1 = CIVector(x: rect.minX + end.x * rect.width, y: rect.maxY - end.y * rect.height)
 
         let from = backgroundStyle.gradientFrom
         let to   = backgroundStyle.gradientTo
