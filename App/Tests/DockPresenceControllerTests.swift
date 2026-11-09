@@ -45,6 +45,19 @@ final class DockPresenceControllerTests: XCTestCase {
         )
     }
 
+    func testOtherAppFullScreenSpaceKeepsMenusVisible() {
+        let window = makeWindow()
+        window.orderFront(nil)
+        defer { window.orderOut(nil) }
+        let policy = { (space: DockPresenceController.ActiveSpace, current: NSApplication.ActivationPolicy) in
+            DockPresenceController.policy(windows: [window], appIsHidden: false, current: current, activeSpace: space)
+        }
+        XCTAssertEqual(policy(.normal, .accessory), .regular)
+        XCTAssertEqual(policy(.otherAppFullScreen, .regular), .accessory)
+        XCTAssertEqual(policy(.elsewhere, .accessory), .accessory)
+        XCTAssertEqual(policy(.elsewhere, .regular), .regular)
+    }
+
     func testUntaggedTitledWindowsDoNotCount() {
         let window = makeWindow(tagged: false)
         window.orderFront(nil)
@@ -67,7 +80,7 @@ final class DockPresenceControllerIntegrationTests: XCTestCase {
         }
     }
 
-    func testPolicyFollowsEditorLifecycle() {
+    func testPolicyFollowsEditorLifecycle() throws {
         let originalPolicy = NSApp.activationPolicy()
         defer {
             NSApp.setActivationPolicy(originalPolicy)
@@ -88,6 +101,10 @@ final class DockPresenceControllerIntegrationTests: XCTestCase {
 
         window.makeKeyAndOrderFront(nil)
         drainMainQueue()
+        try XCTSkipIf(
+            DockPresenceController.activeSpace(of: [window]) == .otherAppFullScreen,
+            "Run from a desktop Space; another app's full-screen Space keeps Capso out of the Dock"
+        )
         XCTAssertEqual(NSApp.activationPolicy(), .regular)
 
         window.close()

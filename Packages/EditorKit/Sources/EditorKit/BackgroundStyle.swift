@@ -70,7 +70,8 @@ public struct BackgroundStyle: Codable, Sendable, Equatable {
     public var solidColor: CodableColor
     public var gradientFrom: CodableColor
     public var gradientTo: CodableColor
-    /// Angle of the gradient in degrees (0 = top-to-bottom).
+    /// Angle of the gradient in degrees: 0 = left-to-right, turning clockwise
+    /// on screen (90 = top-to-bottom). See `gradientUnitPoints`.
     public var gradientAngle: Double
     /// Padding around the video content, in points (0–80).
     public var padding: Double
@@ -111,6 +112,15 @@ public struct BackgroundStyle: Codable, Sendable, Equatable {
     public func clampedCornerRadius(for frameSize: CGSize) -> Double {
         let geometricCap = min(frameSize.width, frameSize.height) / 2
         return min(max(0, cornerRadius), min(Self.maxCornerRadius, geometricCap))
+    }
+
+    /// Gradient start and end in unit space with y pointing down (SwiftUI
+    /// `UnitPoint`). Preview and export both use it so they cannot drift.
+    public var gradientUnitPoints: (start: CGPoint, end: CGPoint) {
+        let radians = gradientAngle * .pi / 180
+        let dx = cos(radians) * 0.5
+        let dy = sin(radians) * 0.5
+        return (CGPoint(x: 0.5 - dx, y: 0.5 - dy), CGPoint(x: 0.5 + dx, y: 0.5 + dy))
     }
 
     /// Default background style with sensible initial values.

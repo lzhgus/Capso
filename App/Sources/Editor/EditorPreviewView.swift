@@ -170,18 +170,12 @@ struct EditorPreviewView: View {
     }
 
     private var gradientStartPoint: UnitPoint {
-        let angle = bg.gradientAngle
-        return UnitPoint(
-            x: 0.5 - cos(angle * .pi / 180) * 0.5,
-            y: 0.5 - sin(angle * .pi / 180) * 0.5
-        )
+        let point = bg.gradientUnitPoints.start
+        return UnitPoint(x: point.x, y: point.y)
     }
 
     private var gradientEndPoint: UnitPoint {
-        let angle = bg.gradientAngle
-        return UnitPoint(
-            x: 0.5 + cos(angle * .pi / 180) * 0.5,
-            y: 0.5 + sin(angle * .pi / 180) * 0.5
-        )
+        let point = bg.gradientUnitPoints.end
+        return UnitPoint(x: point.x, y: point.y)
     }
 }

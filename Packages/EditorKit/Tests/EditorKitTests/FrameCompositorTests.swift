@@ -187,4 +187,33 @@ struct FrameCompositorTests {
         #expect(abs(Double(xs.min()! + xs.max()!) / 2 - 100) < 2)
         #expect(abs(Double(ys.min()! + ys.max()!) / 2 - 100) < 2)
     }
+
+    @Test("Gradient angle maps to the same unit points the preview draws", arguments: [
+        (0.0, CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 0.5)),
+        (90.0, CGPoint(x: 0.5, y: 0), CGPoint(x: 0.5, y: 1)),
+        (135.0, CGPoint(x: 0.854, y: 0.146), CGPoint(x: 0.146, y: 0.854)),
+    ])
+    func gradientUnitPoints(angle: Double, start: CGPoint, end: CGPoint) {
+        let points = BackgroundStyle(gradientAngle: angle).gradientUnitPoints
+        #expect(abs(points.start.x - start.x) < 0.001 && abs(points.start.y - start.y) < 0.001, "start \(points.start)")
+        #expect(abs(points.end.x - end.x) < 0.001 && abs(points.end.y - end.y) < 0.001, "end \(points.end)")
+    }
+
+    @Test("Exported 135° gradient runs from the top-right corner to the bottom-left")
+    func exportedGradientDirection() {
+        let style = BackgroundStyle(
+            enabled: true, colorType: .gradient,
+            gradientFrom: CodableColor(red: 0, green: 0, blue: 0), gradientTo: CodableColor(red: 1, green: 1, blue: 1),
+            gradientAngle: 135, padding: 40, cornerRadius: 0, shadowEnabled: false
+        )
+        let compositor = FrameCompositor(sourceSize: CGSize(width: 200, height: 100), backgroundStyle: style, outputScale: 1)
+        let result = compositor.compose(frame: makeTestImage(width: 200, height: 100),
+                                        zoomTransform: .identity, cursorPosition: nil, cursorImage: nil)
+        let (width, height) = (Int(result.extent.width), Int(result.extent.height))
+        let bytes = renderedBytes(result, width: width, height: height)
+        func luma(_ x: Int, _ row: Int) -> UInt8 { bytes[(row * width + x) * 4 + 1] }
+        let topRight = luma(width - 2, 1), bottomLeft = luma(1, height - 2)
+        #expect(topRight < 40, "top-right should hold the start colour, got \(topRight)")
+        #expect(bottomLeft > 215, "bottom-left should hold the end colour, got \(bottomLeft)")
+    }
 }
