@@ -284,6 +284,19 @@ Capso 采用 [Business Source License 1.1](LICENSE) 许可。
   </a>
 </p>
 
+### 赞助商
+
+<p align="center">
+  <a href="https://www.infistar.cc/register?aff=XSJXPGN2&ref_source=link">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-dark.png" />
+      <img src=".github/assets/sponsors/infistar-light.png" alt="Infistar.cc (赞助)" />
+    </picture>
+  </a>
+  <br />
+  <sub>赞助</sub>
+</p>
+
 <p align="center">
   由 Capso 项目开放构建。
 </p>
