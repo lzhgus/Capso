@@ -46,6 +46,21 @@ brew install --cask capso
 
 ---
 
+## 赞助商
+
+<p align="center">
+  <a href="https://www.infistar.cc/register?aff=XSJXPGN2&ref_source=link">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-dark.png" />
+      <img src=".github/assets/sponsors/infistar-light.png" alt="Infistar.cc (赞助)" />
+    </picture>
+  </a>
+  <br />
+  <sub>赞助</sub>
+</p>
+
+---
+
 ## 为什么要做这个？
 
 市面上好用的 macOS 截图工具都需要付费，CleanShot X 卖 $29，Cap 要 $58。它们确实做得很好，但我们觉得截图录屏这样的基础功能，不应该被付费墙挡住。
@@ -282,19 +297,6 @@ Capso 采用 [Business Source License 1.1](LICENSE) 许可。
   <a href="https://buymeacoffee.com/lzhgus">
     <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" />
   </a>
-</p>
-
-### 赞助商
-
-<p align="center">
-  <a href="https://www.infistar.cc/register?aff=XSJXPGN2&ref_source=link">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-dark.png" />
-      <img src=".github/assets/sponsors/infistar-light.png" alt="Infistar.cc (赞助)" />
-    </picture>
-  </a>
-  <br />
-  <sub>赞助</sub>
 </p>
 
 <p align="center">

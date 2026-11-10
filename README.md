@@ -46,6 +46,21 @@ Or [build from source](#build-from-source).
 
 ---
 
+## Sponsors
+
+<p align="center">
+  <a href="https://www.infistar.cc/register?aff=XSJXPGN2&ref_source=link">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-dark.png" />
+      <img src=".github/assets/sponsors/infistar-light.png" alt="Infistar.cc (Sponsored)" />
+    </picture>
+  </a>
+  <br />
+  <sub>Sponsored</sub>
+</p>
+
+---
+
 ## Why Open Source?
 
 Every macOS screenshot tool worth using costs money — CleanShot X is $29, Cap is $58. They're excellent apps, but a core productivity feature shouldn't be locked behind a paywall.
@@ -298,19 +313,6 @@ If Capso saves you time, a small tip keeps it growing — every bit funds more p
   <a href="https://buymeacoffee.com/lzhgus">
     <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" />
   </a>
-</p>
-
-### Sponsors
-
-<p align="center">
-  <a href="https://www.infistar.cc/register?aff=XSJXPGN2&ref_source=link">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-dark.png" />
-      <img src=".github/assets/sponsors/infistar-light.png" alt="Infistar.cc (Sponsored)" />
-    </picture>
-  </a>
-  <br />
-  <sub>Sponsored</sub>
 </p>
 
 <p align="center">
