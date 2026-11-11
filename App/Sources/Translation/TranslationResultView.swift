@@ -19,6 +19,8 @@ struct TranslationResultView: View {
     let onChangeLanguage: () -> Void
     let onTranslationCompleted: () -> Void
     let height: CGFloat
+    /// The panel hosting this card, so the header can move it.
+    let window: () -> NSWindow?
 
     enum Phase {
         case loading
@@ -276,6 +278,7 @@ struct TranslationResultView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .overlay(Divider().padding(.horizontal, 12), alignment: .bottom)
+        .dragsWindow(window)
     }
 
     private func footer(copiedMessage: String?) -> some View {
