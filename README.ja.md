@@ -283,3 +283,7 @@ Capso が作業時間を節約できたなら、ちょっとしたご支援が�
 <p align="center">
   Capso プロジェクトとしてオープンに開発されています。
 </p>
+
+<p align="center">
+  <sub>作者のその他の Mac アプリ： <a href="https://github.com/lzhgus/menubloom">Menubloom</a> · <a href="https://github.com/lzhgus/agent-kanban">Agent Kanban</a></sub>
+</p>

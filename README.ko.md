@@ -283,3 +283,7 @@ Capso가 시간을 아껴줬다면, 작은 후원이 개발의 큰 힘이 됩니
 <p align="center">
   Capso 프로젝트에서 공개적으로 개발합니다.
 </p>
+
+<p align="center">
+  <sub>제작자의 다른 Mac 앱: <a href="https://github.com/lzhgus/menubloom">Menubloom</a> · <a href="https://github.com/lzhgus/agent-kanban">Agent Kanban</a></sub>
+</p>
