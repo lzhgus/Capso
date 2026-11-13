@@ -302,3 +302,7 @@ Capso 采用 [Business Source License 1.1](LICENSE) 许可。
 <p align="center">
   由 Capso 项目开放构建。
 </p>
+
+<p align="center">
+  <sub>作者的其他 Mac 应用： <a href="https://github.com/lzhgus/menubloom">Menubloom</a> · <a href="https://github.com/lzhgus/agent-kanban">Agent Kanban</a></sub>
+</p>

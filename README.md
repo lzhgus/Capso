@@ -318,3 +318,7 @@ If Capso saves you time, a small tip keeps it growing — every bit funds more p
 <p align="center">
   Built in the open by the Capso project.
 </p>
+
+<p align="center">
+  <sub>More Mac apps by the author: <a href="https://github.com/lzhgus/menubloom">Menubloom</a> · <a href="https://github.com/lzhgus/agent-kanban">Agent Kanban</a></sub>
+</p>
