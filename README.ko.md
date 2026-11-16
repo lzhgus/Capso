@@ -10,7 +10,7 @@ Swift 6.0과 SwiftUI로 만든 무료 네이티브 CleanShot X 대안입니다. 
 
 [![macOS 15+](https://img.shields.io/badge/macOS-15.0%2B-blue)](https://www.apple.com/macos/)
 [![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org)
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/lzhgus/Capso?style=social)](https://github.com/lzhgus/Capso/stargazers)
 
 <p align="center">
@@ -241,20 +241,7 @@ swift test --package-path Packages/AnnotationKit
 
 ## 라이선스
 
-Capso는 [Business Source License 1.1](LICENSE) 로 배포됩니다.
-
-**요약:**
-
-| 하고 싶은 일 | 가능 여부 |
-|---|---|
-| 개인적으로 사용 | ✅ |
-| 회사 내부에서 사용 | ✅ |
-| 소스를 읽고 수정하고 빌드 | ✅ |
-| 포크해서 무료 파생판 배포 | ✅ |
-| 포크해서 경쟁 상용 캡처 제품 판매 | ❌ |
-| 2029-04-08 이후 모든 사용 | ✅ Apache 2.0으로 전환 |
-
-각 버전은 공개 후 3년이 지나면 Apache 2.0으로 자동 전환되어 완전한 퍼미시브 오픈소스가 됩니다.
+Capso는 [MIT 라이선스](LICENSE)로 배포됩니다.
 
 ---
 

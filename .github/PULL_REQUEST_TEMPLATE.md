@@ -26,4 +26,4 @@ Thanks for contributing to Capso! A few quick reminders:
 - [ ] Tests for any touched package pass (`swift test --package-path Packages/<Kit>`)
 - [ ] No new `TODO` / `FIXME` / debug prints left behind
 - [ ] Code follows Swift 6.0 strict concurrency (`@MainActor`, `Sendable` where needed)
-- [ ] I agree that my contribution is licensed under BSL 1.1 per [CONTRIBUTING.md](../CONTRIBUTING.md#license)
+- [ ] I agree that my contribution is licensed under the MIT License per [CONTRIBUTING.md](../CONTRIBUTING.md#license)

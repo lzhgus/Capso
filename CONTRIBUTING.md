@@ -106,4 +106,4 @@ Packages should depend only on `SharedKit` and system frameworks. Never add cros
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same [BSL 1.1 license](LICENSE) that covers the project.
+By contributing, you agree that your contributions will be licensed under the same [MIT License](LICENSE) that covers the project.
