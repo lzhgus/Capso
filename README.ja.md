@@ -10,7 +10,7 @@ Swift 6.0 と SwiftUI で構築された、無料・ネイティブな CleanShot
 
 [![macOS 15+](https://img.shields.io/badge/macOS-15.0%2B-blue)](https://www.apple.com/macos/)
 [![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org)
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/lzhgus/Capso?style=social)](https://github.com/lzhgus/Capso/stargazers)
 
 <p align="center">
@@ -241,20 +241,7 @@ swift test --package-path Packages/AnnotationKit
 
 ## ライセンス
 
-Capso は [Business Source License 1.1](LICENSE) のもとで提供されています。
-
-**要点:**
-
-| やりたいこと | 可能? |
-|---|---|
-| 個人利用 | ✅ |
-| 会社内での利用 | ✅ |
-| ソースを読んで修正・ビルド | ✅ |
-| Fork して無料の派生版を配布 | ✅ |
-| Fork して競合する商用スクリーンキャプチャ製品を販売 | ❌ |
-| 2029-04-08 以降のあらゆる利用 | ✅ Apache 2.0 に移行 |
-
-各バージョンは公開から 3 年後に Apache 2.0 へ自動移行し、完全に寛容なオープンソースライセンスになります。
+Capso は [MIT ライセンス](LICENSE) のもとで提供されています。
 
 ---
 

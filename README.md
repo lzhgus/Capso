@@ -10,7 +10,7 @@ A native, feature-rich alternative to CleanShot X. Built with Swift 6.0 and Swif
 
 [![macOS 15+](https://img.shields.io/badge/macOS-15.0%2B-blue)](https://www.apple.com/macos/)
 [![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org)
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/lzhgus/Capso?style=social)](https://github.com/lzhgus/Capso/stargazers)
 
 <p align="center">
@@ -276,20 +276,7 @@ Thanks to everyone who has contributed to Capso.
 
 ## License
 
-Capso is licensed under the [Business Source License 1.1](LICENSE).
-
-**TL;DR:**
-
-| What you want to do | Allowed? |
-|---|---|
-| Use Capso personally | ✅ |
-| Use Capso inside your company | ✅ |
-| Read, modify, and build from source | ✅ |
-| Fork it and ship a free derivative | ✅ |
-| Fork it and sell a competing screen-capture product | ❌ |
-| Any use after 2029-04-08 | ✅ Becomes Apache 2.0 |
-
-The license auto-converts to Apache 2.0 three years after each release — so every version eventually becomes fully permissive open source.
+Capso is licensed under the [MIT License](LICENSE).
 
 ---
 

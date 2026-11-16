@@ -10,7 +10,7 @@
 
 [![macOS 15+](https://img.shields.io/badge/macOS-15.0%2B-blue)](https://www.apple.com/macos/)
 [![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org)
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/lzhgus/Capso?style=social)](https://github.com/lzhgus/Capso/stargazers)
 
 <p align="center">
@@ -260,20 +260,7 @@ swift test --package-path Packages/AnnotationKit
 
 ## 许可证
 
-Capso 采用 [Business Source License 1.1](LICENSE) 许可。
-
-**简单来说：**
-
-| 你想做的事 | 可以吗？ |
-|---|---|
-| 个人使用 | ✅ |
-| 公司内部使用 | ✅ |
-| 阅读、修改、从源码构建 | ✅ |
-| Fork 后发布免费版 | ✅ |
-| Fork 后做成商业截图产品出售 | ❌ |
-| 2029-04-08 之后的任何用途 | ✅ 转为 Apache 2.0 |
-
-每个版本在发布三年后都会自动转为 Apache 2.0 开源许可。
+Capso 采用 [MIT 许可证](LICENSE)。
 
 ---
 
