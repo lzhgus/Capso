@@ -23,15 +23,25 @@ struct ExportSettingsView: View {
 
             SettingGroup(title: "Quality") {
                 SettingCard {
-                    SettingRow(label: "Export Quality", sublabel: "Applies to video and GIF exports") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Export Quality")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.primary)
+                            Text("Applies to video and GIF exports")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.tertiary)
+                        }
                         Picker("", selection: $viewModel.exportQuality) {
                             Text("Maximum").tag(ExportQuality.maximum)
                             Text("Social").tag(ExportQuality.social)
                             Text("Web").tag(ExportQuality.web)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 220)
+                        .frame(maxWidth: .infinity)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                     SettingRow(
                         label: "Screenshot Format",
                         sublabel: "HEIC produces the smallest files; PNG is lossless",

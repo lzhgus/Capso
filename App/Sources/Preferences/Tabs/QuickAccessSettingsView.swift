@@ -49,7 +49,7 @@ struct QuickAccessSettingsView: View {
                             Text("30s").tag(30)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 180)
+                        .fixedSize()
                         .disabled(!viewModel.quickAccessAutoClose)
                     }
                     SettingRow(label: "Close After Dragging", sublabel: "Close the preview once it's dropped into another app", showDivider: true) {
