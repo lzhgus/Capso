@@ -35,6 +35,26 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         XCTAssertEqual(destinationDocument.selectedObjectID, duplicate.id)
     }
 
+    func testCommandZUndoesAndShiftCommandZRedoes() throws {
+        let document = AnnotationDocument(imageSize: CGSize(width: 400, height: 300))
+        document.addObject(RectangleObject(rect: CGRect(x: 20, y: 30, width: 80, height: 50)))
+        let canvas = AnnotationCanvasNSView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        canvas.document = document
+        var changes = 0
+        canvas.onDocumentChanged = { changes += 1 }
+
+        XCTAssertTrue(canvas.performAnnotationClipboardShortcut(
+            with: try commandEvent(character: "z", keyCode: 6)
+        ))
+        XCTAssertTrue(document.objects.isEmpty)
+
+        XCTAssertTrue(canvas.performAnnotationClipboardShortcut(
+            with: try commandEvent(character: "Z", keyCode: 6, modifiers: [.command, .shift])
+        ))
+        XCTAssertEqual(document.objects.count, 1)
+        XCTAssertEqual(changes, 2)
+    }
+
     func testCommandCReturnsFalseWhenNothingIsSelected() throws {
         let document = AnnotationDocument(imageSize: CGSize(width: 400, height: 300))
         let canvas = AnnotationCanvasNSView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
@@ -239,6 +259,35 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         wait(for: [copied], timeout: 1)
     }
 
+    func testCommandZWhileTypingUndoesTheTextInsteadOfAnAnnotation() throws {
+        let window = AnnotationEditorWindow(
+            image: try makeImage(),
+            screenshotOutput: ScreenshotOutputOptions(format: .png, quality: 0.85),
+            screenshotFilenameTemplate: "Screenshot",
+            onSave: { _ in true },
+            onCopy: { _ in },
+            onPin: { _, _ in },
+            onClose: {}
+        )
+        defer { window.close() }
+
+        window.document.addObject(RectangleObject(rect: CGRect(x: 100, y: 120, width: 60, height: 50)))
+        window.show()
+        window.contentView?.layoutSubtreeIfNeeded()
+
+        let textView = NSTextView(frame: CGRect(x: 0, y: 0, width: 100, height: 30))
+        textView.allowsUndo = true
+        window.contentView?.addSubview(textView)
+        XCTAssertTrue(window.makeFirstResponder(textView))
+        textView.insertText("hello", replacementRange: NSRange(location: 0, length: 0))
+
+        let event = try commandEvent(character: "z", keyCode: 6, windowNumber: window.windowNumber)
+        XCTAssertTrue(window.performKeyEquivalent(with: event))
+
+        XCTAssertEqual(textView.string, "")
+        XCTAssertEqual(window.document.objects.count, 1)
+    }
+
     func testTextResponderKeepsNativeCommandCopyInsteadOfCopyingAnAnnotation() throws {
         let clipboard = AnnotationClipboard()
         let clipboardDocument = AnnotationDocument(imageSize: CGSize(width: 400, height: 300))
@@ -300,11 +349,16 @@ final class AnnotationCanvasClipboardShortcutTests: XCTestCase {
         return nil
     }
 
-    private func commandEvent(character: String, keyCode: UInt16, windowNumber: Int = 0) throws -> NSEvent {
+    private func commandEvent(
+        character: String,
+        keyCode: UInt16,
+        modifiers: NSEvent.ModifierFlags = .command,
+        windowNumber: Int = 0
+    ) throws -> NSEvent {
         try XCTUnwrap(NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
-            modifierFlags: .command,
+            modifierFlags: modifiers,
             timestamp: 0,
             windowNumber: windowNumber,
             context: nil,

@@ -116,7 +116,7 @@ final class InlineAnnotationEditorWindow: NSPanel, NSWindowDelegate {
         if event.isInjectedCopyShortcut {
             return true
         }
-        if routeAnnotationClipboardShortcutToCanvas(event) {
+        if routeAnnotationClipboardShortcutToCanvas(event) || routeUndoShortcutToTextEditing(event) {
             return true
         }
         return super.performKeyEquivalent(with: event)

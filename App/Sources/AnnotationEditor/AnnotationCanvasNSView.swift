@@ -78,6 +78,25 @@ extension NSWindow {
         }
         return canvas.performAnnotationClipboardShortcut(with: event)
     }
+
+    /// Keeps ⌘Z / ⇧⌘Z inside a focused text view so the toolbar's undo
+    /// shortcut does not undo an annotation while the user is typing.
+    func routeUndoShortcutToTextEditing(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown,
+              event.keyCode == 6,
+              let undoManager = (firstResponder as? NSTextView)?.undoManager else {
+            return false
+        }
+        switch event.modifierFlags.intersection([.command, .shift, .option, .control]) {
+        case .command:
+            if undoManager.canUndo { undoManager.undo() }
+        case [.command, .shift]:
+            if undoManager.canRedo { undoManager.redo() }
+        default:
+            return false
+        }
+        return true
+    }
 }
 
 @MainActor
@@ -1350,7 +1369,7 @@ final class AnnotationCanvasNSView: NSView {
         return true
     }
 
-    /// Handles annotation-object clipboard shortcuts (⌘C / ⌘V / ⌘D).
+    /// Handles annotation-object shortcuts (⌘C / ⌘V / ⌘D / ⌘Z / ⇧⌘Z).
     ///
     /// - Returns: `true` when the event was consumed as an annotation action.
     ///   For ⌘C, returns `true` only when a selected object was actually copied
@@ -1359,7 +1378,21 @@ final class AnnotationCanvasNSView: NSView {
     ///   the pasteboard/selection is empty), matching standard editor behavior.
     func performAnnotationClipboardShortcut(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
-        guard modifiers == .command, textEditor == nil, let document else { return false }
+        guard textEditor == nil, let document else { return false }
+
+        if event.keyCode == 6, modifiers == .command || modifiers == [.command, .shift] {
+            guard !isDragging else { return true }
+            if modifiers.contains(.shift) {
+                document.redo()
+            } else {
+                document.undo()
+            }
+            needsDisplay = true
+            onDocumentChanged?()
+            return true
+        }
+
+        guard modifiers == .command else { return false }
 
         let scale = zoomScale > 0 ? zoomScale : 1
         let offset = CGSize(width: 12 / scale, height: 12 / scale)
