@@ -53,8 +53,7 @@ final class TranslationResultWindow: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         collectionBehavior = [.canJoinAllSpaces, .transient]
-        // The card is one SwiftUI surface that hit-tests end to end, so the
-        // window never sees a background press; the header drags it instead.
+        // SwiftUI claims every press on the card, so the header drags the window itself.
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
@@ -65,8 +64,7 @@ final class TranslationResultWindow: NSPanel {
         disarmAutoDismiss()
         resize(height: Self.recognizingHeight)
         contentView = NSHostingView(rootView: TranslationRecognizingView(
-            onClose: { [weak self] in self?.onClose?() },
-            window: { [weak self] in self }
+            onClose: { [weak self] in self?.onClose?() }
         ))
         makeKeyAndOrderFront(nil)
     }
@@ -95,8 +93,7 @@ final class TranslationResultWindow: NSPanel {
             onPinChanged:     { [weak self] isPinned in self?.onPinChanged?(isPinned) },
             onChangeLanguage: { [weak self] in self?.onChangeLanguage?() },
             onTranslationCompleted: { [weak self] in self?.translationDidComplete() },
-            height: height,
-            window: { [weak self] in self }
+            height: height
         )
         // Plain NSHostingView (no NSHostingController sizingOptions) — prevents
         // the window <=> SwiftUI layout feedback loop that was causing stack overflow.
@@ -264,7 +261,6 @@ final class TranslationResultWindow: NSPanel {
 
 private struct TranslationRecognizingView: View {
     let onClose: () -> Void
-    let window: () -> NSWindow?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -281,10 +277,7 @@ private struct TranslationRecognizingView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            // Same header-strip drag as the result card: the loading state can be
-            // moved out of the way while it works, instead of covering the text
-            // being translated.
-            .dragsWindow(window)
+            .dragsWindow()
 
             HStack(spacing: 12) {
                 ProgressView().controlSize(.small)
