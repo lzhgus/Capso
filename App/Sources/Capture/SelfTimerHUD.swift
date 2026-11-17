@@ -66,7 +66,7 @@ final class SelfTimerHUD {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false  // SwiftUI draws its own
-        panel.isMovableByWindowBackground = false  // we handle drag in SwiftUI
+        panel.isMovableByWindowBackground = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.hidesOnDeactivate = false
         panel.acceptsMouseMovedEvents = true
@@ -74,7 +74,6 @@ final class SelfTimerHUD {
         let host = NSHostingView(rootView: SelfTimerHUDView(
             viewModel: viewModel,
             hudSize: size,
-            window: { [weak panel] in panel },
             onCancel: { [weak self] in self?.cancelByUser() },
             onDragEnded: { [weak self] newOrigin in
                 self?.positionPersist?(newOrigin)
@@ -307,17 +306,12 @@ final class SelfTimerViewModel {
 private struct SelfTimerHUDView: View {
     let viewModel: SelfTimerViewModel
     let hudSize: NSSize
-    /// Returns the hosting NSPanel weakly so dragging can move it directly
-    /// without searching `NSApp.windows`.
-    let window: () -> NSWindow?
     let onCancel: () -> Void
     /// Called when a drag finishes, with the new bottom-left origin in screen
     /// coordinates (matching NSWindow.frame.origin convention).
     let onDragEnded: (CGPoint) -> Void
 
     @State private var isHovering = false
-    @State private var dragStartOrigin: CGPoint?
-    @State private var didDrag = false
 
     var body: some View {
         ZStack {
@@ -367,37 +361,10 @@ private struct SelfTimerHUDView: View {
             }
         }
         .frame(width: hudSize.width, height: hudSize.height)
+        .overlay(WindowDragHandle(onTap: onCancel, onDragEnded: onDragEnded))
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
         }
-        .gesture(
-            DragGesture(minimumDistance: 4, coordinateSpace: .global)
-                .onChanged { value in
-                    guard let win = window() else { return }
-                    if dragStartOrigin == nil {
-                        dragStartOrigin = win.frame.origin
-                    }
-                    didDrag = true
-                    let dx = value.translation.width
-                    let dy = -value.translation.height  // SwiftUI y grows down; NSWindow y grows up
-                    if let start = dragStartOrigin {
-                        win.setFrameOrigin(NSPoint(x: start.x + dx, y: start.y + dy))
-                    }
-                }
-                .onEnded { _ in
-                    if didDrag, let win = window() {
-                        onDragEnded(win.frame.origin)
-                    }
-                    dragStartOrigin = nil
-                    didDrag = false
-                }
-        )
-        .simultaneousGesture(
-            // Tap (no drag) cancels.
-            TapGesture().onEnded {
-                if !didDrag { onCancel() }
-            }
-        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Self-timer countdown"))
         .accessibilityValue(Text("\(viewModel.remaining) seconds remaining"))
