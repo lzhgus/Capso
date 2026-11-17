@@ -276,6 +276,7 @@ struct TranslationResultView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .overlay(Divider().padding(.horizontal, 12), alignment: .bottom)
+        .dragsWindow()
     }
 
     private func footer(copiedMessage: String?) -> some View {

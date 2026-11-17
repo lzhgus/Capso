@@ -53,7 +53,8 @@ final class TranslationResultWindow: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         collectionBehavior = [.canJoinAllSpaces, .transient]
-        isMovableByWindowBackground = true
+        // SwiftUI claims every press on the card, so the header drags the window itself.
+        isMovableByWindowBackground = false
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
     }
@@ -276,6 +277,7 @@ private struct TranslationRecognizingView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
+            .dragsWindow()
 
             HStack(spacing: 12) {
                 ProgressView().controlSize(.small)
