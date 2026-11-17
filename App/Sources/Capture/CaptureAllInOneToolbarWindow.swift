@@ -529,13 +529,15 @@ final class CaptureAllInOneToolbarWindow {
             return nil
         }
 
-        guard modifiers == .command else { return event }
+        guard modifiers.contains(.command) else { return event }
 
         // Prefer annotation-object clipboard when a canvas object is selected.
         // ⌘C returns false when nothing is selected so we can fall back below.
         if annotationOverlay?.performAnnotationClipboardShortcut(with: event) == true {
             return nil
         }
+
+        guard modifiers == .command else { return event }
 
         switch event.charactersIgnoringModifiers?.lowercased() {
         case "c":
