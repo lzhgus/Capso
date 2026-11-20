@@ -640,6 +640,10 @@ final class CaptureCoordinator {
             overlay.activate(mode: mode)
             overlayWindows.append(overlay)
         }
+
+        if isAllInOne {
+            attachWindowSnapCandidates(to: overlayWindows)
+        }
     }
 
     private func showFrozenAllInOneOverlay() {
@@ -686,6 +690,35 @@ final class CaptureCoordinator {
             }
             overlay.activate(mode: .area)
             overlayWindows.append(overlay)
+        }
+
+        attachWindowSnapCandidates(to: overlayWindows)
+    }
+
+    /// Give the All-in-One overlay a window list so hovering highlights a window
+    /// and a click snaps the selection to it — no detour through Window mode.
+    ///
+    /// Enumeration starts only after the overlays are on screen: the freeze and
+    /// the first frame stay instant, because `SCShareableContent` is a
+    /// cross-process call that can take a few hundred milliseconds cold.
+    private func attachWindowSnapCandidates(to overlays: [CaptureOverlayWindow]) {
+        guard !overlays.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            // Our own capture chrome (freeze backdrops and overlays) covers the
+            // display and `ContentEnumerator` keeps same-bundle windows, so it
+            // must be filtered out or every hover would hit Capso itself.
+            let excluded = Set(
+                overlayWindows.map { CGWindowID($0.windowNumber) }
+                    + freezeWindows.map { CGWindowID($0.windowNumber) }
+                    + quickAccessWindows.map { CGWindowID($0.windowNumber) }
+            )
+            guard let windows = try? await ContentEnumerator.windows() else { return }
+            let candidates = windows.filter { !excluded.contains($0.id) }
+            guard !candidates.isEmpty else { return }
+            for overlay in overlays {
+                overlay.setWindowSnapCandidates(candidates)
+            }
         }
     }
 

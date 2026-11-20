@@ -70,6 +70,16 @@ final class CaptureOverlayView: NSView {
     private var selectedWindowIDs: [CGWindowID] = []
     private var isShiftHeld = false
 
+    // Window snapping for the All-in-One overlay: hovering a window highlights
+    // it and a plain click snaps the selection to its frame. Only an area
+    // overlay that explicitly receives candidates uses this; every other area
+    // capture gets an empty list and behaves exactly as before.
+    private var windowSnapCandidates: [WindowInfo] = []
+    private var snapPressWindow: WindowInfo?
+    private var snapPressPoint: NSPoint = .zero
+    private var snapDragExceeded = false
+    private static let snapDragThreshold: CGFloat = 3
+
     private var cursorHidden = false
 
     /// Pre-captured frozen screenshot. When set, drawn as the background
@@ -184,6 +194,20 @@ final class CaptureOverlayView: NSView {
         selectedWindowIDs = []
         isShiftHeld = false
         centerLockKeyHeld = false
+        snapPressWindow = nil
+        snapDragExceeded = false
+        needsDisplay = true
+    }
+
+    /// Windows the area overlay can snap to. All-in-One calls this so a window
+    /// can be picked without leaving the first overlay for a separate Window
+    /// mode pass.
+    func setWindowSnapCandidates(_ windows: [WindowInfo]) {
+        windowSnapCandidates = windows
+        // The list arrives asynchronously, often with the pointer already
+        // resting somewhere: resolve the hover immediately so the highlight
+        // shows up without requiring a mouse move.
+        refreshWindowSnapHover()
         needsDisplay = true
     }
 
@@ -386,10 +410,25 @@ final class CaptureOverlayView: NSView {
                 drawPresetBadge(in: context)
             } else {
                 drawDimmedBackdrop(clearing: nil, in: context)
+                // Hovering a window punches it out of the dim and outlines it,
+                // using the same visual language as the dedicated Window mode.
+                if hoveredWindowID != nil {
+                    context.saveGState()
+                    context.clip(to: bounds)
+                    highlightWindow(
+                        frame: hoveredWindowFrame,
+                        name: hoveredWindowName,
+                        showLabel: true,
+                        in: context
+                    )
+                    context.restoreGState()
+                }
                 // Freeform or aspect-ratio mode: standard crosshair
                 if let currentMouseLocation {
                     drawReticle(at: currentMouseLocation, in: context)
-                    drawCoordinateLabel(at: currentMouseLocation, in: context)
+                    if hoveredWindowID == nil {
+                        drawCoordinateLabel(at: currentMouseLocation, in: context)
+                    }
                 }
                 drawPresetBadge(in: context)
             }
@@ -813,12 +852,49 @@ final class CaptureOverlayView: NSView {
     /// Find which window contains the given screen-coordinate point.
     private func windowUnderCursor(at screenPoint: CGPoint) -> WindowInfo? {
         // Windows are in z-order from front to back; return the first (topmost) match
-        for window in availableWindows {
+        for window in hitTestWindows {
             if window.frame.contains(screenPoint) {
                 return window
             }
         }
         return nil
+    }
+
+    /// Windows that participate in hit testing for the current mode: the
+    /// selectable list in Window mode, the snap candidates in area mode.
+    private var hitTestWindows: [WindowInfo] {
+        if case .windowSelection = mode { return availableWindows }
+        return windowSnapCandidates
+    }
+
+    private func windowAtViewPoint(_ point: NSPoint) -> WindowInfo? {
+        guard !windowSnapCandidates.isEmpty else { return nil }
+        return windowUnderCursor(at: viewPointToScreenPoint(point))
+    }
+
+    /// Recompute the hovered window from the current pointer. Fixed-size
+    /// presets capture immediately on press, so they never snap.
+    private func refreshWindowSnapHover() {
+        guard case .area = mode else { return }
+        guard !windowSnapCandidates.isEmpty,
+              !isDragging,
+              activePreset.fixedPixelSize == nil,
+              let currentMouseLocation,
+              let window = windowAtViewPoint(currentMouseLocation) else {
+            hoveredWindowID = nil
+            return
+        }
+        hoveredWindowID = window.id
+        hoveredWindowFrame = window.frame
+        hoveredWindowName = displayName(for: window)
+    }
+
+    /// The view-local selection rect for a snapped window, clipped to this
+    /// display so the resulting capture rect is always on-screen.
+    private func snappedSelectionRect(for window: WindowInfo) -> CGRect? {
+        let clipped = screenRectToViewRect(window.frame).intersection(bounds)
+        guard !clipped.isNull, clipped.width >= 2, clipped.height >= 2 else { return nil }
+        return clipped
     }
 
     /// Convert view-local bottom-left coordinates to ScreenCaptureKit global
@@ -844,6 +920,13 @@ final class CaptureOverlayView: NSView {
             lastRawEnd = loc
             squareLock = event.modifierFlags.contains(.shift)
             centerLockKeyHeld = isCenterLockKeyPressed(alongside: event)
+
+            // Remember what the press landed on. A drag past the threshold
+            // cancels the snap so freeform selection still wins when the user
+            // actually drags.
+            snapPressPoint = loc
+            snapDragExceeded = false
+            snapPressWindow = windowAtViewPoint(loc)
 
             // Fixed-size: no drag — capture immediately centered on cursor
             if let fixedSize = activePreset.fixedPixelSize {
@@ -946,6 +1029,11 @@ final class CaptureOverlayView: NSView {
     override func mouseDragged(with event: NSEvent) {
         guard case .area = mode else { return }
         let rawEnd = convert(event.locationInWindow, from: nil)
+        if !snapDragExceeded,
+           hypot(rawEnd.x - snapPressPoint.x, rawEnd.y - snapPressPoint.y) > Self.snapDragThreshold {
+            snapDragExceeded = true
+            snapPressWindow = nil
+        }
         lastRawEnd = rawEnd
         squareLock = event.modifierFlags.contains(.shift)
         dragEnd = constrainedDragEnd(rawEnd: rawEnd)
@@ -971,6 +1059,18 @@ final class CaptureOverlayView: NSView {
         isDragging = false
 
         let rect = selectionRect
+        // A click (no meaningful drag) on a window snaps the selection to that
+        // window instead of starting a zero-size area capture.
+        if rect.width <= 5 || rect.height <= 5 {
+            if !snapDragExceeded,
+               let window = snapPressWindow,
+               let snapped = snappedSelectionRect(for: window) {
+                restoreCursorIfNeeded()
+                onSelectionComplete?(snapped)
+                needsDisplay = true
+                return
+            }
+        }
         if rect.width > 5 && rect.height > 5 {
             restoreCursorIfNeeded()
             onSelectionComplete?(rect)
@@ -984,7 +1084,9 @@ final class CaptureOverlayView: NSView {
 
         switch mode {
         case .area:
-            break
+            // Hover-to-select window, so All-in-One needs one click instead of
+            // a trip through the separate Window mode.
+            refreshWindowSnapHover()
         case .windowSelection:
             if let currentMouseLocation {
                 let screenPoint = viewPointToScreenPoint(currentMouseLocation)
