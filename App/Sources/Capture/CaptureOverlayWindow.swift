@@ -142,6 +142,12 @@ final class CaptureOverlayWindow: NSPanel {
         overlayView.displayIfNeeded()
     }
 
+    /// Feed the area overlay the windows it can hover and click to snap to.
+    /// Populated asynchronously after the overlay is on screen.
+    func setWindowSnapCandidates(_ windows: [WindowInfo]) {
+        overlayView.setWindowSnapCandidates(windows)
+    }
+
     func setPointerOverPanel(_ isOver: Bool) {
         overlayView.setPointerOverPanel(isOver)
     }
