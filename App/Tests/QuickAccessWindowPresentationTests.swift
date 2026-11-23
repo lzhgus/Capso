@@ -213,6 +213,30 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         XCTAssertEqual(closeCount, 0)
     }
 
+    func testDroppedFileOutlivesTheCardThatClosesAfterTheDrop() throws {
+        let fileURL = try dragFileURLAfterCardCloses { dragSource, _ in
+            dragSource.onDragStarted()
+            dragSource.onDragEnded(true)
+        }
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: fileURL.path),
+            "The receiving app reads the dropped file after the drag ends"
+        )
+    }
+
+    func testUndroppedFileIsRemovedWhenTheCardCloses() throws {
+        let fileURL = try dragFileURLAfterCardCloses { dragSource, window in
+            dragSource.onDragStarted()
+            dragSource.onDragEnded(false)
+            window.onClose?()
+        }
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
     func testClosingDuringEntranceDoesNotReappearAtAnimationCompletion() throws {
         let (window, suiteName) = try makeWindow(autoClose: false)
         defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
@@ -396,6 +420,49 @@ final class QuickAccessWindowPresentationTests: XCTestCase {
         context.setFillColor(CGColor(gray: 0.5, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return try XCTUnwrap(context.makeImage())
+    }
+
+    /// Shows a card the way the app does, so closing it releases the window and tears down its view.
+    private func dragFileURLAfterCardCloses(
+        _ interact: (DragSourceNSView, QuickAccessWindow) -> Void
+    ) throws -> URL {
+        let suiteName = "QuickAccessWindowPresentationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = AppSettings(defaults: defaults)
+        settings.quickAccessAutoClose = false
+        let coordinator = CaptureCoordinator(settings: settings)
+        let result = CaptureResult(
+            image: try makeImage(),
+            mode: .area,
+            captureRect: CGRect(x: 100, y: 100, width: 640, height: 480)
+        )
+        weak var closedWindow: QuickAccessWindow?
+
+        let fileURL = try autoreleasepool {
+            let window = coordinator.showQuickAccess(for: result, entryID: UUID(), autoUpload: false)
+            closedWindow = window
+            settleRunLoop(for: 0.8)
+            let dragSource = try XCTUnwrap(dragSourceView(in: window))
+            let fileURL = try XCTUnwrap(dragSource.fileURLProvider())
+            XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+            interact(dragSource, window)
+            return fileURL
+        }
+        settleRunLoop(for: 1.2)
+
+        XCTAssertFalse(coordinator.hasQuickAccess)
+        XCTAssertNil(closedWindow)
+        return fileURL
+    }
+
+    private func dragSourceView(in window: NSWindow) -> DragSourceNSView? {
+        var pending = window.contentView.map { [$0] } ?? []
+        while let view = pending.popLast() {
+            if let dragSource = view as? DragSourceNSView { return dragSource }
+            pending.append(contentsOf: view.subviews)
+        }
+        return nil
     }
 
     private func settleRunLoop(for interval: TimeInterval) {
