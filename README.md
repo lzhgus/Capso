@@ -51,8 +51,8 @@ Or [build from source](#build-from-source).
 <p align="center">
   <a href="https://www.infistar.cc/register?aff=XSJXPGN2&ref_source=link">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-dark.png" />
-      <img src=".github/assets/sponsors/infistar-light.png" alt="Infistar.cc (Sponsored)" />
+      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/sponsors/infistar-en-dark.png" />
+      <img src=".github/assets/sponsors/infistar-en-light.png" alt="Infistar.cc (Sponsored)" />
     </picture>
   </a>
   <br />
