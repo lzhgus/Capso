@@ -43,6 +43,7 @@ struct QuickAccessView: View {
     @State private var preparedDragFileURL: URL?
     @State private var dragPreparationTask: Task<Void, Never>?
     @State private var dragError: QuickAccessDragFileStoreError?
+    @State private var didDropDragFile = false
     @FocusState private var isFocused: Bool
 
     private typealias DragPreparationResult = Result<URL, QuickAccessDragFileStoreError>
@@ -325,7 +326,10 @@ struct QuickAccessView: View {
                 fileURLProvider: dragFileURL,
                 dragImageProvider: { ImageUtilities.nsImage(from: captureImage) },
                 onDragStarted: onDragStarted,
-                onDragEnded: onDragEnded
+                onDragEnded: { dropped in
+                    if dropped { didDropDragFile = true }
+                    onDragEnded(dropped)
+                }
             )
             .frame(width: 29, height: 28)
             .disabled(dragError != nil)
@@ -444,6 +448,9 @@ struct QuickAccessView: View {
     private func cleanupPreparedDragFile() {
         dragPreparationTask?.cancel()
         dragPreparationTask = nil
+
+        // The app that received a dropped file may read it long after the card closes; stale-file pruning removes it later.
+        guard !didDropDragFile else { return }
 
         if let preparedDragFileURL {
             try? FileManager.default.removeItem(at: preparedDragFileURL)
