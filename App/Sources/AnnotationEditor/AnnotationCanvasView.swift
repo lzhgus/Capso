@@ -40,13 +40,12 @@ struct AnnotationCanvasView: NSViewRepresentable {
     /// hand-off to an enclosing scroll view.
     var onScroll: ((CanvasScrollEvent) -> Void)?
 
-    /// Tools that stay active after each stroke so the user can keep drawing
-    /// without reaching back to the toolbar (issue #75). Shape tools (arrow,
-    /// rectangle, ellipse) and pixelate behave the same way — most users add
-    /// several in a row. Text and crop intentionally stay one-shot: text has
-    /// its own inline-edit flow and crop is naturally one-per-image.
-    private static let stickyTools: Set<AnnotationTool> = [
-        .arrow, .line, .rectangle, .ellipse, .pixelate,
+    /// Tools that stay active after each annotation so the user can keep
+    /// annotating without reaching back to the toolbar (issues #75, #417).
+    /// All drawing tools — including text — stay active until the user picks
+    /// another tool or presses Esc.
+    static let stickyTools: Set<AnnotationTool> = [
+        .arrow, .line, .rectangle, .ellipse, .text, .pixelate,
         .counter, .freehand, .highlighter, .spotlight
     ]
 
