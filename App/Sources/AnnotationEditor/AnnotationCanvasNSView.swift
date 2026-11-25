@@ -153,6 +153,8 @@ final class AnnotationCanvasNSView: NSView {
     /// unaffected.
     var onScroll: ((CanvasScrollEvent) -> Void)?
 
+    var isEditingText: Bool { textEditor != nil }
+
     func commitTextEditingIfNeeded() {
         commitTextEditing()
     }
@@ -898,9 +900,19 @@ final class AnnotationCanvasNSView: NSView {
                 editor.focusTextView()
                 return
             } else {
+                let wasEditingWithTextTool = currentTool == .text
                 commitTextEditing()
-                // Fall through: the click should still be processed as a fresh
-                // canvas interaction (e.g. create another text box, select, etc.).
+                if wasEditingWithTextTool {
+                    // Clicking outside while using the sticky Text tool commits
+                    // the active box without immediately spawning an empty box
+                    // on the same click. The tool stays `.text` so the next
+                    // click starts a fresh text annotation.
+                    window?.makeKey()
+                    return
+                }
+                // Fall through for non-text tools (e.g. double-click re-edit
+                // in `.select` mode, or after switching tools mid-edit) so the
+                // click still selects or starts drawing immediately.
             }
         }
 
@@ -1444,6 +1456,7 @@ final class AnnotationCanvasNSView: NSView {
             editor.beginEditing(initialText: existing.text)
             editingOriginalObject = existing
         } else {
+            document?.clearSelection()
             editor.fontSize = currentTextFontSize
             editor.textColor = currentStyle.color.nsColor
                 .withAlphaComponent(currentStyle.opacity)
@@ -1538,8 +1551,7 @@ final class AnnotationCanvasNSView: NSView {
         onDocumentChanged?()
         onTextEditingEnded?()
 
-        // Creation path: switch back to select, matching the other one-shot
-        // tools (arrow / rect / ellipse / pixelate).
+        // Notify the canvas wrapper so non-sticky tools can switch back to select.
         if currentTool == .text {
             onObjectCreated?()
         }

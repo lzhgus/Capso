@@ -96,6 +96,10 @@ final class CaptureAllInOneAnnotationOverlay {
         session?.isEditingText ?? false
     }
 
+    func commitTextEditing() {
+        session?.commitEditingTrigger += 1
+    }
+
     var annotationDocument: AnnotationDocument? {
         session?.document
     }

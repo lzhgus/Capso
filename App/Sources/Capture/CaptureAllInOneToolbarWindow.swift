@@ -511,6 +511,13 @@ final class CaptureAllInOneToolbarWindow {
         }
         guard event.type == .keyDown else { return event }
         if event.keyCode == 53 {
+            if annotationOverlay?.isEditingText == true {
+                if NSApp.keyWindow?.firstResponder is NSTextView {
+                    return event
+                }
+                annotationOverlay?.commitTextEditing()
+                return nil
+            }
             onCancel?()
             return nil
         }
