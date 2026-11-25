@@ -604,13 +604,7 @@ private struct AllInOneAnnotationCanvasView: View {
 }
 
 private struct AllInOneAnnotationToolbarView: View {
-    private enum TextEffectAction: Hashable {
-        case fill, outline, trace
-    }
-
     @ObservedObject var session: AllInOneAnnotationSession
-    @State private var hoveredTool: AnnotationTool?
-    @State private var hoveredTextEffect: TextEffectAction?
     @State private var showsTextStylePopover = false
 
     private var isFontSizeMode: Bool {
@@ -648,23 +642,11 @@ private struct AllInOneAnnotationToolbarView: View {
             HStack(spacing: 10) {
                 toolRow(primaryTools)
 
-                divider
+                AnnotationToolbarDivider()
 
                 if !session.usesCompactToolbar {
-                    AnnotationColorControls(
-                        currentColor: Binding(
-                            get: { session.currentColor },
-                            set: {
-                                session.currentColor = $0
-                                UserDefaults.standard.set($0.rawValue, forKey: "annotationLastColor")
-                                session.updateSelectedStyle()
-                            }
-                        ),
-                        swatchSize: 17,
-                        selectedRingColor: .white
-                    )
-
-                    divider
+                    colorControls
+                    AnnotationToolbarDivider()
                     primaryControls
                 } else {
                     compactStatus
@@ -675,13 +657,13 @@ private struct AllInOneAnnotationToolbarView: View {
                 }
 
                 if session.usesCompactToolbar {
-                    iconButton(
+                    AnnotationToolbarIconButton(
                         systemName: session.showsOverflow ? "chevron.up" : "ellipsis",
                         help: session.showsOverflow ? "Hide tools" : "More tools",
                         action: { session.toggleOverflow() }
                     )
                 } else {
-                    divider
+                    AnnotationToolbarDivider()
                     undoRedoControls
                 }
             }
@@ -689,22 +671,11 @@ private struct AllInOneAnnotationToolbarView: View {
             if session.usesCompactToolbar && session.showsOverflow {
                 HStack(spacing: 10) {
                     toolRow(overflowTools)
-                    divider
-                    AnnotationColorControls(
-                        currentColor: Binding(
-                            get: { session.currentColor },
-                            set: {
-                                session.currentColor = $0
-                                UserDefaults.standard.set($0.rawValue, forKey: "annotationLastColor")
-                                session.updateSelectedStyle()
-                            }
-                        ),
-                        swatchSize: 17,
-                        selectedRingColor: .white
-                    )
-                    divider
+                    AnnotationToolbarDivider()
+                    colorControls
+                    AnnotationToolbarDivider()
                     primaryControls
-                    divider
+                    AnnotationToolbarDivider()
                     undoRedoControls
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -713,20 +684,15 @@ private struct AllInOneAnnotationToolbarView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
-        )
-        .environment(\.colorScheme, .dark)
+        .annotationToolbarSurface()
         .animation(.spring(response: 0.20, dampingFraction: 0.88), value: session.showsOverflow)
     }
 
     private var miniToolbar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 9) {
-                currentToolGlyph
+                AnnotationToolGlyph(tool: session.currentTool)
+                    .foregroundStyle(.white)
                     .frame(width: 30, height: 28)
                     .background(Color.accentColor.opacity(0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
@@ -744,7 +710,7 @@ private struct AllInOneAnnotationToolbarView: View {
                     textStyleButton
                 }
 
-                iconButton(
+                AnnotationToolbarIconButton(
                     systemName: "ellipsis",
                     help: "More tools",
                     action: { session.toggleOverflow() }
@@ -754,18 +720,7 @@ private struct AllInOneAnnotationToolbarView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(toolbarBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.16), lineWidth: 0.5)
-        )
-        .environment(\.colorScheme, .dark)
-    }
-
-    private var toolbarBackground: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(.thinMaterial)
+        .annotationToolbarSurface()
     }
 
     private var primaryTools: [AnnotationTool] {
@@ -776,6 +731,21 @@ private struct AllInOneAnnotationToolbarView: View {
 
     private var overflowTools: [AnnotationTool] {
         [.ellipse, .pixelate, .counter, .highlighter, .spotlight]
+    }
+
+    private var colorControls: some View {
+        AnnotationColorControls(
+            currentColor: Binding(
+                get: { session.currentColor },
+                set: {
+                    session.currentColor = $0
+                    UserDefaults.standard.set($0.rawValue, forKey: "annotationLastColor")
+                    session.updateSelectedStyle()
+                }
+            ),
+            swatchSize: 17,
+            selectedRingColor: .white
+        )
     }
 
     private var compactStatus: some View {
@@ -795,34 +765,76 @@ private struct AllInOneAnnotationToolbarView: View {
     private var primaryControls: some View {
         HStack(spacing: 7) {
             if !(session.currentTool == .pixelate && session.redactionMode == .solid) {
-                Slider(value: Binding(
-                    get: { session.sliderValue },
-                    set: { session.setSliderValue($0) }
-                ), in: sliderRange, step: sliderStep)
+                Slider(
+                    value: Binding(
+                        get: { session.sliderValue },
+                        set: { session.setSliderValue($0) }
+                    ),
+                    in: AnnotationToolbarChrome.sizeRange(for: session.currentTool, isFontSizeMode: isFontSizeMode),
+                    step: AnnotationToolbarChrome.sizeStep(for: session.currentTool, isFontSizeMode: isFontSizeMode)
+                )
                 .frame(width: 92)
-                .help(sliderHelp)
+                .help(AnnotationToolbarChrome.sizeHelp(
+                    for: session.currentTool,
+                    isFontSizeMode: isFontSizeMode,
+                    value: session.sliderValue
+                ))
             }
 
             if session.currentTool == .pixelate {
-                redactionModeControl
+                AnnotationToolbarRedactionModeControl(selection: Binding(
+                    get: { session.redactionMode },
+                    set: {
+                        session.redactionMode = $0
+                        UserDefaults.standard.set($0.rawValue, forKey: "annotationRedactionMode")
+                        session.updateSelectedStyle()
+                    }
+                ))
             }
 
             if session.currentTool == .arrow || session.currentTool == .line {
-                strokePatternControl
+                AnnotationToolbarStrokePatternControl(selection: Binding(
+                    get: { session.strokePattern },
+                    set: {
+                        session.strokePattern = $0
+                        UserDefaults.standard.set($0.rawValue, forKey: "annotationStrokePattern")
+                        session.updateSelectedStyle()
+                    }
+                ))
             }
 
             if isFontSizeMode
                 && CaptureChromeLayout.showsInlineTextEffects(for: session.toolbarDensity) {
-                textEffectsInlineControls
+                AnnotationToolbarTextEffects(
+                    fill: Binding(
+                        get: { session.textFillEnabled },
+                        set: {
+                            session.textFillEnabled = $0
+                            UserDefaults.standard.set($0, forKey: "annotationTextFillEnabled")
+                            session.updateSelectedStyle()
+                        }
+                    ),
+                    outline: Binding(
+                        get: { session.textOutlineEnabled },
+                        set: {
+                            session.textOutlineEnabled = $0
+                            UserDefaults.standard.set($0, forKey: "annotationTextOutlineEnabled")
+                            session.updateSelectedStyle()
+                        }
+                    ),
+                    trace: Binding(
+                        get: { session.textStrokeEnabled },
+                        set: {
+                            session.textStrokeEnabled = $0
+                            UserDefaults.standard.set($0, forKey: "annotationTextStrokeEnabled")
+                            session.updateSelectedStyle()
+                        }
+                    )
+                )
             }
 
-            if session.currentTool != .counter
-                && session.currentTool != .arrow
-                && session.currentTool != .line
-                && session.currentTool != .highlighter
-                && session.currentTool != .pixelate
-                && !isFontSizeMode {
-                iconButton(
+            if AnnotationToolbarChrome.showsFillToggle(for: session.currentTool, isFontSizeMode: isFontSizeMode) {
+                AnnotationToolbarIconButton(
                     systemName: session.filled ? "square.fill" : "square",
                     help: "Fill Shape",
                     isActive: session.filled,
@@ -836,44 +848,6 @@ private struct AllInOneAnnotationToolbarView: View {
         }
     }
 
-    private var textEffectsInlineControls: some View {
-        HStack(spacing: 4) {
-            textEffectIconButton(
-                .fill,
-                systemName: "square.fill",
-                label: String(localized: "Fill"),
-                help: "Text Fill",
-                isActive: session.textFillEnabled,
-                defaultsKey: "annotationTextFillEnabled"
-            ) {
-                session.textFillEnabled.toggle()
-                return session.textFillEnabled
-            }
-            textEffectIconButton(
-                .outline,
-                systemName: "square",
-                label: String(localized: "Box"),
-                help: "Text Box Outline",
-                isActive: session.textOutlineEnabled,
-                defaultsKey: "annotationTextOutlineEnabled"
-            ) {
-                session.textOutlineEnabled.toggle()
-                return session.textOutlineEnabled
-            }
-            textEffectGlyphButton(
-                .trace,
-                glyph: "Aa",
-                label: String(localized: "Trace"),
-                help: "Text Trace",
-                isActive: session.textStrokeEnabled,
-                defaultsKey: "annotationTextStrokeEnabled"
-            ) {
-                session.textStrokeEnabled.toggle()
-                return session.textStrokeEnabled
-            }
-        }
-    }
-
     private var textStyleButton: some View {
         Button {
             showsTextStylePopover.toggle()
@@ -882,7 +856,7 @@ private struct AllInOneAnnotationToolbarView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 38, height: 38)
-                .background(buttonBackground(isActive: hasActiveTextEffect, isEnabled: true))
+                .background(AnnotationToolbarChrome.buttonBackground(isActive: hasActiveTextEffect))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -951,7 +925,7 @@ private struct AllInOneAnnotationToolbarView: View {
             }
             .foregroundStyle(.white)
             .frame(width: 72, height: 48)
-            .background(buttonBackground(isActive: isActive, isEnabled: true))
+            .background(AnnotationToolbarChrome.buttonBackground(isActive: isActive))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -959,83 +933,9 @@ private struct AllInOneAnnotationToolbarView: View {
         .accessibilityValue(Text(isActive ? "On" : "Off"))
     }
 
-    private func textEffectIconButton(
-        _ kind: TextEffectAction,
-        systemName: String,
-        label: String,
-        help: LocalizedStringKey,
-        isActive: Bool,
-        defaultsKey: String,
-        toggle: @escaping () -> Bool
-    ) -> some View {
-        Button {
-            let newValue = toggle()
-            UserDefaults.standard.set(newValue, forKey: defaultsKey)
-            session.updateSelectedStyle()
-        } label: {
-            VStack(spacing: hoveredTextEffect == kind ? 1 : 0) {
-                Image(systemName: systemName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(height: hoveredTextEffect == kind ? 17 : 38)
-
-                if hoveredTextEffect == kind {
-                    Text(label)
-                        .font(.system(size: 8.5, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-                        .transition(.opacity)
-                }
-            }
-            .foregroundStyle(.white)
-            .frame(width: 32, height: 38)
-            .background(buttonBackground(isActive: isActive, isEnabled: true))
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hoveredTextEffect = $0 ? kind : nil }
-        .help(help)
-    }
-
-    private func textEffectGlyphButton(
-        _ kind: TextEffectAction,
-        glyph: String,
-        label: String,
-        help: LocalizedStringKey,
-        isActive: Bool,
-        defaultsKey: String,
-        toggle: @escaping () -> Bool
-    ) -> some View {
-        Button {
-            let newValue = toggle()
-            UserDefaults.standard.set(newValue, forKey: defaultsKey)
-            session.updateSelectedStyle()
-        } label: {
-            VStack(spacing: hoveredTextEffect == kind ? 1 : 0) {
-                Text(verbatim: glyph)
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(height: hoveredTextEffect == kind ? 17 : 38)
-
-                if hoveredTextEffect == kind {
-                    Text(label)
-                        .font(.system(size: 8.5, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-                        .transition(.opacity)
-                }
-            }
-            .foregroundStyle(.white)
-            .frame(width: 32, height: 38)
-            .background(buttonBackground(isActive: isActive, isEnabled: true))
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hoveredTextEffect = $0 ? kind : nil }
-        .help(help)
-    }
-
     private var undoRedoControls: some View {
         HStack(spacing: 4) {
-            iconButton(
+            AnnotationToolbarIconButton(
                 systemName: "arrow.uturn.backward",
                 help: "Undo",
                 isEnabled: session.document.canUndo,
@@ -1045,7 +945,7 @@ private struct AllInOneAnnotationToolbarView: View {
                 }
             )
 
-            iconButton(
+            AnnotationToolbarIconButton(
                 systemName: "arrow.uturn.forward",
                 help: "Redo",
                 isEnabled: session.document.canRedo,
@@ -1060,215 +960,19 @@ private struct AllInOneAnnotationToolbarView: View {
     private func toolRow(_ tools: [AnnotationTool]) -> some View {
         HStack(spacing: 4) {
             ForEach(tools, id: \.self) { tool in
-                toolButton(tool)
+                AnnotationToolbarToolButton(
+                    tool: tool,
+                    isActive: session.currentTool == tool,
+                    action: { session.switchTool(tool) }
+                )
             }
         }
-    }
-
-    private var currentToolGlyph: some View {
-        Group {
-            if session.currentTool == .text {
-                Text(verbatim: "Aa")
-                    .font(.system(size: 13, weight: .semibold))
-            } else {
-                Image(systemName: iconName(for: session.currentTool))
-                    .font(.system(size: 14, weight: .medium))
-            }
-        }
-        .foregroundStyle(.white)
     }
 
     private var compactValueLabel: String {
-        if session.currentTool == .pixelate {
-            return "\(Int(session.lineWidth))px"
-        }
-        if isFontSizeMode {
+        if isFontSizeMode && session.currentTool != .pixelate {
             return "\(Int(session.textFontSize))pt"
         }
         return "\(Int(session.lineWidth))px"
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.16))
-            .frame(width: 1, height: 30)
-    }
-
-    private var sliderRange: ClosedRange<CGFloat> {
-        if isFontSizeMode { return 12...120 }
-        switch session.currentTool {
-        case .pixelate: return 4...48
-        case .counter: return 12...40
-        case .highlighter: return 10...100
-        default: return 1...40
-        }
-    }
-
-    private var sliderStep: CGFloat {
-        switch session.currentTool {
-        case .pixelate, .highlighter: return 2
-        default: return 1
-        }
-    }
-
-    private var sliderHelp: String {
-        if isFontSizeMode { return "\(String(localized: "Font Size")): \(Int(session.textFontSize))" }
-        switch session.currentTool {
-        case .pixelate: return "\(String(localized: "Block Size")): \(Int(session.lineWidth))"
-        case .counter: return "\(String(localized: "Counter Size")): \(Int(session.lineWidth))"
-        case .highlighter: return "\(String(localized: "Highlighter Width")): \(Int(session.lineWidth))"
-        default: return "\(String(localized: "Line Width")): \(Int(session.lineWidth))"
-        }
-    }
-
-    private var redactionModeControl: some View {
-        HStack(spacing: 2) {
-            ForEach(RedactionMode.allCases, id: \.self) { mode in
-                Button {
-                    session.redactionMode = mode
-                    UserDefaults.standard.set(mode.rawValue, forKey: "annotationRedactionMode")
-                    session.updateSelectedStyle()
-                } label: {
-                    Text(mode.label)
-                        .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .foregroundStyle(.white)
-                        .frame(width: 48, height: 26)
-                        .background(optionBackground(isActive: session.redactionMode == mode))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help(Text(mode.label))
-            }
-        }
-        .padding(2)
-        .background(optionGroupBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .help("Redaction Mode")
-    }
-
-    private var strokePatternControl: some View {
-        HStack(spacing: 2) {
-            ForEach(StrokePattern.allCases, id: \.self) { pattern in
-                Button {
-                    session.strokePattern = pattern
-                    UserDefaults.standard.set(pattern.rawValue, forKey: "annotationStrokePattern")
-                    session.updateSelectedStyle()
-                } label: {
-                    StrokePatternGlyph(pattern: pattern)
-                        .foregroundStyle(.white)
-                        .frame(width: 30, height: 26)
-                        .background(optionBackground(isActive: session.strokePattern == pattern))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help(Text(pattern.rawValue.capitalized))
-            }
-        }
-        .padding(2)
-        .background(optionGroupBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .help("Stroke Pattern")
-    }
-
-    private var optionGroupBackground: Color {
-        Color.white.opacity(0.09)
-    }
-
-    private func optionBackground(isActive: Bool) -> Color {
-        isActive ? Color.accentColor.opacity(0.48) : Color.white.opacity(0.001)
-    }
-
-    @ViewBuilder
-    private func toolButton(_ tool: AnnotationTool) -> some View {
-        Button(action: { session.switchTool(tool) }) {
-            VStack(spacing: hoveredTool == tool ? 1 : 0) {
-                Group {
-                    if tool == .text {
-                        Text(verbatim: "Aa")
-                            .font(.system(size: 13, weight: .semibold))
-                    } else {
-                        Image(systemName: iconName(for: tool))
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                }
-                .frame(height: hoveredTool == tool ? 17 : 38)
-
-                if hoveredTool == tool {
-                    Text(toolHoverLabel(for: tool))
-                        .font(.system(size: 8.5, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-                        .transition(.opacity)
-                }
-            }
-            .foregroundStyle(.white)
-            .frame(width: 29, height: 38)
-            .background(session.currentTool == tool ? Color.accentColor.opacity(0.45) : Color.white.opacity(0.001))
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hoveredTool = $0 ? tool : nil }
-        .help(tool.localizedShortcutHelpTitle)
-    }
-
-    private func iconButton(
-        systemName: String,
-        help: LocalizedStringKey,
-        isActive: Bool = false,
-        isEnabled: Bool = true,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 28)
-                .background(buttonBackground(isActive: isActive, isEnabled: isEnabled))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.35)
-        .help(help)
-    }
-
-    private func buttonBackground(isActive: Bool, isEnabled: Bool) -> Color {
-        if !isEnabled { return Color.white.opacity(0.06) }
-        if isActive { return Color.accentColor.opacity(0.45) }
-        return Color.white.opacity(0.10)
-    }
-
-    private func iconName(for tool: AnnotationTool) -> String {
-        switch tool {
-        case .select: return "cursorarrow"
-        case .arrow: return "arrow.up.right"
-        case .line: return "line.diagonal"
-        case .rectangle: return "rectangle"
-        case .ellipse: return "circle"
-        case .text: return "textformat"
-        case .freehand: return "pencil.tip"
-        case .pixelate: return "eye.slash.fill"
-        case .counter: return "number.circle.fill"
-        case .highlighter: return "highlighter"
-        case .spotlight: return "flashlight.on.fill"
-        }
-    }
-
-    private func toolHoverLabel(for tool: AnnotationTool) -> String {
-        switch tool {
-        case .select: return String(localized: "Select")
-        case .arrow: return String(localized: "Arrow")
-        case .line: return String(localized: "Line")
-        case .rectangle: return String(localized: "Rect")
-        case .ellipse: return String(localized: "Oval")
-        case .text: return String(localized: "Text")
-        case .freehand: return String(localized: "Draw")
-        case .pixelate: return String(localized: "Pixel")
-        case .counter: return String(localized: "Count")
-        case .highlighter: return String(localized: "Mark")
-        case .spotlight: return String(localized: "Spotlight")
-        }
     }
 }

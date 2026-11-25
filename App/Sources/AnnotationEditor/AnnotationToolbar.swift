@@ -48,37 +48,34 @@ struct AnnotationToolbar: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                // Only the editing tools scroll. The actions stay pinned so
-                // Save/Copy/Close never slide out of reach on a display too
-                // narrow for the toolbar's full width (issue #236).
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        toolGroup
-                        toolbarDivider
-                        colorGroup
-                        toolbarDivider
-                        strokeGroup
-                        presetsMenu
-                        toolbarDivider
-                        cropGroup
-                        toolbarDivider
-                        beautifyGroup
-                        toolbarDivider
-                        undoGroup
-                    }
+        HStack(spacing: 10) {
+            // Only the editing tools scroll. The actions stay pinned so
+            // Save/Copy/Close never slide out of reach on a display too
+            // narrow for the toolbar's full width (issue #236).
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    toolGroup
+                    AnnotationToolbarDivider()
+                    AnnotationColorControls(
+                        currentColor: $currentColor,
+                        swatchSize: 17,
+                        selectedRingColor: .white
+                    )
+                    AnnotationToolbarDivider()
+                    strokeGroup
+                    AnnotationToolbarDivider()
+                    editGroup
+                    AnnotationToolbarDivider()
+                    undoGroup
                 }
-                Spacer(minLength: 0)
-                actionGroup
             }
-
-            if isFontSizeMode {
-                textEffectsGroup
-                    .transition(.opacity)
-            }
+            Spacer(minLength: 0)
+            actionGroup
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .annotationToolbarSurface()
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .onHover { hovering in
             if hovering {
@@ -92,160 +89,89 @@ struct AnnotationToolbar: View {
 
     private var toolGroup: some View {
         HStack(spacing: 4) {
-            toolButton(.select, icon: "cursorarrow")
-            toolButton(.arrow, icon: "arrow.up.right")
-            toolButton(.line, icon: "line.diagonal")
-            toolButton(.rectangle, icon: "rectangle")
-            toolButton(.ellipse, icon: "circle")
-            textToolButton
-            toolButton(.freehand, icon: "pencil.tip")
-            toolButton(.pixelate, icon: "eye.slash.fill")
-            toolButton(.counter, icon: "number.circle.fill")
-            toolButton(.highlighter, icon: "highlighter")
-            toolButton(.spotlight, icon: "flashlight.on.fill")
+            ForEach(AnnotationTool.allCases, id: \.self) { tool in
+                AnnotationToolbarToolButton(
+                    tool: tool,
+                    isActive: currentTool == tool,
+                    action: { currentTool = tool }
+                )
+            }
         }
-    }
-
-    private func toolButton(_ tool: AnnotationTool, icon: String) -> some View {
-        Button(action: { currentTool = tool }) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(toolbarIconForeground(isActive: currentTool == tool))
-                .frame(width: 30, height: 26)
-                .background(toolbarButtonBackground(isActive: currentTool == tool))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(toolbarButtonStroke)
-        }
-        .buttonStyle(.plain)
-        .help(tool.localizedShortcutHelpTitle)
-    }
-
-    /// Text-tool button. Rendered as a literal "Aa" glyph rather than the
-    /// SF Symbol `textformat`, because Apple localizes that symbol's
-    /// appearance per language (en: "Aa", zh: "格式", ja: "書式", …) and
-    /// we want a consistent look across all locales — the iconic "Aa"
-    /// shorthand is the industry convention for a text tool.
-    ///
-    /// `Text(verbatim:)` prevents SwiftUI from treating "Aa" as a
-    /// LocalizedStringKey lookup.
-    private var textToolButton: some View {
-        Button(action: { currentTool = .text }) {
-            Text(verbatim: "Aa")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(toolbarIconForeground(isActive: currentTool == .text))
-                .frame(width: 30, height: 26)
-                .background(toolbarButtonBackground(isActive: currentTool == .text))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(toolbarButtonStroke)
-        }
-        .buttonStyle(.plain)
-        .help(AnnotationTool.text.localizedShortcutHelpTitle)
-    }
-
-    private var colorGroup: some View {
-        AnnotationColorControls(currentColor: $currentColor)
     }
 
     private var strokeGroup: some View {
-        HStack(spacing: 8) {
-            if isFontSizeMode {
-                // Text tool or mid-edit: slider becomes a font-size control.
-                Slider(value: $lineWidth, in: 12...120, step: 1)
-                    .frame(width: 80)
-                    .help("Font Size: \(Int(lineWidth))")
-            } else if currentTool == .pixelate {
-                Picker("", selection: $redactionMode) {
-                    ForEach(RedactionMode.allCases, id: \.self) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 184)
-                .help("Redaction Mode")
-
-                if redactionMode != .solid {
-                    Slider(value: $lineWidth, in: 4...48, step: 2)
-                        .frame(width: 80)
-                        .help("Block Size: \(Int(lineWidth))")
-                }
-            } else if currentTool == .counter {
-                Slider(value: $lineWidth, in: 12...40, step: 1)
-                    .frame(width: 80)
-                    .help("Counter Size: \(Int(lineWidth))")
-            } else if currentTool == .highlighter {
-                Slider(value: $lineWidth, in: 10...100, step: 2)
-                    .frame(width: 80)
-                    .help("Highlighter Width: \(Int(lineWidth))")
-            } else {
-                Slider(value: $lineWidth, in: 1...40, step: 1)
-                    .frame(width: 80)
-                    .help("Line Width: \(Int(lineWidth))")
+        HStack(spacing: 7) {
+            if isFontSizeMode || !(currentTool == .pixelate && redactionMode == .solid) {
+                Slider(
+                    value: $lineWidth,
+                    in: AnnotationToolbarChrome.sizeRange(for: currentTool, isFontSizeMode: isFontSizeMode),
+                    step: AnnotationToolbarChrome.sizeStep(for: currentTool, isFontSizeMode: isFontSizeMode)
+                )
+                .frame(width: 92)
+                .help(AnnotationToolbarChrome.sizeHelp(
+                    for: currentTool,
+                    isFontSizeMode: isFontSizeMode,
+                    value: lineWidth
+                ))
             }
+
+            if currentTool == .pixelate && !isFontSizeMode {
+                AnnotationToolbarRedactionModeControl(selection: $redactionMode)
+            }
+
             if currentTool == .arrow || currentTool == .line {
-                Picker("", selection: $strokePattern) {
-                    ForEach(StrokePattern.allCases, id: \.self) { pattern in
-                        StrokePatternGlyph(pattern: pattern)
-                            .tag(pattern)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 104)
-                .help("Stroke Pattern")
+                AnnotationToolbarStrokePatternControl(selection: $strokePattern)
             }
+
             if currentTool == .arrow {
-                Picker("", selection: $arrowHead) {
-                    ForEach(ArrowHeadStyle.allCases, id: \.self) { style in
-                        ArrowHeadGlyph(style: style)
-                            .tag(style)
-                    }
+                AnnotationToolbarSegmentedControl(
+                    options: ArrowHeadStyle.allCases,
+                    selection: $arrowHead,
+                    itemWidth: 34,
+                    help: "Arrow Style",
+                    itemHelp: { _ in Text("Arrow Style") }
+                ) { style in
+                    ArrowHeadGlyph(style: style)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 136)
-                .help("Arrow Style")
             }
-            // Fill toggle is meaningless for counter / highlighter / text.
-            if currentTool != .counter
-                && currentTool != .arrow
-                && currentTool != .line
-                && currentTool != .highlighter
-                && !isFontSizeMode {
-                Toggle(isOn: $filled) {
-                    Image(systemName: filled ? "square.fill" : "square")
-                        .font(.system(size: 12))
-                }
-                .toggleStyle(.button)
-                .help("Fill Shape")
+
+            if isFontSizeMode {
+                AnnotationToolbarTextEffects(
+                    fill: $textFillEnabled,
+                    outline: $textOutlineEnabled,
+                    trace: $textStrokeEnabled
+                )
+            }
+
+            if AnnotationToolbarChrome.showsFillToggle(for: currentTool, isFontSizeMode: isFontSizeMode) {
+                AnnotationToolbarIconButton(
+                    systemName: filled ? "square.fill" : "square",
+                    help: "Fill Shape",
+                    isActive: filled,
+                    action: { filled.toggle() }
+                )
             }
         }
     }
 
-    private var textEffectsGroup: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                textEffectToggle("Fill", isOn: $textFillEnabled, help: "Text Fill")
-                textEffectToggle("Outline", isOn: $textOutlineEnabled, help: "Text Box Outline")
-                textEffectToggle("Trace", isOn: $textStrokeEnabled, help: "Text Trace")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
+    private var editGroup: some View {
+        HStack(spacing: 4) {
+            presetsMenu
 
-    private func textEffectToggle(
-        _ title: LocalizedStringKey,
-        isOn: Binding<Bool>,
-        help: LocalizedStringKey
-    ) -> some View {
-        Toggle(isOn: isOn) {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .frame(minWidth: 46, minHeight: 20)
+            AnnotationToolbarIconButton(
+                systemName: "crop",
+                help: "Crop",
+                isEnabled: !isEditingText,
+                action: onCrop
+            )
+
+            AnnotationToolbarIconButton(
+                systemName: showBeautifyPanel ? "sparkles.rectangle.stack.fill" : "sparkles",
+                help: "Beautify",
+                isActive: showBeautifyPanel,
+                action: { showBeautifyPanel.toggle() }
+            )
         }
-        .toggleStyle(.button)
-        .controlSize(.small)
-        .help(help)
     }
 
     private var presetsMenu: some View {
@@ -266,88 +192,60 @@ struct AnnotationToolbar: View {
                 }
             }
         } label: {
-            Image(systemName: "bookmark")
-                .font(.system(size: 13, weight: .medium))
+            AnnotationToolbarIconFace(systemName: "bookmark", isEnabled: !isEditingText)
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Style Presets")
         .disabled(isEditingText)
     }
 
-    private var cropGroup: some View {
-        Button(action: onCrop) {
-            Image(systemName: "crop")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(toolbarIconForeground(isActive: false))
-                .frame(width: 30, height: 26)
-                .background(toolbarButtonBackground(isActive: false))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(toolbarButtonStroke)
-        }
-        .buttonStyle(.plain)
-        .help("Crop")
-        .disabled(isEditingText)
-    }
-
-    private var beautifyGroup: some View {
-        Button(action: { showBeautifyPanel.toggle() }) {
-            Image(systemName: showBeautifyPanel ? "sparkles.rectangle.stack.fill" : "sparkles")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(toolbarIconForeground(isActive: showBeautifyPanel))
-                .frame(width: 30, height: 26)
-                .background(toolbarButtonBackground(isActive: showBeautifyPanel))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(toolbarButtonStroke)
-        }
-        .buttonStyle(.plain)
-        .help("Beautify")
-    }
-
     private var undoGroup: some View {
         HStack(spacing: 4) {
-            Button(action: onUndo) {
-                Image(systemName: "arrow.uturn.backward")
-            }
-            .disabled(!canUndo)
+            AnnotationToolbarIconButton(
+                systemName: "arrow.uturn.backward",
+                help: "Undo",
+                isEnabled: canUndo,
+                action: onUndo
+            )
             .keyboardShortcut("z", modifiers: .command)
-            .help("Undo")
-            Button(action: onRedo) {
-                Image(systemName: "arrow.uturn.forward")
-            }
-            .disabled(!canRedo)
+
+            AnnotationToolbarIconButton(
+                systemName: "arrow.uturn.forward",
+                help: "Redo",
+                isEnabled: canRedo,
+                action: onRedo
+            )
             .keyboardShortcut("z", modifiers: [.command, .shift])
-            .help("Redo")
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     private var actionGroup: some View {
-        HStack(spacing: 6) {
-            actionButton(icon: "xmark", help: "Close", isDestructive: true, action: onCancel)
+        HStack(spacing: 4) {
+            AnnotationToolbarIconButton(systemName: "xmark", help: "Close", action: onCancel)
 
             dragActionButton
 
             copyActionButton
 
-            actionButton(icon: "pin", help: "Pin", action: onPin)
+            AnnotationToolbarIconButton(systemName: "pin", help: "Pin", action: onPin)
                 .keyboardShortcut("p", modifiers: .command)
 
-            actionButton(icon: "square.and.arrow.down", help: "Save", isPrimary: true, action: onSave)
-                .keyboardShortcut("s", modifiers: .command)
+            AnnotationToolbarIconButton(
+                systemName: "square.and.arrow.down",
+                help: "Save",
+                isPrimary: true,
+                action: onSave
+            )
+            .keyboardShortcut("s", modifiers: .command)
         }
     }
 
     private var dragActionButton: some View {
         ZStack {
-            actionButtonFace(
-                icon: "hand.draw",
-                isPrimary: false,
-                isDestructive: false
-            )
-            .opacity(isDragDisabled ? 0.45 : 1)
+            AnnotationToolbarIconFace(systemName: "hand.draw", isEnabled: !isDragDisabled)
 
             QuickAccessDragSourceView(
                 thumbnail: dragThumbnail,
@@ -357,7 +255,7 @@ struct AnnotationToolbar: View {
                 onDragStarted: onDragStarted,
                 onDragEnded: { _ in onDragEnded() }
             )
-            .frame(width: 34, height: 26)
+            .frame(width: 30, height: 28)
             .disabled(isDragDisabled)
             .accessibilityHidden(true)
         }
@@ -373,8 +271,8 @@ struct AnnotationToolbar: View {
 
     @ViewBuilder
     private var copyActionButton: some View {
-        let button = actionButton(
-            icon: "doc.on.doc",
+        let button = AnnotationToolbarIconButton(
+            systemName: "doc.on.doc",
             help: "Copy Image and Close (⌘C · ⏎ · ⌘⇧C)",
             action: onCopy
         )
@@ -404,78 +302,6 @@ struct AnnotationToolbar: View {
             .frame(width: 0, height: 0)
             .opacity(0)
             .accessibilityHidden(true)
-    }
-
-    private func actionButton(
-        icon: String,
-        help: LocalizedStringKey,
-        isPrimary: Bool = false,
-        isDestructive: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            actionButtonFace(icon: icon, isPrimary: isPrimary, isDestructive: isDestructive)
-        }
-        .buttonStyle(.plain)
-        .help(help)
-    }
-
-    private func actionButtonFace(
-        icon: String,
-        isPrimary: Bool,
-        isDestructive: Bool
-    ) -> some View {
-        Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(actionIconForeground(isPrimary: isPrimary, isDestructive: isDestructive))
-            .frame(width: 34, height: 26)
-            .background(actionButtonBackground(isPrimary: isPrimary, isDestructive: isDestructive))
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(actionButtonStroke(isPrimary: isPrimary))
-    }
-
-    private var toolbarDivider: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.12))
-            .frame(width: 1, height: 24)
-    }
-
-    private func toolbarButtonBackground(isActive: Bool) -> Color {
-        isActive ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.04)
-    }
-
-    private func toolbarIconForeground(isActive: Bool) -> Color {
-        isActive ? Color.accentColor : Color.primary.opacity(0.82)
-    }
-
-    private var toolbarButtonStroke: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
-    }
-
-    private func actionButtonBackground(isPrimary: Bool, isDestructive: Bool) -> Color {
-        if isPrimary {
-            return Color.accentColor
-        }
-        if isDestructive {
-            return Color.primary.opacity(0.045)
-        }
-        return Color.primary.opacity(0.055)
-    }
-
-    private func actionIconForeground(isPrimary: Bool, isDestructive: Bool) -> Color {
-        if isPrimary {
-            return .white
-        }
-        if isDestructive {
-            return Color.primary.opacity(0.72)
-        }
-        return Color.primary.opacity(0.84)
-    }
-
-    private func actionButtonStroke(isPrimary: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .stroke(isPrimary ? Color.white.opacity(0.18) : Color.primary.opacity(0.08), lineWidth: 0.5)
     }
 }
 
