@@ -305,13 +305,16 @@ struct AnnotationEditorView: View {
         )
     }
 
+    private static let canvasBackground = Color(white: 0.12)
+
     private var editorContent: some View {
         VStack(spacing: 0) {
             toolbar
-            Divider()
+                .background(Self.canvasBackground)
 
             if showBeautifyPanel {
                 BeautifyPanel(settings: beautifySettingsBinding)
+                    .environment(\.colorScheme, .dark)
                 Divider()
             }
 
@@ -366,7 +369,7 @@ struct AnnotationEditorView: View {
             ) {
                 previewCanvas
             }
-            .background(Color(white: 0.12))
+            .background(Self.canvasBackground)
             .onAppear { handleCanvasAppear(size: geo.size) }
             .onChange(of: currentTool, handleToolChange)
             .onChange(of: currentColor) { _, _ in updateSelectedStyle() }
