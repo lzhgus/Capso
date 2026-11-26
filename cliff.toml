@@ -1,0 +1,62 @@
+# git-cliff configuration (https://git-cliff.org)
+# Regenerate: git cliff -o CHANGELOG.md
+# For a release: git cliff --tag vX.Y.Z -o CHANGELOG.md
+# (done automatically on "chore: release X.Y.Z" PRs by .github/workflows/changelog.yml)
+# Commits follow Conventional Commits (feat:, fix:, docs:, ...); release and merge commits are skipped
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented in this file.
+It is generated from the commit history by [git-cliff](https://git-cliff.org) - do not edit manually.
+{% for release in releases %}{% if loop.first %}
+A list of unreleased changes can be found [here](https://github.com/lzhgus/Capso/compare/{{ release.version | default(value=release.previous.version) }}...HEAD).
+{% endif %}{% endfor %}
+"""
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+{% if true -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits -%}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | split(pat="\\n") | first | upper_first | trim }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/lzhgus/Capso/commit/{{ commit.id }}))
+{% endfor %}
+{%- endfor %}
+{% endif -%}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+# Keep older commits without a type prefix (they land in "Other")
+filter_unconventional = false
+split_commits = false
+filter_commits = true
+topo_order_commits = false
+sort_commits = "oldest"
+tag_pattern = "v[0-9].*"
+commit_preprocessors = [
+  # Turn the trailing "(#123)" into a PR link
+  { pattern = '\s*\(#(\d+)\)', replace = " ([#${1}](https://github.com/lzhgus/Capso/pull/${1}))" },
+]
+commit_parsers = [
+  # Skip release bookkeeping and merge commits
+  { message = '^chore(\(.*\))?: (release|prepare)', skip = true },
+  { message = '^(Prepare|Ship) .*(release|v\d)', skip = true },
+  { message = '^Merge ', skip = true },
+  { message = '^.*!:', group = "<!-- 0 -->Breaking Changes" },
+  { body = 'BREAKING CHANGE', group = "<!-- 0 -->Breaking Changes" },
+  { message = '^feat', group = "<!-- 1 -->Features" },
+  { message = '^fix', group = "<!-- 2 -->Bug Fixes" },
+  { message = '^(l10n|i18n)', group = "<!-- 3 -->Localization" },
+  { message = '^perf', group = "<!-- 4 -->Performance" },
+  { message = '^refactor', group = "<!-- 5 -->Refactoring" },
+  { message = '^docs', group = "<!-- 6 -->Documentation" },
+  { message = '^(ci|build|test|chore)', group = "<!-- 7 -->Development/Infrastructure/Test/CI" },
+  { message = '.*', group = "<!-- 8 -->Other" },
+]
