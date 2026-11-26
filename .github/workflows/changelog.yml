@@ -1,0 +1,70 @@
+name: Changelog
+
+# Regenerates CHANGELOG.md on a release PR (title "chore: release X.Y.Z") with
+# git-cliff (config: cliff.toml), so the commit that gets tagged vX.Y.Z already
+# contains its changelog entry. The version is read from MARKETING_VERSION in
+# project.yml. The result is committed to the PR branch, never to main.
+#
+# Locally: git cliff --tag vX.Y.Z -o CHANGELOG.md
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: changelog-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  GIT_CLIFF_VERSION: 2.14.2
+
+jobs:
+  changelog:
+    # Only release PRs from branches in this repo (the token cannot push to forks)
+    if: >-
+      startsWith(github.event.pull_request.title, 'chore: release') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0 # git-cliff needs the full history and the tags
+
+      - name: Read version from project.yml
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^[[:space:]]*MARKETING_VERSION:[[:space:]]*"\{0,1\}\([^"]*\)"\{0,1\}[[:space:]]*$/\1/p' project.yml | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::MARKETING_VERSION not found in project.yml"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: npx --yes "git-cliff@${GIT_CLIFF_VERSION}" --tag "v${VERSION}" -o CHANGELOG.md
+
+      - name: Commit CHANGELOG.md to the PR branch
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG.md for ${VERSION}"
+          git push

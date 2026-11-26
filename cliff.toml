@@ -1,6 +1,7 @@
 # git-cliff configuration (https://git-cliff.org)
 # Regenerate: git cliff -o CHANGELOG.md
 # For a release: git cliff --tag vX.Y.Z -o CHANGELOG.md
+# (done automatically on "chore: release X.Y.Z" PRs by .github/workflows/changelog.yml)
 # Commits follow Conventional Commits (feat:, fix:, docs:, ...); release and merge commits are skipped
 
 [changelog]
