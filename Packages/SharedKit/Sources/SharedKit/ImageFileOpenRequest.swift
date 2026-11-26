@@ -14,6 +14,19 @@ public enum ImageFileOpenRequest {
         }
         return (imageFiles, remainder)
     }
+
+    public static func partitionPDFs(urls: [URL]) -> (pdfFiles: [URL], remainder: [URL]) {
+        var pdfFiles: [URL] = []
+        var remainder: [URL] = []
+        for url in urls {
+            if url.isFileURL && url.pathExtension.lowercased() == "pdf" {
+                pdfFiles.append(url)
+            } else {
+                remainder.append(url)
+            }
+        }
+        return (pdfFiles, remainder)
+    }
 }
 
 public struct ImageFileOpenBuffer: Sendable {

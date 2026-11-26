@@ -7,6 +7,11 @@ struct HistoryItemView: View {
     let entry: HistoryEntry
     let coordinator: HistoryCoordinator
     var isSelected = false
+    var pageNumber: Int? = nil
+    var entriesForCollectionAction: [HistoryEntry]? = nil
+    var onRemoveFromCollection: (() -> Void)? = nil
+    var onMoveEarlier: (() -> Void)? = nil
+    var onMoveLater: (() -> Void)? = nil
     @State private var isHovered = false
     @State private var thumbnailImage: NSImage?
 
@@ -25,6 +30,7 @@ struct HistoryItemView: View {
         case .window: ("Window", .blue)
         case .recording: ("Video", .red)
         case .gif: ("GIF", .orange)
+        case .pdfPage: ("PDF", .purple)
         }
     }
 
@@ -39,6 +45,15 @@ struct HistoryItemView: View {
     }
 
     private var displayName: String {
+        if entry.captureMode == .pdfPage {
+            if let page = entry.sourceWindowTitle, !page.isEmpty {
+                return page
+            }
+            if let name = entry.sourceAppName, !name.isEmpty {
+                return name
+            }
+            return String(localized: "PDF Page")
+        }
         if let name = entry.sourceAppName, !name.isEmpty {
             return name
         }
@@ -48,12 +63,13 @@ struct HistoryItemView: View {
         case .window: return String(localized: "Window")
         case .recording: return String(localized: "Recording")
         case .gif: return String(localized: "GIF")
+        case .pdfPage: return String(localized: "PDF Page")
         }
     }
 
     private var isScreenshot: Bool {
         switch entry.captureMode {
-        case .area, .fullscreen, .window:
+        case .area, .fullscreen, .window, .pdfPage:
             return true
         case .recording, .gif:
             return false
@@ -62,10 +78,25 @@ struct HistoryItemView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                thumbnailView
-                    .frame(maxWidth: .infinity)
+            ZStack {
+                Color.clear
                     .aspectRatio(16.0 / 10.0, contentMode: .fit)
+                    .overlay {
+                        thumbnailView
+                    }
+
+                // Page number badge when shown inside a PDF collection
+                if let pageNumber {
+                    Text("\(pageNumber)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.black.opacity(0.68))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .padding(6)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
 
                 // Mode badge
                 let (label, color) = modeBadge
@@ -79,6 +110,7 @@ struct HistoryItemView: View {
                     .background(color.opacity(0.85))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .padding(6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
                 // Hover action buttons
                 if isHovered {
@@ -174,7 +206,7 @@ struct HistoryItemView: View {
 
     private var hoverActionButtons: some View {
         HStack(spacing: 4) {
-            if isScreenshot, let thumbnailImage {
+            if onRemoveFromCollection == nil, isScreenshot, let thumbnailImage {
                 dragActionButton(thumbnail: thumbnailImage)
             }
 
@@ -187,7 +219,12 @@ struct HistoryItemView: View {
             actionButton("pencil.tip.crop.circle") { coordinator.editEntry(entry) }
                 .help(String(localized: "Edit"))
 
-            cloudActionButton
+            if let onRemoveFromCollection {
+                actionButton("minus.circle", action: onRemoveFromCollection)
+                    .help(String(localized: "Remove from PDF Collection"))
+            } else {
+                cloudActionButton
+            }
         }
     }
 
@@ -342,22 +379,47 @@ struct HistoryItemView: View {
         Button("Save to...") { coordinator.saveToFile(entry) }
         Button("Edit") { coordinator.editEntry(entry) }
 
-        if let cloudURL = entry.cloudURL {
-            Button(String(localized: "Copy Cloud Link")) {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(cloudURL, forType: .string)
+        if onRemoveFromCollection == nil, isScreenshot, !coordinator.collections.isEmpty {
+            let targets = entriesForCollectionAction ?? [entry]
+            Menu("Add to PDF Collection") {
+                ForEach(coordinator.collections) { summary in
+                    Button(summary.collection.title) {
+                        coordinator.addEntries(targets, toCollection: summary.id)
+                    }
+                }
             }
-        } else if coordinator.shareCoordinator != nil {
-            Button(String(localized: "Upload to Cloud")) {
-                Task { await performUpload() }
+        }
+
+        if let onMoveEarlier {
+            Divider()
+            Button("Move Earlier", action: onMoveEarlier)
+        }
+        if let onMoveLater {
+            Button("Move Later", action: onMoveLater)
+        }
+
+        if onRemoveFromCollection == nil {
+            if let cloudURL = entry.cloudURL {
+                Button(String(localized: "Copy Cloud Link")) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(cloudURL, forType: .string)
+                }
+            } else if coordinator.shareCoordinator != nil {
+                Button(String(localized: "Upload to Cloud")) {
+                    Task { await performUpload() }
+                }
             }
         }
 
         Divider()
         Button("Show in Finder") { coordinator.showInFinder(entry) }
         Divider()
-        Button("Delete from History", role: .destructive) {
-            showDeleteConfirm = true
+        if let onRemoveFromCollection {
+            Button("Remove from PDF Collection", role: .destructive, action: onRemoveFromCollection)
+        } else {
+            Button("Delete from History", role: .destructive) {
+                showDeleteConfirm = true
+            }
         }
     }
 

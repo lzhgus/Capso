@@ -839,11 +839,20 @@ final class CaptureCoordinator {
             self.pendingAction = .clipboard
             self.performAreaCapture(rect: rect, screen: screen)
         }
-        toolbar.onCopyRendered = { [weak self] image, _ in
+        toolbar.onCopyRendered = { [weak self] image, rect in
             guard let self else { return }
             self.dismissAllInOneToolbar()
             self.dismissFreezeWindows()
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            let sourceApp = self.pendingSourceApplication
+            self.pendingSourceApplication = nil
             self.copyRenderedImage(image)
+            self.saveRenderedAllInOneCaptureToHistory(
+                image: image,
+                rect: rect,
+                screen: screen,
+                sourceApp: sourceApp
+            )
         }
         toolbar.onSave = { [weak self] rect in
             guard let self else { return }
@@ -861,12 +870,20 @@ final class CaptureCoordinator {
             self.pendingAction = .save
             self.performAreaCapture(rect: rect, screen: screen)
         }
-        toolbar.onSaveRendered = { [weak self] image, _ in
+        toolbar.onSaveRendered = { [weak self] image, rect in
             guard let self else { return }
             self.dismissAllInOneToolbar()
             self.dismissFreezeWindows()
-            self.saveRenderedImage(image, sourceAppName: self.pendingSourceApplication?.name)
+            self.settings.lastCaptureSelection = .area(rect: rect, screenID: screen.displayID)
+            let sourceApp = self.pendingSourceApplication
             self.pendingSourceApplication = nil
+            self.saveRenderedImage(image, sourceAppName: sourceApp?.name)
+            self.saveRenderedAllInOneCaptureToHistory(
+                image: image,
+                rect: rect,
+                screen: screen,
+                sourceApp: sourceApp
+            )
         }
         toolbar.onPin = { [weak self] rect in
             guard let self else { return }
@@ -904,6 +921,21 @@ final class CaptureCoordinator {
         allInOneToolbarWindow = toolbar
         toolbar.show()
     }
+
+#if DEBUG
+    func showAllInOneToolbarForTesting(
+        selectionRect: CGRect,
+        screen: NSScreen,
+        frozenImage: CGImage?
+    ) {
+        showAllInOneToolbar(selectionRect: selectionRect, screen: screen, frozenImage: frozenImage)
+    }
+
+    func dismissAllInOneForTesting() {
+        dismissAllInOneToolbar()
+        dismissFreezeWindows()
+    }
+#endif
 
     /// Show the Self-Timer HUD on the screen the user just selected an area
     /// on, then fire the capture once the countdown finishes. Esc / click on
@@ -2329,6 +2361,29 @@ final class CaptureCoordinator {
 
     private func copyRenderedImage(_ image: CGImage) {
         copyRenderedScreenshotToClipboard(image)
+    }
+
+    private func saveRenderedAllInOneCaptureToHistory(
+        image: CGImage,
+        rect: CGRect,
+        screen: NSScreen,
+        sourceApp: SourceApplication?
+    ) {
+        let captureRect = CGRect(
+            x: rect.origin.x,
+            y: screen.frame.height - rect.origin.y - rect.height,
+            width: rect.width,
+            height: rect.height
+        )
+        let result = CaptureResult(
+            image: image,
+            mode: .area,
+            captureRect: captureRect,
+            appName: sourceApp?.name,
+            appBundleIdentifier: sourceApp?.bundleIdentifier,
+            displayID: screen.displayID
+        )
+        historyCoordinator?.saveCapture(result: result)
     }
 
     private func showToast(

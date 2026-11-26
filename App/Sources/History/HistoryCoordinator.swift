@@ -14,6 +14,17 @@ import SharedKit
 @MainActor
 @Observable
 final class HistoryCoordinator {
+    struct PDFImportProgress: Equatable {
+        let fileName: String
+        let completedPages: Int
+        let totalPages: Int
+
+        var fraction: Double {
+            guard totalPages > 0 else { return 0 }
+            return Double(completedPages) / Double(totalPages)
+        }
+    }
+
     private enum HistorySaveError: Error {
         case pngEncodingFailed
     }
@@ -21,6 +32,11 @@ final class HistoryCoordinator {
     let settings: AppSettings
     private let store: HistoryStore?
     private(set) var entries: [HistoryEntry] = []
+    private(set) var collections: [HistoryCollectionSummary] = []
+    private(set) var activeCollectionID: UUID?
+    private(set) var activeCollectionEntries: [HistoryEntry] = []
+    private(set) var pdfImportProgress: PDFImportProgress?
+    private(set) var pdfImportError: String?
     private(set) var totalSize: Int64 = 0
     var currentFilter: HistoryFilter = .all
     /// Cloud sharing coordinator — set by AppDelegate after creation.
@@ -36,10 +52,16 @@ final class HistoryCoordinator {
     private var dragFileURLs: [UUID: URL] = [:]
     private var dragPreparationTasks: [UUID: Task<Void, Never>] = [:]
     private var pendingCloudURLs = PendingHistoryCloudURLTracker()
+    private var pdfImportTask: Task<Void, Never>?
 
-    init(settings: AppSettings) {
+    init(settings: AppSettings, store: HistoryStore? = nil) {
         self.settings = settings
-        self.store = try? HistoryStore()
+        self.store = store ?? (try? HistoryStore())
+    }
+
+    var activeCollection: HistoryCollectionSummary? {
+        guard let activeCollectionID else { return nil }
+        return collections.first { $0.id == activeCollectionID }
     }
 
     // MARK: - Window
@@ -75,6 +97,17 @@ final class HistoryCoordinator {
         persistHeldCloudURLs(using: store)
         do {
             entries = try store.fetchAll(filter: currentFilter)
+            collections = try store.fetchCollectionSummaries()
+            if let activeCollectionID {
+                if collections.contains(where: { $0.id == activeCollectionID }) {
+                    activeCollectionEntries = try store.fetchCollectionEntries(collectionID: activeCollectionID)
+                } else {
+                    self.activeCollectionID = nil
+                    activeCollectionEntries = []
+                }
+            } else {
+                activeCollectionEntries = []
+            }
             totalSize = try store.totalFileSize()
         } catch {
             print("Failed to load history: \(error)")
@@ -84,6 +117,437 @@ final class HistoryCoordinator {
     func setFilter(_ filter: HistoryFilter) {
         currentFilter = filter
         loadEntries()
+    }
+
+    /// Returns all regular screenshots in history (used by the "Add Screenshots to Deck" picker).
+    func availableScreenshots() -> [HistoryEntry] {
+        guard let store else { return [] }
+        return (try? store.fetchAll(filter: .screenshots)) ?? []
+    }
+
+    // MARK: - PDF Collections
+
+    func openCollection(_ id: UUID) {
+        activeCollectionID = id
+        loadEntries()
+    }
+
+    func closeCollection() {
+        activeCollectionID = nil
+        activeCollectionEntries = []
+    }
+
+    func dismissPDFImportError() {
+        pdfImportError = nil
+    }
+
+    func renameCollection(_ id: UUID, to title: String) {
+        guard let store else { return }
+        do {
+            try store.renameCollection(id: id, title: title)
+            loadEntries()
+        } catch {
+            print("Failed to rename collection: \(error)")
+        }
+    }
+
+    func deleteCollection(_ id: UUID) {
+        guard let store else { return }
+        do {
+            let orphanedPages = try store.deleteCollection(id: id)
+            removeEntryDirectories(for: orphanedPages, in: store)
+            if activeCollectionID == id {
+                activeCollectionID = nil
+                activeCollectionEntries = []
+            }
+            loadEntries()
+        } catch {
+            print("Failed to delete collection: \(error)")
+        }
+    }
+
+    func addEntries(_ entries: [HistoryEntry], toCollection collectionID: UUID, insertAt index: Int? = nil) {
+        guard let store else { return }
+        let screenshotIDs = entries.filter { isScreenshot($0) }.map(\.id)
+        guard !screenshotIDs.isEmpty else { return }
+        do {
+            try store.addEntries(screenshotIDs, toCollection: collectionID, insertAt: index)
+            loadEntries()
+        } catch {
+            print("Failed to add entries to collection: \(error)")
+        }
+    }
+
+    func reorderCollection(_ collectionID: UUID, orderedEntryIDs: [UUID]) {
+        guard let store else { return }
+        do {
+            try store.reorderCollection(collectionID: collectionID, orderedEntryIDs: orderedEntryIDs)
+            loadEntries()
+        } catch {
+            print("Failed to reorder collection: \(error)")
+        }
+    }
+
+    func moveEntry(
+        _ entryID: UUID,
+        before targetEntryID: UUID,
+        inCollection collectionID: UUID
+    ) {
+        guard entryID != targetEntryID else { return }
+        var ids = (try? store?.fetchCollectionEntries(collectionID: collectionID).map(\.id)) ?? []
+        guard let sourceIndex = ids.firstIndex(of: entryID),
+              let targetIndex = ids.firstIndex(of: targetEntryID) else { return }
+        ids.remove(at: sourceIndex)
+        ids.insert(entryID, at: targetIndex)
+        reorderCollection(collectionID, orderedEntryIDs: ids)
+    }
+
+    func moveEntry(
+        _ entryID: UUID,
+        by offset: Int,
+        inCollection collectionID: UUID
+    ) {
+        var ids = (try? store?.fetchCollectionEntries(collectionID: collectionID).map(\.id)) ?? []
+        guard let sourceIndex = ids.firstIndex(of: entryID) else { return }
+        let targetIndex = max(0, min(ids.count - 1, sourceIndex + offset))
+        guard targetIndex != sourceIndex else { return }
+        ids.remove(at: sourceIndex)
+        ids.insert(entryID, at: targetIndex)
+        reorderCollection(collectionID, orderedEntryIDs: ids)
+    }
+
+    func removeEntries(_ entries: [HistoryEntry], fromCollection collectionID: UUID) {
+        guard let store, !entries.isEmpty else { return }
+        do {
+            let orphanedPages = try store.removeEntries(entries.map(\.id), fromCollection: collectionID)
+            removeEntryDirectories(for: orphanedPages, in: store)
+            loadEntries()
+        } catch {
+            print("Failed to remove entries from collection: \(error)")
+        }
+    }
+
+    @discardableResult
+    func pasteImageIntoCollection(_ collectionID: UUID, insertAt index: Int? = nil) -> Bool {
+        guard let cgImage = ClipboardImageReader.image(from: .general) else { return false }
+        addImage(cgImage, displayName: String(localized: "Pasted Image"), toCollection: collectionID, insertAt: index)
+        return true
+    }
+
+    func addImageFiles(_ urls: [URL], toCollection collectionID: UUID, insertAt index: Int? = nil) {
+        let supported = urls.filter { ImageFileReader.isSupported($0) }
+        guard !supported.isEmpty else { return }
+        var currentIndex = index
+        for url in supported {
+            guard let cgImage = ImageFileReader.image(at: url) else { continue }
+            let title = url.deletingPathExtension().lastPathComponent
+            addImage(cgImage, displayName: title, toCollection: collectionID, insertAt: currentIndex)
+            if let idx = currentIndex {
+                currentIndex = idx + 1
+            }
+        }
+    }
+
+    func addImage(_ image: CGImage, displayName: String, toCollection collectionID: UUID, insertAt index: Int? = nil) {
+        guard let store else { return }
+        let entryID = UUID()
+        let entryDir = store.entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
+        Task.detached(priority: .userInitiated) {
+            do {
+                try FileManager.default.createDirectory(at: entryDir, withIntermediateDirectories: true)
+                let fullImageName = "capture.png"
+                let fullImageURL = entryDir.appendingPathComponent(fullImageName)
+                guard let pngData = ImageUtilities.pngData(from: image) else {
+                    throw HistorySaveError.pngEncodingFailed
+                }
+                try pngData.write(to: fullImageURL, options: [.atomic])
+
+                let thumbName = "thumbnail.jpg"
+                let thumbURL = entryDir.appendingPathComponent(thumbName)
+                if let thumbData = ThumbnailGenerator.generateThumbnail(from: image) {
+                    try thumbData.write(to: thumbURL, options: [.atomic])
+                }
+
+                let entry = HistoryEntry(
+                    id: entryID,
+                    captureMode: .pdfPage,
+                    imageWidth: image.width,
+                    imageHeight: image.height,
+                    sourceAppName: displayName,
+                    thumbnailFileName: thumbName,
+                    fullImageFileName: fullImageName,
+                    fileSize: Int64(pngData.count)
+                )
+                try store.insertEntryAndAddToCollection(entry, collectionID: collectionID, insertAt: index)
+                await MainActor.run { self.loadEntries() }
+            } catch {
+                try? FileManager.default.removeItem(at: entryDir)
+                print("Failed to add image to collection: \(error)")
+            }
+        }
+    }
+
+    func importPDFWithPanel(intoCollectionID: UUID? = nil, insertAt index: Int? = nil) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.title = String(localized: "Import PDF")
+        panel.prompt = String(localized: "Import")
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        importPDFFiles(panel.urls, openHistoryWindow: false, intoCollectionID: intoCollectionID, insertAt: index)
+    }
+
+    func importPDFFiles(
+        _ urls: [URL],
+        openHistoryWindow: Bool = false,
+        intoCollectionID: UUID? = nil,
+        insertAt index: Int? = nil
+    ) {
+        let pdfURLs = urls.filter { $0.isFileURL && $0.pathExtension.lowercased() == "pdf" }
+        guard !pdfURLs.isEmpty else { return }
+        if openHistoryWindow {
+            showWindow()
+        }
+
+        pdfImportTask?.cancel()
+        pdfImportError = nil
+        pdfImportTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            var currentInsertIndex = index
+            var lastCreatedCollectionID: UUID?
+            for url in pdfURLs {
+                if Task.isCancelled { break }
+                if let collectionID = await self.importPDF(
+                    from: url,
+                    intoCollectionID: intoCollectionID,
+                    insertAt: currentInsertIndex
+                ) {
+                    lastCreatedCollectionID = collectionID
+                    if let idx = currentInsertIndex, let count = PDFDocument(url: url)?.pageCount {
+                        currentInsertIndex = idx + count
+                    }
+                }
+            }
+            self.pdfImportProgress = nil
+            self.pdfImportTask = nil
+            if let lastCreatedCollectionID, intoCollectionID == nil {
+                self.openCollection(lastCreatedCollectionID)
+            }
+        }
+    }
+
+    func cancelPDFImport() {
+        pdfImportTask?.cancel()
+        pdfImportTask = nil
+        pdfImportProgress = nil
+    }
+
+    /// Imports every page of `url` into a new collection (or into `intoCollectionID` when provided).
+    /// Returns the target collection ID on success.
+    @discardableResult
+    func importPDF(
+        from url: URL,
+        intoCollectionID: UUID? = nil,
+        insertAt index: Int? = nil,
+        password: String? = nil
+    ) async -> UUID? {
+        guard let store else { return nil }
+        guard let document = PDFDocument(url: url) else {
+            pdfImportError = String(localized: "Could not open PDF file \"\(url.lastPathComponent)\".")
+            return nil
+        }
+
+        let resolvedPassword: String?
+        if document.isLocked {
+            if let password {
+                resolvedPassword = password
+            } else if let prompted = promptForPDFPassword(fileName: url.lastPathComponent) {
+                resolvedPassword = prompted
+            } else {
+                return nil
+            }
+            guard let resolvedPassword, document.unlock(withPassword: resolvedPassword) else {
+                pdfImportError = String(localized: "Incorrect password for \"\(url.lastPathComponent)\".")
+                return nil
+            }
+        } else {
+            resolvedPassword = nil
+        }
+
+        let pageCount = document.pageCount
+        guard pageCount > 0 else {
+            pdfImportError = String(localized: "PDF file \"\(url.lastPathComponent)\" has no pages.")
+            return nil
+        }
+
+        let title = url.deletingPathExtension().lastPathComponent
+        let collectionID: UUID
+        let createdNewCollection: Bool
+        if let intoCollectionID {
+            collectionID = intoCollectionID
+            createdNewCollection = false
+        } else {
+            let collection = HistoryCollection(title: title)
+            do {
+                try store.createCollection(collection)
+                collectionID = collection.id
+                createdNewCollection = true
+            } catch {
+                pdfImportError = error.localizedDescription
+                return nil
+            }
+        }
+
+        let fileName = url.lastPathComponent
+        pdfImportProgress = PDFImportProgress(fileName: fileName, completedPages: 0, totalPages: pageCount)
+        loadEntries()
+
+        let entriesDirectory = store.entriesDirectory
+        var importedAnyPage = false
+
+        for pageIndex in 0..<pageCount {
+            if Task.isCancelled { break }
+            let targetInsertIndex = index.map { $0 + pageIndex }
+            let renderedSuccess: Bool = await Task.detached(priority: .userInitiated) {
+                autoreleasepool {
+                    guard let doc = PDFDocument(url: url) else { return false }
+                    if doc.isLocked, let resolvedPassword {
+                        guard doc.unlock(withPassword: resolvedPassword) else { return false }
+                    }
+                    guard let page = doc.page(at: pageIndex),
+                          let image = Self.renderPDFPage(page),
+                          let pngData = ImageUtilities.pngData(from: image) else {
+                        return false
+                    }
+
+                    let entryID = UUID()
+                    let entryDir = entriesDirectory.appendingPathComponent(entryID.uuidString, isDirectory: true)
+                    do {
+                        try FileManager.default.createDirectory(at: entryDir, withIntermediateDirectories: true)
+                        let fullImageName = "capture.png"
+                        try pngData.write(to: entryDir.appendingPathComponent(fullImageName), options: [.atomic])
+
+                        let thumbName = "thumbnail.jpg"
+                        if let thumbData = ThumbnailGenerator.generateThumbnail(from: image) {
+                            try thumbData.write(to: entryDir.appendingPathComponent(thumbName), options: [.atomic])
+                        }
+
+                        let entry = HistoryEntry(
+                            id: entryID,
+                            captureMode: .pdfPage,
+                            imageWidth: image.width,
+                            imageHeight: image.height,
+                            sourceAppName: title,
+                            sourceWindowTitle: String(localized: "Page \(pageIndex + 1)"),
+                            thumbnailFileName: thumbName,
+                            fullImageFileName: fullImageName,
+                            fileSize: Int64(pngData.count)
+                        )
+                        try store.insertEntryAndAddToCollection(
+                            entry,
+                            collectionID: collectionID,
+                            insertAt: targetInsertIndex
+                        )
+                        return true
+                    } catch {
+                        try? FileManager.default.removeItem(at: entryDir)
+                        return false
+                    }
+                }
+            }.value
+
+            if renderedSuccess {
+                importedAnyPage = true
+            }
+            pdfImportProgress = PDFImportProgress(
+                fileName: fileName,
+                completedPages: pageIndex + 1,
+                totalPages: pageCount
+            )
+            if pageIndex == 0 || (pageIndex + 1) % 5 == 0 || pageIndex + 1 == pageCount {
+                loadEntries()
+            }
+        }
+
+        if !importedAnyPage, createdNewCollection {
+            _ = try? store.deleteCollection(id: collectionID)
+            loadEntries()
+            return nil
+        }
+
+        loadEntries()
+        return collectionID
+    }
+
+    /// Renders a PDF page onto an opaque white sRGB bitmap suitable for annotation.
+    nonisolated static func renderPDFPage(
+        _ page: PDFPage,
+        scale: CGFloat = 2.0,
+        maxDimension: CGFloat = 2400
+    ) -> CGImage? {
+        let cropBounds = page.bounds(for: .cropBox)
+        let rawBounds = cropBounds.isEmpty ? page.bounds(for: .mediaBox) : cropBounds
+        guard rawBounds.width > 0, rawBounds.height > 0 else { return nil }
+
+        let rotation = ((page.rotation % 360) + 360) % 360
+        let rotatedSize = (rotation == 90 || rotation == 270)
+            ? CGSize(width: rawBounds.height, height: rawBounds.width)
+            : rawBounds.size
+
+        let longest = max(rotatedSize.width, rotatedSize.height)
+        let effectiveScale = min(scale, maxDimension / longest)
+        let pixelWidth = max(1, Int((rotatedSize.width * effectiveScale).rounded()))
+        let pixelHeight = max(1, Int((rotatedSize.height * effectiveScale).rounded()))
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(
+                data: nil,
+                width: pixelWidth,
+                height: pixelHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else {
+            return nil
+        }
+
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+        ctx.interpolationQuality = .high
+        ctx.scaleBy(
+            x: CGFloat(pixelWidth) / rotatedSize.width,
+            y: CGFloat(pixelHeight) / rotatedSize.height
+        )
+        let box: PDFDisplayBox = cropBounds.isEmpty ? .mediaBox : .cropBox
+        let transform = page.transform(for: box)
+        ctx.concatenate(transform)
+        page.draw(with: box, to: ctx)
+        return ctx.makeImage()
+    }
+
+    private func promptForPDFPassword(fileName: String) -> String? {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = String(localized: "Password Required")
+        alert.informativeText = String(localized: "Enter the password to unlock \"\(fileName)\".")
+        let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        alert.accessoryView = field
+        alert.addButton(withTitle: String(localized: "Unlock"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue
+    }
+
+    private func removeEntryDirectories(for entries: [HistoryEntry], in store: HistoryStore) {
+        let fm = FileManager.default
+        for entry in entries {
+            let entryDir = store.entriesDirectory.appendingPathComponent(entry.id.uuidString, isDirectory: true)
+            try? fm.removeItem(at: entryDir)
+            clearDragFileCache(for: entry)
+        }
     }
 
     // MARK: - Cloud URL
@@ -173,7 +637,7 @@ final class HistoryCoordinator {
             format = .gif
             fileExtension = "gif"
             contentType = "image/gif"
-        case .area, .fullscreen, .window:
+        case .area, .fullscreen, .window, .pdfPage:
             let type = UTType(filenameExtension: sourceURL.pathExtension.lowercased())
             return PreparedUpload(
                 url: sourceURL,
@@ -604,7 +1068,7 @@ final class HistoryCoordinator {
 
     private func isScreenshot(_ entry: HistoryEntry) -> Bool {
         switch entry.captureMode {
-        case .area, .fullscreen, .window:
+        case .area, .fullscreen, .window, .pdfPage:
             return true
         case .recording, .gif:
             return false
@@ -731,7 +1195,7 @@ final class HistoryCoordinator {
             pasteboard.clearContents()
             pasteboard.writeObjects([sourceURL as NSURL])
 
-        case .area, .fullscreen, .window:
+        case .area, .fullscreen, .window, .pdfPage:
             guard let image = Self.loadCGImage(from: sourceURL) else { return }
             copyScreenshotToClipboard(image, preferredFileURL: sourceURL)
         }
@@ -789,17 +1253,27 @@ final class HistoryCoordinator {
         }
     }
 
-    /// Combines the screenshots among `entries` into one PDF, oldest first,
-    /// one capture per page.
-    func exportAsPDF(_ entries: [HistoryEntry]) {
-        let screenshots = entries
-            .filter { preferredCaptureType(for: $0) == .screenshot }
-            .sorted { $0.createdAt < $1.createdAt }
+    /// Combines the screenshots among `entries` into one PDF, one capture per page.
+    /// By default sorts oldest-first (for chronological history groups); pass `preserveOrder: true`
+    /// for ordered PDF collections.
+    func exportAsPDF(
+        _ entries: [HistoryEntry],
+        preserveOrder: Bool = false,
+        defaultFileName: String? = nil
+    ) {
+        let filtered = entries.filter { preferredCaptureType(for: $0) == .screenshot }
+        let screenshots = preserveOrder ? filtered : filtered.sorted { $0.createdAt < $1.createdAt }
         let imageURLs = screenshots.compactMap { fullImageURL(for: $0) }
         guard let first = screenshots.first, !imageURLs.isEmpty else { return }
 
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Capso \(first.createdAt.formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month().day())).pdf"
+        if let defaultFileName, !defaultFileName.isEmpty {
+            panel.nameFieldStringValue = defaultFileName.lowercased().hasSuffix(".pdf")
+                ? defaultFileName
+                : "\(defaultFileName).pdf"
+        } else {
+            panel.nameFieldStringValue = "Capso \(first.createdAt.formatted(Date.ISO8601FormatStyle(timeZone: .current).year().month().day())).pdf"
+        }
         panel.allowedContentTypes = [.pdf]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let destURL = panel.url else { return }
@@ -809,6 +1283,24 @@ final class HistoryCoordinator {
                 print("Failed to export history as PDF")
             }
         }
+    }
+
+    func exportCollectionAsPDF(_ collection: HistoryCollection) {
+        guard let store,
+              let entries = try? store.fetchCollectionEntries(collectionID: collection.id),
+              !entries.isEmpty else { return }
+        exportAsPDF(entries, preserveOrder: true, defaultFileName: collection.title)
+    }
+
+    /// Writes `collection`'s ordered pages directly to `destinationURL`. Used by export and tests.
+    @discardableResult
+    func writeCollectionPDF(_ collectionID: UUID, to destinationURL: URL) -> Bool {
+        guard let store,
+              let entries = try? store.fetchCollectionEntries(collectionID: collectionID) else {
+            return false
+        }
+        let urls = entries.compactMap { fullImageURL(for: $0) }
+        return Self.writePDF(pages: urls, to: destinationURL)
     }
 
     nonisolated static func writePDF(pages imageURLs: [URL], to destinationURL: URL) -> Bool {
@@ -829,7 +1321,7 @@ final class HistoryCoordinator {
         switch entry.captureMode {
         case .recording, .gif:
             return .recording
-        case .area, .fullscreen, .window:
+        case .area, .fullscreen, .window, .pdfPage:
             return .screenshot
         }
     }
@@ -840,7 +1332,7 @@ final class HistoryCoordinator {
             return .gif
         case .recording:
             return .mp4
-        case .area, .fullscreen, .window:
+        case .area, .fullscreen, .window, .pdfPage:
             return FileFormat(pathExtension: sourceURL.pathExtension) ?? .png
         }
     }
