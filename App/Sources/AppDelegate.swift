@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dockPresenceController: DockPresenceController?
     private var automationURLRequestBuffer = AutomationURLRequestBuffer()
     private var imageFileOpenBuffer = ImageFileOpenBuffer()
+    private var pdfFileOpenBuffer = ImageFileOpenBuffer()
     /// Sparkle update coordinator used by preferences and manual update checks.
     let updateManager = UpdateManager()
 
@@ -89,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registerGlobalShortcuts()
         performPendingAutomationURLAction()
         performPendingImageFileOpen()
+        performPendingPDFFileOpen()
         historyCoordinator?.runCleanup()
 
         NotificationCenter.default.addObserver(
@@ -222,13 +224,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        let (imageFiles, remainder) = ImageFileOpenRequest.partition(urls: urls)
+        let (imageFiles, nonImageURLs) = ImageFileOpenRequest.partition(urls: urls)
+        let (pdfFiles, remainder) = ImageFileOpenRequest.partitionPDFs(urls: nonImageURLs)
 
-        // Opening image files is never gated by the Automation URLs toggle —
+        // Opening image and PDF files is never gated by the Automation URLs toggle —
         // that setting only governs the `capso://` automation scheme.
         if !imageFiles.isEmpty {
             imageFileOpenBuffer.enqueue(imageFiles)
             performPendingImageFileOpen()
+        }
+
+        if !pdfFiles.isEmpty {
+            pdfFileOpenBuffer.enqueue(pdfFiles)
+            performPendingPDFFileOpen()
         }
 
         guard !remainder.isEmpty else { return }
@@ -269,6 +277,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         captureCoordinator?.openImageFiles(urls)
+    }
+
+    private func performPendingPDFFileOpen() {
+        guard let urls = pdfFileOpenBuffer.takeIfReady(coordinatorIsReady: historyCoordinator != nil) else {
+            return
+        }
+        historyCoordinator?.importPDFFiles(urls, openHistoryWindow: true)
     }
 
     private func performPendingAutomationURLAction() {

@@ -22,6 +22,18 @@ struct ImageFileOpenRequestTests {
         #expect(result.imageFiles.isEmpty)
         #expect(result.remainder.isEmpty)
     }
+
+    @Test("partitionPDFs splits PDF files from other URLs")
+    func partitionPDFsSplitsPDFFiles() throws {
+        let deck = URL(fileURLWithPath: "/tmp/slides.PDF")
+        let automation = try #require(URL(string: "capso://grab/area"))
+        let notes = URL(fileURLWithPath: "/tmp/notes.txt")
+
+        let result = ImageFileOpenRequest.partitionPDFs(urls: [deck, automation, notes])
+
+        #expect(result.pdfFiles == [deck])
+        #expect(result.remainder == [automation, notes])
+    }
 }
 
 @Suite("ImageFileOpenBuffer")

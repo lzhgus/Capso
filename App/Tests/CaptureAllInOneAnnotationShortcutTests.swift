@@ -1,6 +1,8 @@
 import AppKit
 import AnnotationKit
 import CaptureKit
+import HistoryKit
+import SharedKit
 import XCTest
 
 @testable import Capso
@@ -423,6 +425,48 @@ final class CaptureAllInOneAnnotationShortcutTests: XCTestCase {
             windowNumber: canvasWindow2.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
         )))
         XCTAssertTrue(canvas2.isEditingText)
+    }
+
+    func testAllInOneCommandCRecordsRenderedCaptureToHistory() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let settings = AppSettings()
+        let previousHistoryEnabled = settings.historyEnabled
+        settings.historyEnabled = true
+        defer { settings.historyEnabled = previousHistoryEnabled }
+
+        let store = try HistoryStore(directory: tempDir)
+        let historyCoordinator = HistoryCoordinator(settings: settings, store: store)
+        let captureCoordinator = CaptureCoordinator(settings: settings)
+        captureCoordinator.historyCoordinator = historyCoordinator
+
+        let screen = try XCTUnwrap(NSScreen.main)
+        let frozenImage = try makeImage(size: screen.frame.size)
+        captureCoordinator.showAllInOneToolbarForTesting(
+            selectionRect: CGRect(x: 100, y: 100, width: 240, height: 160),
+            screen: screen,
+            frozenImage: frozenImage
+        )
+        defer { captureCoordinator.dismissAllInOneForTesting() }
+
+        let event = try commandEvent(
+            character: "c",
+            keyCode: 8,
+            modifiers: .command,
+            windowNumber: NSApp.keyWindow?.windowNumber ?? 0
+        )
+        NSApp.sendEvent(event)
+
+        let deadline = Date(timeIntervalSinceNow: 2.0)
+        while Date() < deadline {
+            if ((try? store.count(filter: .screenshots)) ?? 0) == 1 {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertEqual(try store.count(filter: .screenshots), 1)
     }
 
     private func makeImage(size: CGSize) throws -> CGImage {

@@ -48,9 +48,10 @@ public enum HistoryCleanup {
         return expired.count
     }
 
-    /// Delete all history entries and their files.
+    /// Delete all history entries, collections, and their files.
     public static func clearAll(store: HistoryStore) throws {
-        let all = try store.fetchAll()
+        try store.deleteAllCollections()
+        let all = try store.fetchAllIncludingCollectionPages()
         let fm = FileManager.default
         for entry in all {
             try store.delete(id: entry.id)
